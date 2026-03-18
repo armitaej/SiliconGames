@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SiliconGames — Digital Arcade</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;700;900&display=swap');
+
+:root {
+  --neon-pink: #ff2d75;
+  --neon-cyan: #00f0ff;
+  --neon-green: #39ff14;
+  --neon-yellow: #ffe600;
+  --neon-purple: #b44dff;
+  --bg-dark: #0a0a12;
+  --bg-card: #111122;
+  --scanline-opacity: 0.04;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg-dark);
+  color: #e0e0e0;
+  font-family: 'Orbitron', 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* CRT Scanline overlay on the whole page */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, var(--scanline-opacity)) 2px,
+    rgba(0, 0, 0, var(--scanline-opacity)) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Animated grid background */
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,240,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,240,255,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: gridScroll 20s linear infinite;
+  z-index: 0;
+}
+@keyframes gridScroll {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(60px); }
+}
+
+/* Floating particles */
+.particles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+.particle {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  animation: float linear infinite;
+  opacity: 0;
+}
+@keyframes float {
+  0% { transform: translateY(100vh) scale(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+}
+
+/* Header */
+header {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 50px 20px 20px;
+}
+
+.logo {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(28px, 5vw, 56px);
+  letter-spacing: 4px;
+  color: #fff;
+  text-shadow:
+    0 0 10px var(--neon-cyan),
+    0 0 20px var(--neon-cyan),
+    0 0 40px var(--neon-cyan),
+    0 0 80px rgba(0,240,255,0.3);
+  animation: logoGlow 3s ease-in-out infinite alternate;
+  margin-bottom: 8px;
+}
+@keyframes logoGlow {
+  0% { text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan), 0 0 40px var(--neon-cyan), 0 0 80px rgba(0,240,255,0.3); }
+  100% { text-shadow: 0 0 5px var(--neon-pink), 0 0 15px var(--neon-pink), 0 0 30px var(--neon-pink), 0 0 60px rgba(255,45,117,0.3); }
+}
+
+.tagline {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(11px, 1.8vw, 16px);
+  color: var(--neon-cyan);
+  letter-spacing: 8px;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 6px;
+}
+
+.coin-counter {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 8px rgba(255,230,0,0.5);
+  margin-top: 10px;
+  animation: blink 1.2s steps(2) infinite;
+}
+@keyframes blink {
+  50% { opacity: 0.6; }
+}
+
+/* Decorative neon line */
+.neon-line {
+  width: 80%;
+  max-width: 700px;
+  height: 2px;
+  margin: 20px auto 40px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-pink), var(--neon-cyan), transparent);
+  box-shadow: 0 0 8px var(--neon-cyan), 0 0 16px rgba(0,240,255,0.3);
+  animation: lineShimmer 4s ease-in-out infinite;
+}
+@keyframes lineShimmer {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+/* Games Grid */
+.arcade-floor {
+  position: relative;
+  z-index: 10;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 28px;
+  justify-items: center;
+}
+
+/* Game Cabinet Card */
+.cabinet {
+  width: 100%;
+  max-width: 340px;
+  background: var(--bg-card);
+  border: 2px solid #222;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+.cabinet::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-pink), var(--neon-purple));
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.cabinet:hover::before {
+  opacity: 1;
+}
+.cabinet:hover {
+  transform: translateY(-8px) scale(1.02);
+  border-color: transparent;
+  box-shadow:
+    0 20px 60px rgba(0,240,255,0.15),
+    0 0 30px rgba(255,45,117,0.1);
+}
+
+.cabinet-screen {
+  width: 100%;
+  aspect-ratio: 16/10;
+  background: #080818;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* CRT effect on the game preview */
+.cabinet-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.08) 1px,
+    rgba(0, 0, 0, 0.08) 2px
+  );
+  pointer-events: none;
+}
+
+.screen-art {
+  font-size: 64px;
+  filter: drop-shadow(0 0 20px currentColor);
+  animation: cabinetPulse 2s ease-in-out infinite alternate;
+}
+@keyframes cabinetPulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 15px currentColor); }
+  100% { transform: scale(1.05); filter: drop-shadow(0 0 25px currentColor); }
+}
+
+/* Per-game colors */
+.cabinet[data-game="lolo"] .screen-art { color: var(--neon-pink); }
+.cabinet[data-game="lolo"] .game-title { color: var(--neon-pink); text-shadow: 0 0 10px rgba(255,45,117,0.5); }
+.cabinet[data-game="lolo"] .play-btn { background: var(--neon-pink); box-shadow: 0 0 20px rgba(255,45,117,0.4); }
+
+.cabinet[data-game="starwars"] .screen-art { color: var(--neon-yellow); }
+.cabinet[data-game="starwars"] .game-title { color: var(--neon-yellow); text-shadow: 0 0 10px rgba(255,230,0,0.5); }
+.cabinet[data-game="starwars"] .play-btn { background: var(--neon-yellow); color: #000; box-shadow: 0 0 20px rgba(255,230,0,0.4); }
+
+.cabinet[data-game="snake"] .screen-art { color: var(--neon-green); }
+.cabinet[data-game="snake"] .game-title { color: var(--neon-green); text-shadow: 0 0 10px rgba(57,255,20,0.5); }
+.cabinet[data-game="snake"] .play-btn { background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57,255,20,0.4); }
+
+.cabinet[data-game="ssb"] .screen-art { color: var(--neon-purple); }
+.cabinet[data-game="ssb"] .game-title { color: var(--neon-purple); text-shadow: 0 0 10px rgba(180,77,255,0.5); }
+.cabinet[data-game="ssb"] .play-btn { background: var(--neon-purple); box-shadow: 0 0 20px rgba(180,77,255,0.4); }
+
+.cabinet[data-game="swbounty"] .screen-art { color: var(--neon-cyan); }
+.cabinet[data-game="swbounty"] .game-title { color: var(--neon-cyan); text-shadow: 0 0 10px rgba(0,240,255,0.5); }
+.cabinet[data-game="swbounty"] .play-btn { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(0,240,255,0.4); }
+
+.cabinet-info {
+  padding: 20px;
+  text-align: center;
+}
+
+.game-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+.game-desc {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.game-tags {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.tag {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #aaa;
+  font-family: 'Orbitron', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.play-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  padding: 10px 28px;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+.play-btn:hover {
+  transform: scale(1.08);
+  filter: brightness(1.2);
+}
+
+/* Game iframe overlay */
+#game-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  display: none;
+  flex-direction: column;
+}
+#game-overlay.active {
+  display: flex;
+}
+
+#game-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #0a0a16;
+  border-bottom: 2px solid #222;
+  min-height: 48px;
+  z-index: 10;
+}
+
+#game-topbar-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0,240,255,0.5);
+}
+
+.back-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  padding: 8px 18px;
+  background: none;
+  border: 2px solid var(--neon-pink);
+  color: var(--neon-pink);
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+.back-btn:hover {
+  background: var(--neon-pink);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(255,45,117,0.4);
+}
+
+#game-frame {
+  flex: 1;
+  border: none;
+  width: 100%;
+  background: #000;
+}
+
+/* Footer */
+footer {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 30px 20px 40px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  color: #444;
+  letter-spacing: 2px;
+}
+footer a {
+  color: var(--neon-cyan);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+footer a:hover { color: var(--neon-pink); }
+
+/* Responsive */
+@media (max-width: 700px) {
+  .games-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .cabinet { max-width: 100%; }
+  header { padding: 30px 16px 16px; }
+  .logo { letter-spacing: 2px; }
+  .tagline { letter-spacing: 3px; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+
+<div class="particles" id="particles"></div>
+
+<header>
+  <div class="logo">SILICON GAMES</div>
+  <div class="tagline">Digital Arcade</div>
+  <div class="coin-counter">INSERT COIN TO PLAY</div>
+</header>
+
+<div class="neon-line"></div>
+
+<main class="arcade-floor">
+  <div class="games-grid">
+
+    <!-- Lolo's Quest -->
+    <div class="cabinet" data-game="lolo" onclick="launchGame('games/lolo-puzzle.html', 'LOLO\'S QUEST')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3AE;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Lolo's Quest</div>
+        <div class="game-desc">Navigate deadly dungeons, solve block puzzles, dodge enemies, and collect hearts to escape each level.</div>
+        <div class="game-tags">
+          <span class="tag">Puzzle</span>
+          <span class="tag">Action</span>
+          <span class="tag">10 Levels</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+      </div>
+    </div>
+
+    <!-- Star Wars: Galaxy Bounty -->
+    <div class="cabinet" data-game="starwars" onclick="launchGame('games/star_wars_game.html', 'STAR WARS: GALAXY BOUNTY')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F680;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Galaxy Bounty</div>
+        <div class="game-desc">Choose your bounty hunter and blast through the galaxy in this Star Wars-inspired space combat adventure.</div>
+        <div class="game-tags">
+          <span class="tag">Action</span>
+          <span class="tag">Space</span>
+          <span class="tag">Shooter</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+      </div>
+    </div>
+
+    <!-- Snake Gauntlet -->
+    <div class="cabinet" data-game="snake" onclick="launchGame('games/snake.html', 'SNAKE GAUNTLET')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F40D;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Snake Gauntlet</div>
+        <div class="game-desc">The classic snake game evolved — survive waves of challenges, power-ups, and obstacles in this intense gauntlet.</div>
+        <div class="game-tags">
+          <span class="tag">Classic</span>
+          <span class="tag">Arcade</span>
+          <span class="tag">Survival</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+      </div>
+    </div>
+
+    <!-- Super Smash Bros N64 -->
+    <div class="cabinet" data-game="ssb" onclick="launchGame('games/ssb-n64.html', 'SUPER SMASH ARENA')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F4A5;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Smash Arena</div>
+        <div class="game-desc">16 fighters, one arena. Pick your character, master their specials, and smash your opponent off the stage.</div>
+        <div class="game-tags">
+          <span class="tag">Fighting</span>
+          <span class="tag">2 Player</span>
+          <span class="tag">16 Fighters</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+      </div>
+    </div>
+
+    <!-- Star Wars: Galaxy Bounty (Side-Scroller) -->
+    <div class="cabinet" data-game="swbounty" onclick="launchGame('games/star-wars-bounty.html', 'STAR WARS: GALAXY BOUNTY')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x2694;&#xFE0F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Galaxy Bounty II</div>
+        <div class="game-desc">8 Star Wars characters, 5 levels of increasing danger. Jetpacks, lightsabers, and force powers await.</div>
+        <div class="game-tags">
+          <span class="tag">Platformer</span>
+          <span class="tag">Shooter</span>
+          <span class="tag">5 Levels</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  SILICON GAMES &copy; 2026 &mdash; Built by <a href="#">Evan</a>
+</footer>
+
+<!-- Game Overlay -->
+<div id="game-overlay">
+  <div id="game-topbar">
+    <button class="back-btn" onclick="closeGame()">&#9664; BACK TO ARCADE</button>
+    <div id="game-topbar-title"></div>
+  </div>
+  <iframe id="game-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+</div>
+
+<script>
+// Floating particles
+(function() {
+  const container = document.getElementById('particles');
+  const colors = ['#ff2d75', '#00f0ff', '#39ff14', '#b44dff', '#ffe600'];
+  for (let i = 0; i < 40; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.boxShadow = `0 0 6px ${p.style.background}`;
+    p.style.animationDuration = (8 + Math.random() * 16) + 's';
+    p.style.animationDelay = (Math.random() * 12) + 's';
+    p.style.width = (1.5 + Math.random() * 2.5) + 'px';
+    p.style.height = p.style.width;
+    container.appendChild(p);
+  }
+})();
+
+// Launch game in iframe
+function launchGame(url, title) {
+  const overlay = document.getElementById('game-overlay');
+  const frame = document.getElementById('game-frame');
+  const titleEl = document.getElementById('game-topbar-title');
+  frame.src = url;
+  titleEl.textContent = title;
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeGame() {
+  const overlay = document.getElementById('game-overlay');
+  const frame = document.getElementById('game-frame');
+  frame.src = '';
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// ESC key to close game
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeGame();
+});
+
+// Coin counter text cycle
+const coinTexts = ['INSERT COIN TO PLAY', 'SELECT A GAME', 'PRESS START', 'PLAYER 1 READY'];
+let coinIdx = 0;
+setInterval(() => {
+  coinIdx = (coinIdx + 1) % coinTexts.length;
+  document.querySelector('.coin-counter').textContent = coinTexts[coinIdx];
+}, 2500);
+</script>
+</body>
+</html>

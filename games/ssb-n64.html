@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Smash Bros N64 - HTML5</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            border: 4px solid #333;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+    </style>
+</head>
+<body>
+<canvas id="game" width="900" height="600"></canvas>
+
+<script>
+// ═════════════════════════════════════════════════════════════════════════════
+//  SUPER SMASH BROS N64 - HTML5/Canvas Implementation
+// ═════════════════════════════════════════════════════════════════════════════
+
+const GW = 900, GH = 600;
+const ARENA_H = 510;
+const FPS = 60;
+const STOCKS = 3;
+const GRAV = 0.7, MAX_FALL = 18;
+const FRIC = 0.82, AIRFRIC = 0.92;
+
+let gameState = 'title';
+let frameCount = 0;
+let particles = [];
+let projectiles = [];
+let screenShake = 0;
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  UTILITY FUNCTIONS
+// ═════════════════════════════════════════════════════════════════════════════
+
+function rgb(hex) {
+    hex = hex.replace('#', '');
+    return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+}
+
+function blend(c, amt = 0.5) {
+    return [
+        Math.min(255, Math.floor(c[0] + (255 - c[0]) * amt)),
+        Math.min(255, Math.floor(c[1] + (255 - c[1]) * amt)),
+        Math.min(255, Math.floor(c[2] + (255 - c[2]) * amt))
+    ];
+}
+
+function darken(c, amt = 0.4) {
+    return [
+        Math.max(0, Math.floor(c[0] * (1 - amt))),
+        Math.max(0, Math.floor(c[1] * (1 - amt))),
+        Math.max(0, Math.floor(c[2] * (1 - amt)))
+    ];
+}
+
+function makeSound(freq = 440, duration = 0.1) {
+    return { freq, duration };
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  SOUND MANAGER
+// ═════════════════════════════════════════════════════════════════════════════
+
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(freq, duration = 0.1, volume = 0.2) {
+    try {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(volume, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+        osc.start(audioContext.currentTime);
+        osc.stop(audioContext.currentTime + duration);
+    } catch (e) {}
+}
+
+const SND_HIT = () => playSound(150, 0.1, 0.3);
+const SND_JUMP = () => playSound(400, 0.08, 0.2);
+const SND_LAND = () => playSound(100, 0.06, 0.2);
+const SND_KO = () => playSound(200, 0.35, 0.2);
+const SND_SPECIAL = () => playSound(350, 0.12, 0.2);
+const SND_MENU = () => playSound(500, 0.05, 0.15);
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  CHARACTER DEFINITIONS
+// ═════════════════════════════════════════════════════════════════════════════
+
+const CHARS = [
+    { id: 'mario', name: 'Mario', desc: 'Balanced all-rounder',
+      c1: '#E53935', c2: '#1565C0', c3: '#FDBCB4', c4: '#E53935',
+      w: 36, h: 50, weight: 100, speed: 5.5, jp: 15, aJumps: 1, fall: 0.70,
+      jab: { d: 9, kb: 5, a: 40 }, aerial: { d: 10, kb: 6, a: 55 },
+      uatk: { d: 11, kb: 9, a: 85 }, datk: { d: 9, kb: 6, a: 270 },
+      special: 'fireball' },
+    { id: 'luigi', name: 'Luigi', desc: 'Floaty with a punch',
+      c1: '#43A047', c2: '#1565C0', c3: '#FDBCB4', c4: '#43A047',
+      w: 36, h: 54, weight: 100, speed: 5.0, jp: 16, aJumps: 1, fall: 0.62,
+      jab: { d: 8, kb: 5, a: 35 }, aerial: { d: 9, kb: 6, a: 55 },
+      uatk: { d: 12, kb: 11, a: 88 }, datk: { d: 8, kb: 5, a: 270 },
+      special: 'green_fire' },
+    { id: 'dk', name: 'Donkey Kong', desc: 'Slow but massive power',
+      c1: '#5D4037', c2: '#E53935', c3: '#8D6E37', c4: '#E53935',
+      w: 50, h: 60, weight: 127, speed: 4.5, jp: 14, aJumps: 1, fall: 0.85,
+      jab: { d: 12, kb: 7, a: 30 }, aerial: { d: 13, kb: 8, a: 45 },
+      uatk: { d: 13, kb: 10, a: 88 }, datk: { d: 12, kb: 8, a: 270 },
+      special: 'giant_punch' },
+    { id: 'link', name: 'Link', desc: 'Sword and boomerang',
+      c1: '#388E3C', c2: '#8D6E37', c3: '#FDBCB4', c4: '#F9A825',
+      w: 38, h: 54, weight: 104, speed: 5.0, jp: 15, aJumps: 1, fall: 0.72,
+      jab: { d: 10, kb: 5, a: 38 }, aerial: { d: 12, kb: 7, a: 50 },
+      uatk: { d: 12, kb: 9, a: 82 }, datk: { d: 10, kb: 7, a: 270 },
+      special: 'boomerang' },
+    { id: 'samus', name: 'Samus', desc: 'Charge shot powerhouse',
+      c1: '#FF6D00', c2: '#FF6D00', c3: '#FF6D00', c4: '#FFCA28',
+      w: 40, h: 54, weight: 108, speed: 4.8, jp: 14, aJumps: 1, fall: 0.68,
+      jab: { d: 9, kb: 5, a: 35 }, aerial: { d: 11, kb: 7, a: 50 },
+      uatk: { d: 10, kb: 8, a: 83 }, datk: { d: 9, kb: 6, a: 270 },
+      special: 'charge_shot' },
+    { id: 'falcon', name: 'C. Falcon', desc: 'FALCON PUUUNCH',
+      c1: '#1565C0', c2: '#1565C0', c3: '#FDBCB4', c4: '#E53935',
+      w: 38, h: 56, weight: 104, speed: 7.0, jp: 16, aJumps: 1, fall: 0.95,
+      jab: { d: 10, kb: 6, a: 40 }, aerial: { d: 12, kb: 8, a: 55 },
+      uatk: { d: 11, kb: 9, a: 80 }, datk: { d: 10, kb: 7, a: 280 },
+      special: 'falcon_punch' },
+    { id: 'ness', name: 'Ness', desc: 'PSI power fighter',
+      c1: '#1565C0', c2: '#E53935', c3: '#FDBCB4', c4: '#FFEB3B',
+      w: 34, h: 48, weight: 94, speed: 5.2, jp: 14, aJumps: 1, fall: 0.65,
+      jab: { d: 8, kb: 5, a: 40 }, aerial: { d: 10, kb: 6, a: 55 },
+      uatk: { d: 11, kb: 10, a: 85 }, datk: { d: 9, kb: 6, a: 270 },
+      special: 'pk_fire' },
+    { id: 'kirby', name: 'Kirby', desc: '5 jumps, copy ability',
+      c1: '#F48FB1', c2: '#F48FB1', c3: '#F48FB1', c4: '#EF5350',
+      w: 36, h: 40, weight: 80, speed: 5.0, jp: 14, aJumps: 5, fall: 0.50,
+      jab: { d: 7, kb: 4, a: 40 }, aerial: { d: 9, kb: 5, a: 50 },
+      uatk: { d: 10, kb: 8, a: 88 }, datk: { d: 8, kb: 5, a: 270 },
+      special: 'inhale' },
+    { id: 'fox', name: 'Fox', desc: 'Speed and rapid fire',
+      c1: '#ECEFF1', c2: '#FF6D00', c3: '#FDBCB4', c4: '#FF6D00',
+      w: 34, h: 48, weight: 80, speed: 7.0, jp: 16, aJumps: 1, fall: 1.00,
+      jab: { d: 8, kb: 4, a: 38 }, aerial: { d: 9, kb: 5, a: 50 },
+      uatk: { d: 10, kb: 8, a: 88 }, datk: { d: 9, kb: 6, a: 270 },
+      special: 'blaster' },
+    { id: 'pikachu', name: 'Pikachu', desc: 'Electric thunder attacks',
+      c1: '#FFD600', c2: '#FFD600', c3: '#FFD600', c4: '#EF5350',
+      w: 32, h: 40, weight: 78, speed: 6.2, jp: 15, aJumps: 1, fall: 0.60,
+      jab: { d: 7, kb: 4, a: 38 }, aerial: { d: 9, kb: 5, a: 50 },
+      uatk: { d: 10, kb: 8, a: 85 }, datk: { d: 8, kb: 5, a: 270 },
+      special: 'thunder_jolt' },
+    { id: 'jigglypuff', name: 'Jigglypuff', desc: '5 jumps + Sing',
+      c1: '#F8BBD0', c2: '#F8BBD0', c3: '#F8BBD0', c4: '#CE93D8',
+      w: 34, h: 38, weight: 68, speed: 4.8, jp: 17, aJumps: 5, fall: 0.40,
+      jab: { d: 6, kb: 4, a: 38 }, aerial: { d: 10, kb: 7, a: 50 },
+      uatk: { d: 9, kb: 7, a: 85 }, datk: { d: 7, kb: 5, a: 270 },
+      special: 'sing' },
+    { id: 'yoshi', name: 'Yoshi', desc: 'Egg throw, flutter jump',
+      c1: '#43A047', c2: '#FFFFFF', c3: '#FDBCB4', c4: '#EF5350',
+      w: 40, h: 48, weight: 108, speed: 5.5, jp: 15, aJumps: 2, fall: 0.55,
+      jab: { d: 8, kb: 5, a: 35 }, aerial: { d: 11, kb: 7, a: 50 },
+      uatk: { d: 10, kb: 8, a: 82 }, datk: { d: 9, kb: 6, a: 270 },
+      special: 'egg_throw' },
+    { id: 'metalmario', name: 'Metal Mario', desc: 'Incredibly heavy punch',
+      c1: '#9E9E9E', c2: '#757575', c3: '#BDBDBD', c4: '#9E9E9E',
+      w: 38, h: 50, weight: 155, speed: 4.0, jp: 11, aJumps: 1, fall: 1.10,
+      jab: { d: 14, kb: 8, a: 30 }, aerial: { d: 15, kb: 9, a: 45 },
+      uatk: { d: 14, kb: 11, a: 80 }, datk: { d: 13, kb: 9, a: 270 },
+      special: 'metal_punch' },
+    { id: 'masterhand', name: 'Master Hand', desc: 'The final boss fights back',
+      c1: '#F5F5F5', c2: '#E0E0E0', c3: '#FAFAFA', c4: '#BDBDBD',
+      w: 80, h: 60, weight: 160, speed: 3.5, jp: 0, aJumps: 0, fall: 0.30, hover: true,
+      jab: { d: 18, kb: 12, a: 30 }, aerial: { d: 18, kb: 12, a: 40 },
+      uatk: { d: 16, kb: 10, a: 80 }, datk: { d: 20, kb: 16, a: 270 },
+      special: 'laser_beam' },
+    { id: 'bowser', name: 'Bowser', desc: 'Fire breath, heavy shell',
+      c1: '#388E3C', c2: '#F9A825', c3: '#FDBCB4', c4: '#EF5350',
+      w: 54, h: 64, weight: 136, speed: 3.8, jp: 12, aJumps: 1, fall: 0.90,
+      jab: { d: 14, kb: 9, a: 32 }, aerial: { d: 14, kb: 9, a: 45 },
+      uatk: { d: 14, kb: 12, a: 85 }, datk: { d: 13, kb: 10, a: 270 },
+      special: 'fire_breath' },
+    { id: 'waluigi', name: 'Waluigi', desc: 'Whirluigi spin attack',
+      c1: '#6A1B9A', c2: '#6A1B9A', c3: '#FDBCB4', c4: '#FFD600',
+      w: 34, h: 60, weight: 96, speed: 5.8, jp: 15, aJumps: 1, fall: 0.65,
+      jab: { d: 9, kb: 5, a: 40 }, aerial: { d: 10, kb: 6, a: 55 },
+      uatk: { d: 11, kb: 8, a: 85 }, datk: { d: 9, kb: 6, a: 270 },
+      special: 'whirluigi' },
+    { id: 'warrior', name: 'Warrior', desc: 'Counter-attack specialist',
+      c1: '#78909C', c2: '#EF5350', c3: '#FDBCB4', c4: '#CFD8DC',
+      w: 40, h: 54, weight: 118, speed: 4.8, jp: 13, aJumps: 1, fall: 0.78,
+      jab: { d: 11, kb: 6, a: 38 }, aerial: { d: 13, kb: 8, a: 50 },
+      uatk: { d: 12, kb: 10, a: 85 }, datk: { d: 11, kb: 8, a: 270 },
+      special: 'shield_bash' },
+    { id: 'polygon', name: 'Polygon', desc: 'Unpredictable morph attacks',
+      c1: '#E91E63', c2: '#FF9800', c3: '#FFEB3B', c4: '#4CAF50',
+      w: 40, h: 50, weight: 90, speed: 6.0, jp: 15, aJumps: 1, fall: 0.60,
+      jab: { d: 10, kb: 6, a: 45 }, aerial: { d: 11, kb: 7, a: 55 },
+      uatk: { d: 12, kb: 9, a: 88 }, datk: { d: 10, kb: 7, a: 270 },
+      special: 'morph' }
+];
+
+const SPECIALS = {
+    fireball: { type: 'proj', color: '#FF5722', speed: 8, dmg: 12, kb: 4, angle: 15, bounce: true, init_vy: -1 },
+    green_fire: { type: 'proj', color: '#69F0AE', speed: 6, dmg: 10, kb: 3, angle: 10, bounce: true, init_vy: 0 },
+    giant_punch: { type: 'charge', color: '#8D6E37', max_charge: 80, dmg: 28, kb: 22, angle: 30 },
+    boomerang: { type: 'proj', color: '#F9A825', speed: 9, dmg: 10, kb: 4, angle: 20, returns: true },
+    charge_shot: { type: 'charge', color: '#FF6D00', max_charge: 120, dmg: 26, kb: 20, angle: 12 },
+    falcon_punch: { type: 'charge', color: '#FF3D00', max_charge: 40, dmg: 27, kb: 24, angle: 35 },
+    pk_fire: { type: 'proj', color: '#40C4FF', speed: 9, dmg: 14, kb: 8, angle: 65, init_vy: -9 },
+    inhale: { type: 'area', color: '#F48FB1', radius: 90, dmg: 8, kb: 7, angle: 50 },
+    blaster: { type: 'proj', color: '#42A5F5', speed: 14, dmg: 7, kb: 2, angle: 5, rapid: true },
+    thunder_jolt: { type: 'proj', color: '#FFD600', speed: 5, dmg: 11, kb: 6, angle: 40, ground_roll: true },
+    sing: { type: 'area', color: '#CE93D8', radius: 110, dmg: 5, kb: 0, angle: 0, sleep: true },
+    egg_throw: { type: 'proj', color: '#F9A825', speed: 7, dmg: 11, kb: 6, angle: 45, init_vy: -8, arc: true },
+    metal_punch: { type: 'charge', color: '#9E9E9E', max_charge: 20, dmg: 32, kb: 28, angle: 25 },
+    laser_beam: { type: 'proj', color: '#FFEB3B', speed: 16, dmg: 15, kb: 8, angle: 5 },
+    fire_breath: { type: 'continuous', color: '#FF5722', dmg: 3, kb: 2, angle: 30, range: 130 },
+    whirluigi: { type: 'spin', color: '#AB47BC', dmg: 16, kb: 11, angle: 50, radius: 70 },
+    shield_bash: { type: 'counter', color: '#90A4AE', dmg: 18, kb: 14, angle: 65 },
+    morph: { type: 'proj', color: '#E91E63', speed: 7, dmg: 20, kb: 15, angle: 45 }
+};
+
+const STAGE = {
+    plats: [
+        { x: 100, y: 480, w: 700, h: 30, main: true },
+        { x: 135, y: 355, w: 190, h: 14 },
+        { x: 575, y: 355, w: 190, h: 14 },
+        { x: 380, y: 272, w: 140, h: 14 }
+    ],
+    blast_l: -280, blast_r: 1180, blast_t: -260, blast_b: 650,
+    spawn_p1: [320, 430], spawn_p2: [580, 430]
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  PARTICLE SYSTEM
+// ═════════════════════════════════════════════════════════════════════════════
+
+function spawnParticles(x, y, color, count = 8, speed = 4) {
+    const c = typeof color === 'string' ? rgb(color) : color;
+    for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const s = Math.random() * speed + 1;
+        const life = Math.floor(Math.random() * 25) + 20;
+        particles.push({
+            x, y,
+            vx: Math.cos(angle) * s,
+            vy: Math.sin(angle) * s - 2,
+            life, maxLife: life,
+            color: c,
+            size: Math.random() * 3 + 2
+        });
+    }
+}
+
+function spawnHitEffect(x, y, color) {
+    spawnParticles(x, y, color, 8, 5);
+    spawnParticles(x, y, [255, 255, 255], 4, 3);
+}
+
+function updateParticles() {
+    particles = particles.filter(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.95;
+        p.vy += 0.08;
+        p.life--;
+        return p.life > 0;
+    });
+}
+
+function drawParticles(ctx) {
+    particles.forEach(p => {
+        const alpha = p.life / p.maxLife;
+        ctx.fillStyle = `rgba(${p.color[0]}, ${p.color[1]}, ${p.color[2]}, ${alpha * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  CHARACTER DRAWING
+// ═════════════════════════════════════════════════════════════════════════════
+
+function drawRect(ctx, color, cx, feetY, w, h) {
+    ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    ctx.fillRect(cx - w / 2, feetY - h, w, h);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx - w / 2, feetY - h, w, h);
+}
+
+function drawCircle(ctx, color, cx, cy, r) {
+    ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+}
+
+function drawEye(ctx, cx, cy) {
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(cx + 1, cy - 1, 1, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawSwing(state, animFrame, scale = 6) {
+    return state === 'walk' ? Math.sin(animFrame * 0.5) * scale : 0;
+}
+
+function drawHumanoidLegs(ctx, cx, cy, pantColor, shoeColor, swing, lw = 8, lh = 16, sw = 9, sh = 7) {
+    // Left leg
+    drawRect(ctx, pantColor, cx - lw / 2 - 1, cy - sh + swing, lw, lh - sh);
+    drawRect(ctx, shoeColor, cx - lw / 2 - 2, cy + swing, sw, sh);
+    // Right leg
+    drawRect(ctx, pantColor, cx + lw / 2 + 1, cy - sh - swing, lw, lh - sh);
+    drawRect(ctx, shoeColor, cx + lw / 2, cy - swing, sw, sh);
+}
+
+function drawHumanoidArms(ctx, cx, cyShoulder, color, isAtk, swing, armW = 7, armH = 8) {
+    if (isAtk) {
+        drawRect(ctx, color, cx + 10, cyShoulder + armH, armW + 4, armH);
+    } else {
+        drawRect(ctx, color, cx - 12, cyShoulder + swing, armW, armH);
+        drawRect(ctx, color, cx + 5, cyShoulder - swing, armW, armH);
+    }
+}
+
+// Character-specific draw functions
+const drawMario = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), c2 = rgb(cfg.c2), c3 = rgb(cfg.c3);
+    const BROWN = [80, 50, 20];
+    const sw = drawSwing(state, af);
+    drawHumanoidLegs(ctx, cx, cy, c2, BROWN, sw);
+    drawRect(ctx, c1, cx, cy - 16, 28, 20);
+    drawRect(ctx, c2, cx - 6, cy - 34, 20, 6);
+    drawHumanoidArms(ctx, cx, cy - 34, c1, atk, sw);
+    drawCircle(ctx, c3, cx, cy - 42, 11);
+    drawRect(ctx, c1, cx - 1, cy - 47, 22, 6);
+    drawRect(ctx, c1, cx + 2, cy - 55, 14, 10);
+    ctx.fillStyle = '#502800';
+    ctx.fillRect(cx, cy - 42, 9, 3);
+    drawEye(ctx, cx + 4, cy - 44);
+};
+
+const drawLuigi = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), c2 = rgb(cfg.c2), c3 = rgb(cfg.c3);
+    const BROWN = [80, 50, 20];
+    const sw = drawSwing(state, af);
+    drawHumanoidLegs(ctx, cx, cy, c2, BROWN, sw, 8, 18);
+    drawRect(ctx, c1, cx, cy - 18, 28, 22);
+    drawRect(ctx, c2, cx - 6, cy - 36, 20, 6);
+    drawHumanoidArms(ctx, cx, cy - 36, c1, atk, sw);
+    drawCircle(ctx, c3, cx, cy - 44, 11);
+    drawRect(ctx, c1, cx - 1, cy - 49, 22, 6);
+    drawRect(ctx, c1, cx + 2, cy - 58, 14, 10);
+    ctx.fillStyle = '#502800';
+    ctx.fillRect(cx, cy - 44, 9, 3);
+    drawEye(ctx, cx + 4, cy - 46);
+};
+
+const drawDK = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), c2 = rgb(cfg.c3);
+    const sw = drawSwing(state, af, 8);
+    drawRect(ctx, c1, cx - 6, cy, 14, 20);
+    drawRect(ctx, c1, cx + 6, cy - Math.round(sw), 14, 20);
+    drawRect(ctx, c1, cx, cy - 20, 42, 28);
+    drawRect(ctx, c2, cx - 2, cy - 34, 16, 16);
+    if (atk) drawRect(ctx, c1, cx + 22, cy - 32, 18, 12);
+    else {
+        drawRect(ctx, c1, cx - 22, cy - 32 + Math.round(sw), 16, 12);
+        drawRect(ctx, c1, cx + 16, cy - 32 - Math.round(sw), 16, 12);
+    }
+    drawCircle(ctx, c1, cx, cy - 44, 18);
+    drawCircle(ctx, c2, cx + 2, cy - 44, 10);
+    drawEye(ctx, cx + 6, cy - 46);
+    drawEye(ctx, cx - 1, cy - 46);
+    ctx.fillStyle = '#c81e1e';
+    ctx.fillRect(cx - 2, cy - 25, 10, 4);
+};
+
+const drawLink = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), c2 = rgb(cfg.c2), c3 = rgb(cfg.c3);
+    const GOLD = rgb(cfg.c4);
+    const sw = drawSwing(state, af);
+    drawHumanoidLegs(ctx, cx, cy, c2, [80, 60, 30], sw);
+    drawRect(ctx, c1, cx, cy - 16, 30, 22);
+    if (atk) {
+        ctx.fillStyle = '#c8c8c8';
+        ctx.fillRect(cx + 16, cy - 32, 4, 28);
+    } else {
+        drawHumanoidArms(ctx, cx, cy - 36, c1, false, sw);
+    }
+    drawCircle(ctx, c3, cx, cy - 42, 11);
+    const pts = [[cx - 12, cy - 50], [cx + 12, cy - 50], [cx + 4, cy - 70]];
+    ctx.fillStyle = `rgb(${c1[0]}, ${c1[1]}, ${c1[2]})`;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    ctx.lineTo(pts[1][0], pts[1][1]);
+    ctx.lineTo(pts[2][0], pts[2][1]);
+    ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    drawEye(ctx, cx + 4, cy - 44);
+};
+
+const drawSamus = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), c4 = rgb(cfg.c4);
+    const sw = drawSwing(state, af);
+    drawRect(ctx, c1, cx - 6, cy, 14, 22);
+    drawRect(ctx, c1, cx + 6, cy - Math.round(sw), 14, 22);
+    drawRect(ctx, c1, cx, cy - 22, 36, 28);
+    drawRect(ctx, c4, cx, cy - 32, 14, 8);
+    if (atk) drawRect(ctx, c4, cx + 18, cy - 30, 18, 10);
+    else {
+        drawRect(ctx, c1, cx - 16, cy - 30 + Math.round(sw), 12, 10);
+        drawRect(ctx, c1, cx + 14, cy - 28, 16, 12);
+    }
+    drawCircle(ctx, c1, cx, cy - 42, 14);
+    drawCircle(ctx, c4, cx + 2, cy - 44, 7);
+};
+
+const drawFalcon = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), c3 = rgb(cfg.c3);
+    const RED = [200, 30, 30];
+    const sw = drawSwing(state, af, 8);
+    drawHumanoidLegs(ctx, cx, cy, c1, [30, 30, 30], sw, 8, 20);
+    drawRect(ctx, c1, cx, cy - 20, 32, 26);
+    drawRect(ctx, RED, cx, cy - 36, 12, 8);
+    if (atk) drawRect(ctx, RED, cx + 16, cy - 30, 20, 14);
+    else drawHumanoidArms(ctx, cx, cy - 38, c1, false, sw, 7, 10);
+    drawCircle(ctx, c1, cx, cy - 44, 13);
+    drawCircle(ctx, RED, cx + 2, cy - 46, 6);
+    drawEye(ctx, cx + 5, cy - 47);
+};
+
+const drawNess = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), c2 = rgb(cfg.c2), c3 = rgb(cfg.c3);
+    const BLUE2 = [100, 140, 200], YEL = [240, 200, 50];
+    const sw = drawSwing(state, af);
+    drawHumanoidLegs(ctx, cx, cy, BLUE2, [40, 30, 10], sw, 8, 14);
+    drawRect(ctx, c1, cx, cy - 14, 28, 16);
+    drawRect(ctx, YEL, cx, cy - 16, 28, 3);
+    if (atk) drawRect(ctx, YEL, cx + 14, cy - 24, 18, 8);
+    else drawHumanoidArms(ctx, cx, cy - 28, c1, false, sw);
+    drawCircle(ctx, c3, cx, cy - 36, 11);
+    drawRect(ctx, c2, cx - 1, cy - 40, 20, 6);
+    drawRect(ctx, c2, cx + 2, cy - 48, 13, 9);
+    drawEye(ctx, cx + 4, cy - 37);
+};
+
+const drawKirby = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), c4 = rgb(cfg.c4);
+    const sw = drawSwing(state, af, 3);
+    drawRect(ctx, c4, cx - 8, cy, 8, 8);
+    drawRect(ctx, c4, cx + 1, cy - Math.round(sw), 8, 8);
+    drawCircle(ctx, c1, cx, cy - 22, 20);
+    ctx.fillStyle = '#1e3cc8';
+    ctx.fillRect(cx - 8, cy - 32, 10, 12);
+    ctx.strokeStyle = '#000';
+    ctx.strokeRect(cx - 8, cy - 32, 10, 12);
+    ctx.fillRect(cx + 1, cy - 32, 10, 12);
+    ctx.strokeRect(cx + 1, cy - 32, 10, 12);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(cx - 5, cy - 28, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + 4, cy - 28, 3, 0, Math.PI * 2);
+    ctx.fill();
+    if (atk) {
+        ctx.fillStyle = '#c83232';
+        ctx.fillRect(cx - 8, cy - 20, 16, 10);
+    } else {
+        ctx.strokeStyle = '#c83232';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy - 18, 8, Math.PI, 0);
+        ctx.stroke();
+    }
+    drawCircle(ctx, c1, cx - 22, cy - 24, 6);
+    drawCircle(ctx, c1, cx + 22, cy - 24, 6);
+};
+
+const drawFox = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), c2 = rgb(cfg.c2), c3 = rgb(cfg.c3);
+    const BROWN = [140, 90, 40];
+    const sw = drawSwing(state, af, 7);
+    drawHumanoidLegs(ctx, cx, cy, c2, [50, 40, 20], sw, 8, 18);
+    drawRect(ctx, c1, cx, cy - 18, 30, 22);
+    drawRect(ctx, c2, cx, cy - 30, 12, 8);
+    if (atk) drawRect(ctx, [200, 200, 200], cx + 14, cy - 28, 18, 8);
+    else drawHumanoidArms(ctx, cx, cy - 36, c1, false, sw);
+    drawCircle(ctx, BROWN, cx, cy - 42, 12);
+    drawCircle(ctx, c1, cx + 2, cy - 42, 8);
+    const pts1 = [[cx - 12, cy - 50], [cx - 6, cy - 50], [cx - 10, cy - 62]];
+    const pts2 = [[cx + 4, cy - 50], [cx + 10, cy - 50], [cx + 6, cy - 62]];
+    [pts1, pts2].forEach(pts => {
+        ctx.fillStyle = `rgb(${BROWN[0]}, ${BROWN[1]}, ${BROWN[2]})`;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        ctx.lineTo(pts[1][0], pts[1][1]);
+        ctx.lineTo(pts[2][0], pts[2][1]);
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+    });
+    drawEye(ctx, cx + 5, cy - 46);
+    drawCircle(ctx, BROWN, cx - 18, cy - 8, 8);
+    drawCircle(ctx, c1, cx - 18, cy - 10, 4);
+};
+
+const drawPikachu = (ctx, cx, cy, af, atk, state, cfg) => {
+    const YEL = rgb(cfg.c1), RED = [220, 50, 50];
+    const sw = drawSwing(state, af, 4);
+    drawRect(ctx, YEL, cx - 6, cy, 10, 12);
+    drawRect(ctx, YEL, cx + 6, cy - Math.round(sw), 10, 12);
+    drawCircle(ctx, YEL, cx, cy - 22, 18);
+    if (atk) drawRect(ctx, YEL, cx + 18, cy - 26, 16, 8);
+    else {
+        drawCircle(ctx, YEL, cx - 18, cy - 24, 7);
+        drawCircle(ctx, YEL, cx + 18, cy - 24, 7);
+    }
+    drawCircle(ctx, YEL, cx, cy - 40, 14);
+    drawCircle(ctx, RED, cx - 8, cy - 38, 4);
+    drawCircle(ctx, RED, cx + 8, cy - 38, 4);
+    const pts1 = [[cx - 14, cy - 48], [cx - 8, cy - 48], [cx - 12, cy - 66]];
+    const pts2 = [[cx + 4, cy - 48], [cx + 10, cy - 48], [cx + 6, cy - 66]];
+    [pts1, pts2].forEach(pts => {
+        ctx.fillStyle = `rgb(${YEL[0]}, ${YEL[1]}, ${YEL[2]})`;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        ctx.lineTo(pts[1][0], pts[1][1]);
+        ctx.lineTo(pts[2][0], pts[2][1]);
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+    });
+    drawEye(ctx, cx + 4, cy - 42);
+    drawEye(ctx, cx - 4, cy - 42);
+};
+
+const drawJigglypuff = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), PUR = rgb(cfg.c4);
+    const sw = drawSwing(state, af, 3);
+    drawCircle(ctx, [230, 150, 170], cx - 7, cy - 4, 5);
+    drawCircle(ctx, [230, 150, 170], cx + 7, cy - 4, 5);
+    drawCircle(ctx, c1, cx, cy - 24, 22);
+    drawCircle(ctx, c1, cx - 18, cy - 38, 5);
+    drawCircle(ctx, c1, cx + 18, cy - 38, 5);
+    drawCircle(ctx, PUR, cx - 18, cy - 38, 3);
+    drawCircle(ctx, PUR, cx + 18, cy - 38, 3);
+    ctx.fillStyle = '#3250dc';
+    ctx.fillRect(cx - 11, cy - 34, 12, 14);
+    ctx.strokeStyle = '#000';
+    ctx.strokeRect(cx - 11, cy - 34, 12, 14);
+    ctx.fillRect(cx + 1, cy - 34, 12, 14);
+    ctx.strokeRect(cx + 1, cy - 34, 12, 14);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(cx - 7, cy - 30, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + 5, cy - 30, 3, 0, Math.PI * 2);
+    ctx.fill();
+    if (atk) drawCircle(ctx, c1, cx + 22, cy - 20, 8);
+};
+
+const drawYoshi = (ctx, cx, cy, af, atk, state, cfg) => {
+    const c1 = rgb(cfg.c1), c2 = rgb(cfg.c2), c4 = rgb(cfg.c4);
+    const sw = drawSwing(state, af, 5);
+    drawRect(ctx, c4, cx - 8, cy, 10, 14);
+    drawRect(ctx, c4, cx + 8, cy - Math.round(sw), 10, 14);
+    drawRect(ctx, c1, cx, cy - 14, 36, 22);
+    drawRect(ctx, c2, cx - 4, cy - 24, 18, 14);
+    if (atk) drawRect(ctx, c4, cx + 20, cy - 22, 14, 8);
+    else {
+        drawCircle(ctx, c1, cx - 18, cy - 22, 6);
+        drawCircle(ctx, c1, cx + 18, cy - 22, 6);
+    }
+    drawCircle(ctx, c1, cx + 4, cy - 38, 14);
+    drawCircle(ctx, c2, cx + 8, cy - 36, 7);
+    drawEye(ctx, cx + 4, cy - 42);
+    for (let i = 0; i < 3; i++) {
+        const sx = cx - 6 + i * 5, sy = cy - 36 - i * 4;
+        ctx.fillStyle = `rgb(${c4[0]}, ${c4[1]}, ${c4[2]})`;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + 4, sy);
+        ctx.lineTo(sx + 2, sy - 8);
+        ctx.fill();
+    }
+};
+
+const drawMetalMario = (ctx, cx, cy, af, atk, state, cfg) => {
+    const SIL = [180, 190, 200], DARK = [100, 110, 120], LIGHT = [220, 230, 240];
+    const sw = drawSwing(state, af);
+    drawHumanoidLegs(ctx, cx, cy, DARK, [60, 70, 80], sw);
+    drawRect(ctx, SIL, cx, cy - 16, 28, 20);
+    drawRect(ctx, DARK, cx - 6, cy - 34, 20, 6);
+    drawHumanoidArms(ctx, cx, cy - 34, SIL, atk, sw);
+    drawCircle(ctx, SIL, cx, cy - 42, 11);
+    drawRect(ctx, SIL, cx - 1, cy - 47, 22, 6);
+    drawRect(ctx, SIL, cx + 2, cy - 55, 14, 10);
+    ctx.fillStyle = `rgb(${DARK[0]}, ${DARK[1]}, ${DARK[2]})`;
+    ctx.fillRect(cx, cy - 42, 9, 3);
+    ctx.strokeStyle = `rgb(${LIGHT[0]}, ${LIGHT[1]}, ${LIGHT[2]})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, cy - 28);
+    ctx.lineTo(cx - 2, cy - 18);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, cy - 46);
+    ctx.lineTo(cx - 2, cy - 40);
+    ctx.stroke();
+};
+
+const drawMasterHand = (ctx, cx, cy, af, atk, state, cfg) => {
+    const WHT2 = [245, 245, 245], GRAY = [200, 200, 200];
+    const palmY = cy - 30;
+    drawRect(ctx, WHT2, cx, palmY, 60, 40);
+    drawCircle(ctx, WHT2, cx - 20, palmY - 20, 12);
+    const fingerData = [[cx - 22, 12], [cx - 10, 14], [cx + 2, 14], [cx + 14, 13], [cx + 24, 10]];
+    if (atk) {
+        fingerData.forEach(([fx, fw]) => {
+            drawRect(ctx, WHT2, fx, palmY - 10, fw, 14 + Math.random() * 6);
+        });
+    } else {
+        const wave = Math.sin(af * 0.3) * 4;
+        fingerData.forEach(([fx, fw], i) => {
+            const h = 18 + Math.sin(af * 0.3 + i) * 4;
+            drawRect(ctx, WHT2, fx, palmY - 6 + Math.round(wave), fw, h);
+        });
+    }
+    drawRect(ctx, WHT2, cx + 28, palmY + 4, 10, 20);
+    ctx.strokeStyle = `rgb(${GRAY[0]}, ${GRAY[1]}, ${GRAY[2]})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - 30, palmY - 40, 60, 40);
+};
+
+const drawBowser = (ctx, cx, cy, af, atk, state, cfg) => {
+    const GRN = rgb(cfg.c1), YEL = rgb(cfg.c2), RED = rgb(cfg.c4);
+    const DKGRN = [30, 100, 40];
+    const sw = drawSwing(state, af, 6);
+    drawRect(ctx, GRN, cx - 10, cy, 18, 24);
+    drawRect(ctx, GRN, cx + 10, cy - Math.round(sw), 18, 24);
+    drawRect(ctx, GRN, cx, cy - 24, 46, 32);
+    drawRect(ctx, YEL, cx - 4, cy - 34, 20, 18);
+    for (let i = 0; i < 4; i++) {
+        const sx = cx - 12 + i * 8, sy = cy - 56 + Math.cos(i) * 4;
+        ctx.fillStyle = `rgb(${YEL[0]}, ${YEL[1]}, ${YEL[2]})`;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + 6, sy);
+        ctx.lineTo(sx + 3, sy - 8);
+        ctx.fill();
+    }
+    drawRect(ctx, DKGRN, cx, cy - 58, 40, 20);
+    if (atk) drawRect(ctx, RED, cx + 22, cy - 32, 20, 10);
+    else {
+        drawRect(ctx, GRN, cx - 22, cy - 32 + Math.round(sw), 14, 12);
+        drawRect(ctx, GRN, cx + 18, cy - 32 - Math.round(sw), 14, 12);
+    }
+    drawCircle(ctx, GRN, cx, cy - 68, 16);
+    drawEye(ctx, cx + 6, cy - 70);
+    drawEye(ctx, cx - 4, cy - 70);
+    ctx.fillStyle = `rgb(${YEL[0]}, ${YEL[1]}, ${YEL[2]})`;
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, cy - 78);
+    ctx.lineTo(cx - 6, cy - 78);
+    ctx.lineTo(cx - 8, cy - 90);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + 8, cy - 78);
+    ctx.lineTo(cx + 12, cy - 78);
+    ctx.lineTo(cx + 10, cy - 90);
+    ctx.fill();
+};
+
+const drawWaluigi = (ctx, cx, cy, af, atk, state, cfg) => {
+    const PUR = rgb(cfg.c1), YEL = rgb(cfg.c4), SKIN = rgb(cfg.c3);
+    const sw = drawSwing(state, af, 8);
+    drawHumanoidLegs(ctx, cx, cy, PUR, [30, 20, 40], sw, 8, 22);
+    drawRect(ctx, PUR, cx, cy - 22, 26, 24);
+    drawRect(ctx, YEL, cx - 4, cy - 40, 18, 6);
+    if (atk) drawRect(ctx, PUR, cx + 16, cy - 32, 20, 10);
+    else drawHumanoidArms(ctx, cx, cy - 40, PUR, false, sw, 7, 10);
+    drawCircle(ctx, SKIN, cx, cy - 48, 11);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx - 6, cy - 48, 6, 0, Math.PI);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + 6, cy - 48, 6, 0, Math.PI);
+    ctx.stroke();
+    ctx.fillStyle = `rgb(${SKIN[0]}, ${SKIN[1]}, ${SKIN[2]})`;
+    ctx.beginPath();
+    ctx.moveTo(cx + 2, cy - 46);
+    ctx.lineTo(cx + 14, cy - 46);
+    ctx.lineTo(cx + 8, cy - 40);
+    ctx.fill();
+    drawRect(ctx, PUR, cx, cy - 54, 20, 6);
+    drawRect(ctx, PUR, cx + 2, cy - 63, 13, 10);
+    drawRect(ctx, YEL, cx + 2, cy - 55, 13, 4);
+    drawEye(ctx, cx - 2, cy - 50);
+};
+
+const drawWarrior = (ctx, cx, cy, af, atk, state, cfg) => {
+    const GRAY = rgb(cfg.c1), RED = rgb(cfg.c2), SKIN = rgb(cfg.c3);
+    const sw = drawSwing(state, af);
+    drawHumanoidLegs(ctx, cx, cy, [80, 80, 90], [50, 50, 60], sw);
+    drawRect(ctx, GRAY, cx, cy - 16, 32, 24);
+    drawRect(ctx, RED, cx, cy - 30, 14, 8);
+    drawRect(ctx, GRAY, cx, cy - 32, 36, 4);
+    if (atk) {
+        ctx.fillStyle = '#c8c8be';
+        ctx.fillRect(cx + 16, cy - 30, 6, 26);
+    } else {
+        drawRect(ctx, [180, 180, 190], cx - 18, cy - 20, 6, 24);
+        drawRect(ctx, GRAY, cx + 12, cy - 30, 12, 10);
+    }
+    drawCircle(ctx, SKIN, cx, cy - 42, 11);
+    drawRect(ctx, GRAY, cx, cy - 48, 22, 8);
+    drawRect(ctx, GRAY, cx + 2, cy - 56, 16, 10);
+    drawEye(ctx, cx + 4, cy - 44);
+};
+
+const drawPolygon = (ctx, cx, cy, af, atk, state, cfg) => {
+    const colors = [rgb(cfg.c1), rgb(cfg.c2), rgb(cfg.c3), rgb(cfg.c4)];
+    const rot = af * 0.1;
+    const sides = 5 + Math.round(Math.sin(af * 0.05) * 1.5);
+    const pts = [];
+    for (let i = 0; i < sides; i++) {
+        const angle = rot + (i * 2 * Math.PI) / sides;
+        const r = 20 + Math.sin(af * 0.1 + i) * 4;
+        pts.push([cx + r * Math.cos(angle), cy - 28 + r * Math.sin(angle)]);
+    }
+    if (pts.length >= 3) {
+        ctx.fillStyle = `rgb(${colors[0][0]}, ${colors[0][1]}, ${colors[0][2]})`;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        pts.forEach(p => ctx.lineTo(p[0], p[1]));
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+    for (let i = 0; i < 3; i++) {
+        const c = colors[i + 1];
+        const a2 = rot * 2 + (i * Math.PI * 2) / 3;
+        const ox = cx + 28 * Math.cos(a2);
+        const oy = cy - 28 + 18 * Math.sin(a2);
+        drawCircle(ctx, c, ox, oy, 6);
+    }
+    drawRect(ctx, colors[0], cx - 6, cy, 8, 16);
+    drawRect(ctx, colors[1], cx + 6, cy, 8, 16);
+};
+
+const DRAW_FNS = {
+    mario: drawMario, luigi: drawLuigi, dk: drawDK, link: drawLink, samus: drawSamus,
+    falcon: drawFalcon, ness: drawNess, kirby: drawKirby, fox: drawFox, pikachu: drawPikachu,
+    jigglypuff: drawJigglypuff, yoshi: drawYoshi, metalmario: drawMetalMario,
+    masterhand: drawMasterHand, bowser: drawBowser, waluigi: drawWaluigi,
+    warrior: drawWarrior, polygon: drawPolygon
+};
+
+function drawCharacter(ctx, cfg, x, y, facing, animFrame, isAtk, state, scale = 1.0) {
+    const fn = DRAW_FNS[cfg.id] || drawMario;
+
+    ctx.save();
+    ctx.translate(x, y);
+    if (facing < 0) ctx.scale(-1, 1);
+    if (scale !== 1.0) ctx.scale(scale, scale);
+
+    fn(ctx, 0, 0, Math.floor(animFrame) % 60, isAtk, state, cfg);
+    ctx.restore();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  PROJECTILES
+// ═════════════════════════════════════════════════════════════════════════════
+
+class Projectile {
+    constructor(ownerNum, x, y, vx, vy, spc) {
+        this.owner = ownerNum;
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = typeof spc.color === 'string' ? rgb(spc.color) : spc.color;
+        this.dmg = spc.dmg;
+        this.kb = spc.kb;
+        this.angle = spc.angle;
+        this.bounce = spc.bounce || false;
+        this.returns = spc.returns || false;
+        this.groundRoll = spc.ground_roll || false;
+        this.arc = spc.arc || false;
+        this.active = true;
+        this.life = 180;
+        this.size = 8;
+    }
+
+    update(p1f, p2f) {
+        if (!this.active) return;
+        this.life--;
+        if (this.life <= 0) { this.active = false; return; }
+        if (this.arc) this.vy += 0.3;
+        this.x += this.vx;
+        this.y += this.vy;
+
+        const mainPlat = STAGE.plats[0];
+        if (this.y >= mainPlat.y && this.x >= mainPlat.x && this.x <= mainPlat.x + mainPlat.w) {
+            if (this.bounce) this.vy = -Math.abs(this.vy) * 0.5;
+            else if (this.groundRoll) this.vy = 0;
+            else { this.active = false; return; }
+        }
+
+        if (this.returns) {
+            const owner = this.owner === 1 ? p1f : p2f;
+            const dx = owner.x - this.x;
+            if (this.vx > 0 && dx < -50) this.vx = -Math.abs(this.vx);
+            else if (this.vx < 0 && dx > 50) this.vx = Math.abs(this.vx);
+        }
+
+        for (const f of [p1f, p2f]) {
+            if (f.playerNum === this.owner) continue;
+            if (['dead', 'spawn'].includes(f.state)) continue;
+            const dx = Math.abs(f.x - this.x);
+            const dy = Math.abs((f.y - f.cfg.h / 2) - this.y);
+            if (dx < f.cfg.w / 2 + this.size && dy < f.cfg.h / 2 + this.size) {
+                applyHitData(f, this.x, this.dmg, this.kb, this.angle);
+                this.active = false;
+                break;
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.fillStyle = `rgb(${this.color[0]}, ${this.color[1]}, ${this.color[2]})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  FIGHTER
+// ═════════════════════════════════════════════════════════════════════════════
+
+function applyHitData(defender, attackerX, dmg, kbVal, angleDeg) {
+    if (defender.invincible > 0) return;
+    if (defender.sleeping > 0) defender.sleeping = 0;
+
+    const kb = kbVal * (1 + defender.damage * 0.012) * (100 / defender.cfg.weight);
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const direction = attackerX < defender.x ? 1 : -1;
+
+    defender.vx = Math.cos(angleRad) * kb * direction;
+    defender.vy = -Math.abs(Math.sin(angleRad) * kb);
+    if (Math.abs(defender.vy) < 2) defender.vy = -2;
+
+    defender.damage += dmg;
+    defender.state = 'hitstun';
+    defender.stateTimer = Math.floor(8 + kb * 2.5);
+    defender.onGround = false;
+    defender.invincible = 8;
+
+    SND_HIT();
+    spawnHitEffect(defender.x, defender.y - defender.cfg.h / 2, defender.cfg.c1);
+    screenShake = Math.min(screenShake + 5, 10);
+}
+
+class Fighter {
+    constructor(charIdx, spawnPos, playerNum) {
+        this.cfg = CHARS[charIdx];
+        this.charIdx = charIdx;
+        this.playerNum = playerNum;
+        this.x = spawnPos[0];
+        this.y = spawnPos[1];
+        this.vx = 0;
+        this.vy = 0;
+        this.facing = playerNum === 1 ? 1 : -1;
+        this.damage = 0;
+        this.stocks = STOCKS;
+        this.onGround = false;
+        this.airJumpsLeft = this.cfg.aJumps;
+        this.state = 'spawn';
+        this.stateTimer = 60;
+        this.invincible = 60;
+        this.attackType = null;
+        this.attackTimer = 0;
+        this.hitboxActive = false;
+        this.hitCooldown = 0;
+        this.specialCooldown = 0;
+        this.chargeTime = 0;
+        this.charging = false;
+        this.continuousSpecial = false;
+        this.breathTimer = 0;
+        this.animFrame = 0;
+        this.animTimer = 0;
+        this.respawnTimer = 0;
+        this.counterActive = false;
+        this.counterTimer = 0;
+        this.sleeping = 0;
+        this.prevJump = false;
+        this.prevAtk = false;
+        this.prevSpc = false;
+        this._cpuState = 'approach';
+        this._cpuTimer = 0;
+        this._cpuJumpTimer = 0;
+        this._cpuSpecialTimer = 0;
+    }
+
+    update(other, inp) {
+        const cfg = this.cfg;
+
+        this.hitCooldown = Math.max(0, this.hitCooldown - 1);
+        this.specialCooldown = Math.max(0, this.specialCooldown - 1);
+        this.invincible = Math.max(0, this.invincible - 1);
+        if (this.sleeping > 0) this.sleeping--;
+
+        if (this.state === 'dead') {
+            this.stateTimer--;
+            if (this.stateTimer <= 0 && this.stocks > 0) {
+                this._respawn();
+            }
+            return;
+        }
+
+        if (this.state === 'spawn') {
+            this.stateTimer--;
+            this._applyPhysics();
+            this._platformCollision();
+            if (this.stateTimer <= 0) this.state = 'idle';
+            this._animUpdate();
+            return;
+        }
+
+        if (this.sleeping > 0) {
+            this._applyPhysics();
+            this._platformCollision();
+            return;
+        }
+
+        if (this.state === 'hitstun') {
+            this.stateTimer--;
+            if (this.stateTimer <= 0) this.state = 'idle';
+            this._applyPhysics();
+            this._platformCollision();
+            this._checkBlast(other);
+            this._animUpdate();
+            return;
+        }
+
+        if (cfg.hover) {
+            this.vy = 0;
+            this.onGround = false;
+            if (inp.left && !inp.right) {
+                this.vx = Math.max(this.vx - cfg.speed * 0.5, -cfg.speed);
+                this.facing = -1;
+            } else if (inp.right && !inp.left) {
+                this.vx = Math.min(this.vx + cfg.speed * 0.5, cfg.speed);
+                this.facing = 1;
+            } else {
+                this.vx *= 0.8;
+            }
+            if (inp.down) this.y = Math.min(ARENA_H - 80, this.y + 3);
+            else if (inp.up) this.y = Math.max(80, this.y - 3);
+            this.x += this.vx;
+            this.x = Math.max(50, Math.min(GW - 50, this.x));
+            this._handleAttacks(other, inp);
+            this._animUpdate();
+            return;
+        }
+
+        if (this.state !== 'attack') {
+            if (inp.left && !inp.right) {
+                this.vx = Math.max(this.vx - cfg.speed * 0.6, -cfg.speed);
+                this.facing = -1;
+                if (!['jump', 'fall'].includes(this.state)) this.state = 'walk';
+            } else if (inp.right && !inp.left) {
+                this.vx = Math.min(this.vx + cfg.speed * 0.6, cfg.speed);
+                this.facing = 1;
+                if (!['jump', 'fall'].includes(this.state)) this.state = 'walk';
+            } else {
+                if (this.state === 'walk') this.state = 'idle';
+            }
+        }
+
+        if (inp.jump && !inp.prevJump) {
+            if (this.onGround) {
+                this.vy = -cfg.jp;
+                this.onGround = false;
+                this.state = 'jump';
+                this.airJumpsLeft = cfg.aJumps;
+                SND_JUMP();
+                spawnParticles(this.x, this.y, cfg.c1, 4, 2);
+            } else if (this.airJumpsLeft > 0) {
+                this.vy = -(cfg.jp * 0.82);
+                this.airJumpsLeft--;
+                this.state = 'jump';
+                SND_JUMP();
+                spawnParticles(this.x, this.y, cfg.c1, 4, 2);
+            }
+        }
+
+        if (inp.down && !this.onGround && this.vy > 0) {
+            this.vy = Math.min(this.vy + 3, MAX_FALL);
+        }
+
+        this._handleAttacks(other, inp);
+        this._applyPhysics();
+        this._platformCollision();
+        this._checkBlast(other);
+        this._animUpdate();
+
+        this.prevJump = inp.jump;
+        this.prevAtk = inp.atk;
+        this.prevSpc = inp.spc;
+    }
+
+    _handleAttacks(other, inp) {
+        const cfg = this.cfg;
+
+        if (this.attackTimer > 0) {
+            this.attackTimer--;
+            if (this.attackTimer <= 0) {
+                this.hitboxActive = false;
+                this.state = 'idle';
+                this.attackType = null;
+                this.charging = false;
+            } else if (this.hitboxActive && this.hitCooldown <= 0) {
+                const hb = this._getHitbox();
+                if (hb) {
+                    const oh = other.cfg;
+                    const ox1 = other.x - oh.w / 2;
+                    const oy1 = other.y - oh.h;
+                    const ox2 = other.x + oh.w / 2;
+                    const oy2 = other.y;
+
+                    if (hb[0] < ox2 && hb[2] > ox1 && hb[1] < oy2 && hb[3] > oy1) {
+                        if (!['dead', 'spawn'].includes(other.state) && other.invincible <= 0) {
+                            if (this.counterActive) {
+                                applyHitData(other, this.x, 18, 14, 65);
+                                this.counterActive = false;
+                                this.counterTimer = 0;
+                            } else {
+                                const atkData = cfg[this.attackType];
+                                if (atkData) {
+                                    applyHitData(other, this.x, atkData.d, atkData.kb, atkData.a);
+                                }
+                            }
+                            this.hitCooldown = 20;
+                        }
+                    }
+                }
+            }
+        } else {
+            if (this.charging) {
+                if (inp.spc) {
+                    this.chargeTime = Math.min(this.chargeTime + 1, SPECIALS[cfg.special].max_charge || 60);
+                } else {
+                    const spc = SPECIALS[cfg.special];
+                    const pct = this.chargeTime / (spc.max_charge || 60);
+                    const dmg = Math.floor(spc.dmg * (0.5 + pct * 0.5));
+                    const kb = spc.kb * (0.5 + pct * 0.5);
+                    applyHitData(other, this.x, dmg, kb, spc.angle);
+                    this.charging = false;
+                    this.chargeTime = 0;
+                    this.specialCooldown = 60;
+                    SND_SPECIAL();
+                }
+                return;
+            }
+
+            if (inp.atk && !inp.prevAtk && this.state !== 'attack') {
+                if (inp.up) this._triggerAttack('uatk');
+                else if (inp.down && !this.onGround) this._triggerAttack('datk');
+                else if (!this.onGround) this._triggerAttack('aerial');
+                else this._triggerAttack('jab');
+            }
+
+            if (inp.spc && !inp.prevSpc && this.specialCooldown <= 0 && this.state !== 'attack') {
+                this._triggerSpecial(other);
+            }
+        }
+
+        if (this.counterTimer > 0) {
+            this.counterTimer--;
+            if (this.counterTimer <= 0) {
+                this.counterActive = false;
+            }
+        }
+
+        if (this.continuousSpecial && this.breathTimer > 0) {
+            this.breathTimer--;
+            if (this.breathTimer <= 0) {
+                this.continuousSpecial = false;
+                this.state = 'idle';
+            } else {
+                const spc = SPECIALS[cfg.special];
+                const fx = this.x + this.facing * 60;
+                const fy = this.y - cfg.h / 2;
+                if (Math.abs(other.x - fx) < spc.range / 2 && Math.abs(other.y - fy) < 40) {
+                    if (other.invincible <= 0) {
+                        applyHitData(other, this.x, spc.dmg, spc.kb, spc.angle);
+                    }
+                }
+            }
+        }
+    }
+
+    _triggerAttack(atkType) {
+        const cfg = this.cfg;
+        const data = cfg[atkType];
+        if (!data) return;
+        this.state = 'attack';
+        this.attackType = atkType;
+        this.attackTimer = 20;
+        this.hitboxActive = true;
+        this.hitCooldown = 0;
+        spawnParticles(this.x, this.y - cfg.h / 2, cfg.c1, 4, 3);
+    }
+
+    _triggerSpecial(other) {
+        const cfg = this.cfg;
+        const spcName = cfg.special;
+        const spc = SPECIALS[spcName];
+        this.specialCooldown = 90;
+        SND_SPECIAL();
+
+        if (spc.type === 'proj') {
+            const vx = spc.speed * this.facing;
+            const vy = spc.init_vy || 0;
+            const p = new Projectile(this.playerNum, this.x + this.facing * 20, this.y - cfg.h / 2, vx, vy, spc);
+            projectiles.push(p);
+        } else if (spc.type === 'charge') {
+            this.charging = true;
+            this.chargeTime = 0;
+            this.state = 'attack';
+            this.attackTimer = 999;
+        } else if (spc.type === 'area') {
+            const dist = Math.sqrt((other.x - this.x) ** 2 + (other.y - this.y) ** 2);
+            if (dist < spc.radius) {
+                if (spc.sleep) {
+                    other.sleeping = 180;
+                    spawnParticles(other.x, other.y - other.cfg.h / 2, spc.color, 12, 3);
+                } else {
+                    applyHitData(other, this.x, spc.dmg, spc.kb, spc.angle);
+                }
+            }
+            spawnParticles(this.x, this.y - cfg.h / 2, spc.color, 16, 5);
+        } else if (spc.type === 'spin') {
+            this.state = 'attack';
+            this.attackType = 'jab';
+            this.attackTimer = 50;
+            this.hitboxActive = true;
+            spawnParticles(this.x, this.y - cfg.h / 2, spc.color, 12, 5);
+        } else if (spc.type === 'counter') {
+            this.counterActive = true;
+            this.counterTimer = 40;
+            this.invincible = 40;
+            spawnParticles(this.x, this.y - cfg.h / 2, spc.color, 8, 3);
+        } else if (spc.type === 'continuous') {
+            this.continuousSpecial = true;
+            this.breathTimer = 45;
+            this.state = 'attack';
+            this.attackType = 'jab';
+        }
+    }
+
+    _getHitbox() {
+        const cfg = this.cfg;
+        if (!this.hitboxActive) return null;
+        const ext = ['uatk', 'datk'].includes(this.attackType) ? 20 : 26;
+        if (this.attackType === 'uatk') {
+            return [this.x - cfg.w / 2, this.y - cfg.h - ext, this.x + cfg.w / 2, this.y - cfg.h];
+        } else if (this.attackType === 'datk') {
+            return [this.x - cfg.w / 2, this.y, this.x + cfg.w / 2, this.y + ext];
+        } else {
+            const ox = this.facing * (cfg.w / 2 + ext);
+            return [this.x + ox - ext / 2, this.y - cfg.h, this.x + ox + ext / 2, this.y];
+        }
+    }
+
+    _applyPhysics() {
+        if (this.cfg.hover) return;
+        const grav = GRAV * this.cfg.fall;
+        this.vy = Math.min(this.vy + grav, MAX_FALL);
+        this.y += this.vy;
+        this.x += this.vx;
+        if (this.onGround) this.vx *= FRIC;
+        else this.vx *= AIRFRIC;
+        if (Math.abs(this.vx) < 0.2) this.vx = 0;
+        this.x = Math.max(-200, Math.min(GW + 200, this.x));
+    }
+
+    _platformCollision() {
+        if (this.cfg.hover) return;
+        this.onGround = false;
+        for (const plat of STAGE.plats) {
+            const fw2 = this.cfg.w / 2;
+            if (this.x + fw2 > plat.x && this.x - fw2 < plat.x + plat.w) {
+                const prevY = this.y - this.vy;
+                if (this.vy >= 0 && prevY <= plat.y && this.y >= plat.y) {
+                    if (!plat.main && this.vy > 8) continue;
+                    this.y = plat.y;
+                    this.vy = 0;
+                    this.onGround = true;
+                    this.airJumpsLeft = this.cfg.aJumps;
+                    if (['jump', 'fall'].includes(this.state)) {
+                        this.state = 'idle';
+                        SND_LAND();
+                    }
+                    break;
+                }
+            }
+        }
+        if (!this.onGround && this.vy > 0) {
+            if (!['attack', 'hitstun'].includes(this.state)) this.state = 'fall';
+        }
+    }
+
+    _checkBlast(other) {
+        const bz = STAGE;
+        if (this.x < bz.blast_l || this.x > bz.blast_r || this.y < bz.blast_t || this.y > bz.blast_b) {
+            this._kill();
+        }
+    }
+
+    _kill() {
+        spawnParticles(this.x, this.y, this.cfg.c1, 20, 8);
+        spawnParticles(this.x, this.y, [255, 220, 50], 15, 6);
+        SND_KO();
+        this.stocks--;
+        this.state = 'dead';
+        this.stateTimer = 90;
+        this.x = -1000;
+        this.y = -1000;
+        this.vx = 0;
+        this.vy = 0;
+        this.damage = 0;
+        this.invincible = 0;
+    }
+
+    _respawn() {
+        const pos = this.playerNum === 1 ? STAGE.spawn_p1 : STAGE.spawn_p2;
+        this.x = pos[0];
+        this.y = pos[1];
+        this.vx = 0;
+        this.vy = 0;
+        this.state = 'spawn';
+        this.stateTimer = 60;
+        this.invincible = 120;
+        this.airJumpsLeft = this.cfg.aJumps;
+        this.charging = false;
+        this.continuousSpecial = false;
+    }
+
+    _animUpdate() {
+        if (this.state === 'walk') {
+            this.animTimer++;
+            if (this.animTimer > 5) {
+                this.animTimer = 0;
+                this.animFrame++;
+            }
+        } else {
+            this.animFrame = 0;
+            this.animTimer = 0;
+        }
+    }
+
+    getCpuInput(other) {
+        const inp = {
+            left: false, right: false, up: false, down: false,
+            jump: false, atk: false, spc: false,
+            prevJump: this.prevJump, prevAtk: this.prevAtk, prevSpc: this.prevSpc
+        };
+        const cfg = this.cfg;
+        const dx = other.x - this.x;
+        const dy = (other.y - other.cfg.h / 2) - (this.y - cfg.h / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        this._cpuTimer--;
+        this._cpuJumpTimer--;
+        this._cpuSpecialTimer--;
+
+        const mp = STAGE.plats[0];
+        const off = this.x < mp.x - 60 || this.x > mp.x + mp.w + 60;
+        if (off || this.y < STAGE.blast_t + 120) {
+            const cx = mp.x + mp.w / 2;
+            if (this.x < cx) inp.right = true;
+            else inp.left = true;
+            if (!this.onGround && this._cpuJumpTimer <= 0) {
+                inp.jump = true;
+                this._cpuJumpTimer = 20;
+            }
+            this._updateCpuPrev(inp);
+            return inp;
+        }
+
+        if (this._cpuState === 'approach' || this._cpuTimer <= 0) {
+            if (dist < 80) {
+                this._cpuState = 'attack';
+                this._cpuTimer = 30;
+            } else if (dist > 300 && this.damage < 60) {
+                this._cpuState = 'approach';
+                this._cpuTimer = 60;
+            } else {
+                this._cpuState = 'approach';
+                this._cpuTimer = 40;
+            }
+        }
+
+        if (this._cpuState === 'approach') {
+            if (dx > 10) inp.right = true;
+            else if (dx < -10) inp.left = true;
+            if (dy < -80 && this.onGround && this._cpuJumpTimer <= 0) {
+                inp.jump = true;
+                this._cpuJumpTimer = 25;
+            } else if (!this.onGround && Math.abs(dx) > 20 && this._cpuJumpTimer <= 0) {
+                if (dy < -60) {
+                    inp.jump = true;
+                    this._cpuJumpTimer = 20;
+                }
+            }
+        } else if (this._cpuState === 'attack') {
+            if (dx > 5) inp.right = true;
+            else if (dx < -5) inp.left = true;
+            if (dist < 120) {
+                if (this._cpuSpecialTimer <= 0 && Math.random() < 0.02) {
+                    inp.spc = true;
+                    this._cpuSpecialTimer = 90;
+                } else if (Math.random() < 0.15) {
+                    inp.atk = true;
+                    if (Math.abs(dy) > 50) inp.up = dy < 0;
+                }
+            }
+            if (dist < 60 && Math.random() < 0.03 && this._cpuJumpTimer <= 0) {
+                inp.jump = true;
+                this._cpuJumpTimer = 20;
+            }
+        }
+
+        this._updateCpuPrev(inp);
+        return inp;
+    }
+
+    _updateCpuPrev(inp) {
+        this.prevJump = inp.jump;
+        this.prevAtk = inp.atk;
+        this.prevSpc = inp.spc;
+    }
+
+    draw(ctx) {
+        if (this.state === 'dead') return;
+        if (this.invincible > 0 && Math.floor(this.invincible / 4) % 2 === 0) return;
+
+        const cfg = this.cfg;
+        const isAtk = this.state === 'attack';
+        drawCharacter(ctx, cfg, this.x, this.y, this.facing, this.animFrame, isAtk, this.state);
+
+        if (this.sleeping > 0) {
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#9664c8';
+            ctx.textAlign = 'center';
+            ctx.fillText('💤', this.x, this.y - cfg.h - 20);
+        }
+
+        if (this.invincible > 0 && this.state === 'hitstun') {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillRect(this.x - cfg.w / 2, this.y - cfg.h, cfg.w, cfg.h);
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  GAME CLASS
+// ═════════════════════════════════════════════════════════════════════════════
+
+const P1_KEYS = { left: 'a', right: 'd', up: 'w', down: 's', atk: 'z', spc: 'x' };
+const P2_KEYS = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', atk: 'k', spc: 'l' };
+
+class Game {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.state = 'title';
+        this.p1CharIdx = 0;
+        this.p2CharIdx = 1;
+        this.p1Cursor = 0;
+        this.p2Cursor = 1;
+        this.p2Mode = 'p2';
+        this.winner = null;
+        this.vsTimer = 0;
+        this.p1f = null;
+        this.p2f = null;
+        this.keysPressed = {};
+        this.justPressed = new Set();
+        this.starData = Array.from({ length: 80 }, () => [
+            Math.random() * GW,
+            Math.random() * GH,
+            Math.random() * 2 + 0.5
+        ]);
+    }
+
+    handleInput() {
+        this.justPressed.clear();
+    }
+
+    drawTitle() {
+        // Background gradient
+        for (let i = 0; i < GH; i++) {
+            const t = i / GH;
+            const r = Math.floor(10 + t * 20);
+            const g = Math.floor(10 + t * 10);
+            const b = Math.floor(26 + t * 40);
+            this.ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            this.ctx.fillRect(0, i, GW, 1);
+        }
+
+        // Stars
+        this.starData.forEach(([sx, sy, sz]) => {
+            const r = Math.max(1, Math.floor(sz));
+            const a = Math.min(255, Math.floor(sz * 80));
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${a / 255})`;
+            this.ctx.beginPath();
+            this.ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+
+        // Title
+        this.drawText('SUPER SMASH BROS', GW / 2, 140, 'rgb(255, 230, 30)', 52, 'center', true);
+        this.drawText('N64  EDITION', GW / 2, 195, 'rgb(220, 50, 50)', 32, 'center');
+        this.drawText('18 FIGHTERS — ORIGINAL + NEW CHALLENGERS', GW / 2, 240, 'rgb(170, 170, 170)', 13, 'center');
+
+        // Character showcase
+        const showcase = [0, 7, 9, 12, 13, 14];
+        showcase.forEach((ci, i) => {
+            const bx = 70 + i * 128;
+            const by = 360;
+            drawCharacter(this.ctx, CHARS[ci], bx, by, i % 2 === 0 ? 1 : -1, frameCount / 6, false, 'walk', 0.9);
+            this.drawText(CHARS[ci].name.toUpperCase(), bx, by + 10, `rgb(${CHARS[ci].c1.slice(1).match(/.{2}/g).map(x => parseInt(x, 16)).join(',')})`, 10, 'center');
+        });
+
+        if (Math.floor(frameCount / 24) % 2 === 0) {
+            this.drawText('PRESS ANY KEY TO START', GW / 2, GH - 60, 'rgb(255, 230, 30)', 20, 'center');
+        }
+        this.drawText('P1: WASD + Z(atk) + X(spc)    P2: ARROWS + K(atk) + L(spc)', GW / 2, GH - 28, 'rgb(80, 80, 80)', 10, 'center');
+    }
+
+    drawCharSelect() {
+        for (let i = 0; i < GH; i++) {
+            const t = i / GH;
+            const r = Math.floor(10 + t * 20);
+            const g = Math.floor(10 + t * 10);
+            const b = Math.floor(26 + t * 40);
+            this.ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            this.ctx.fillRect(0, i, GW, 1);
+        }
+
+        this.drawText('SELECT YOUR FIGHTER', GW / 2, 42, 'rgb(255, 230, 30)', 32, 'center');
+        this.drawText('P1: WASD+Z pick    P2: Arrows+K pick    E: toggle CPU    Enter: fight', GW / 2, 66, 'rgb(140, 140, 140)', 10, 'center');
+
+        const CS_COLS = 6, CS_ROWS = 3, CS_CW = 144, CS_CH = 92, CS_OX = 12, CS_OY = 88;
+
+        CHARS.forEach((ch, i) => {
+            const col = i % CS_COLS;
+            const row = Math.floor(i / CS_COLS);
+            const cx = CS_OX + col * CS_CW;
+            const cy = CS_OY + row * CS_CH;
+            const isP1 = i === this.p1Cursor;
+            const isP2 = i === this.p2Cursor;
+
+            const c1 = rgb(ch.c1);
+            this.ctx.fillStyle = `rgba(${c1[0]}, ${c1[1]}, ${c1[2]}, 0.12)`;
+            this.ctx.fillRect(cx, cy, CS_CW - 4, CS_CH - 4);
+
+            const bc = (isP1 && isP2) ? 'rgb(255, 87, 34)' : isP1 ? 'rgb(255, 87, 34)' : isP2 ? 'rgb(21, 101, 192)' : 'rgb(50, 50, 50)';
+            const lw = (isP1 || isP2) ? 3 : 1;
+            this.ctx.strokeStyle = bc;
+            this.ctx.lineWidth = lw;
+            this.ctx.strokeRect(cx, cy, CS_CW - 4, CS_CH - 4);
+
+            drawCharacter(this.ctx, ch, cx + 22, cy + CS_CH - 8, 1, 0, false, 'idle', 0.42);
+
+            this.drawText(ch.name.toUpperCase(), cx + 44, cy + 14, 'rgb(255, 255, 255)', 10);
+            this.drawText(ch.desc.slice(0, 18), cx + 44, cy + 26, 'rgb(140, 140, 140)', 10);
+
+            this.ctx.fillStyle = 'rgb(40, 40, 40)';
+            this.ctx.fillRect(cx + 44, cy + 36, 80, 4);
+            this.ctx.fillStyle = 'rgb(41, 182, 246)';
+            this.ctx.fillRect(cx + 44, cy + 36, Math.floor(ch.speed / 7 * 80), 4);
+            this.drawText('SPD', cx + 44, cy + 48, 'rgb(80, 80, 80)', 10);
+
+            this.ctx.fillStyle = 'rgb(40, 40, 40)';
+            this.ctx.fillRect(cx + 44, cy + 52, 80, 4);
+            this.ctx.fillStyle = 'rgb(239, 83, 80)';
+            this.ctx.fillRect(cx + 44, cy + 52, Math.floor(ch.weight / 160 * 80), 4);
+            this.drawText('WT', cx + 44, cy + 64, 'rgb(80, 80, 80)', 10);
+
+            if (isP1) this.drawText('P1', cx + 3, cy + 10, 'rgb(255, 87, 34)', 10);
+            if (isP2) this.drawText(this.p2Mode === 'cpu' ? 'CPU' : 'P2', cx + (isP1 ? 16 : 3), cy + 10, 'rgb(21, 101, 192)', 10);
+        });
+
+        const p1c = CHARS[this.p1CharIdx];
+        const p2c = CHARS[this.p2CharIdx];
+
+        this.ctx.fillStyle = `rgba(${rgb(p1c.c1)[0]}, ${rgb(p1c.c1)[1]}, ${rgb(p1c.c1)[2]}, 0.08)`;
+        this.ctx.fillRect(4, ARENA_H - 92, 160, 92);
+        this.ctx.strokeStyle = 'rgb(255, 87, 34)';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(4, ARENA_H - 92, 160, 92);
+        drawCharacter(this.ctx, p1c, 50, ARENA_H - 10, 1, frameCount / 8, false, 'idle', 1.0);
+        this.drawText('P1: ' + p1c.name, 10, ARENA_H - 96, 'rgb(255, 87, 34)', 10);
+
+        this.ctx.fillStyle = `rgba(${rgb(p2c.c1)[0]}, ${rgb(p2c.c1)[1]}, ${rgb(p2c.c1)[2]}, 0.08)`;
+        this.ctx.fillRect(GW - 164, ARENA_H - 92, 160, 92);
+        this.ctx.strokeStyle = 'rgb(21, 101, 192)';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(GW - 164, ARENA_H - 92, 160, 92);
+        drawCharacter(this.ctx, p2c, GW - 114, ARENA_H - 10, -1, frameCount / 8, false, 'idle', 1.0);
+        this.drawText((this.p2Mode === 'cpu' ? 'CPU: ' : 'P2: ') + p2c.name, GW - 162, ARENA_H - 96, 'rgb(21, 101, 192)', 10);
+
+        this.drawText('Press ENTER to start!', GW / 2, GH - 16, 'rgb(255, 230, 30)', 20, 'center');
+    }
+
+    handleCharSelect() {
+        if (this.keysPressed['a']) { this.p1Cursor = Math.max(0, this.p1Cursor - 1); SND_MENU(); }
+        if (this.keysPressed['d']) { this.p1Cursor = Math.min(CHARS.length - 1, this.p1Cursor + 1); SND_MENU(); }
+        if (this.keysPressed['w']) { this.p1Cursor = Math.max(0, this.p1Cursor - 6); SND_MENU(); }
+        if (this.keysPressed['s']) { this.p1Cursor = Math.min(CHARS.length - 1, this.p1Cursor + 6); SND_MENU(); }
+        if (this.keysPressed['z']) { this.p1CharIdx = this.p1Cursor; SND_MENU(); }
+
+        if (this.keysPressed['ArrowLeft']) { this.p2Cursor = Math.max(0, this.p2Cursor - 1); SND_MENU(); }
+        if (this.keysPressed['ArrowRight']) { this.p2Cursor = Math.min(CHARS.length - 1, this.p2Cursor + 1); SND_MENU(); }
+        if (this.keysPressed['ArrowUp']) { this.p2Cursor = Math.max(0, this.p2Cursor - 6); SND_MENU(); }
+        if (this.keysPressed['ArrowDown']) { this.p2Cursor = Math.min(CHARS.length - 1, this.p2Cursor + 6); SND_MENU(); }
+        if (this.keysPressed['k']) { this.p2CharIdx = this.p2Cursor; SND_MENU(); }
+
+        if (this.justPressed.has('e')) {
+            this.p2Mode = this.p2Mode === 'p2' ? 'cpu' : 'p2';
+            SND_MENU();
+        }
+        if (this.justPressed.has('Enter')) {
+            this.p1CharIdx = this.p1Cursor;
+            this.p2CharIdx = this.p2Cursor;
+            this.vsTimer = 0;
+            this.state = 'vs';
+        }
+    }
+
+    drawVs() {
+        this.ctx.fillStyle = '#000';
+        this.ctx.fillRect(0, 0, GW, GH);
+
+        const c1 = rgb(CHARS[this.p1CharIdx].c1);
+        const c2 = rgb(CHARS[this.p2CharIdx].c1);
+
+        this.ctx.fillStyle = `rgba(${c1[0]}, ${c1[1]}, ${c1[2]}, 0.3)`;
+        this.ctx.fillRect(0, 0, GW / 2, GH);
+        this.ctx.fillStyle = `rgba(${c2[0]}, ${c2[1]}, ${c2[2]}, 0.3)`;
+        this.ctx.fillRect(GW / 2, 0, GW / 2, GH);
+
+        drawCharacter(this.ctx, CHARS[this.p1CharIdx], GW / 4, GH / 2 + 60, 1, 0, false, 'idle', 2.2);
+        drawCharacter(this.ctx, CHARS[this.p2CharIdx], (GW * 3) / 4, GH / 2 + 60, -1, 0, false, 'idle', 2.2);
+
+        this.drawText('P1', GW / 4, 70, 'rgb(255, 255, 255)', 32, 'center');
+        this.drawText(CHARS[this.p1CharIdx].name, GW / 4, 108, `rgb(${c1.join(',')})`, 32, 'center');
+        this.drawText(this.p2Mode === 'cpu' ? 'CPU' : 'P2', (GW * 3) / 4, 70, 'rgb(255, 255, 255)', 32, 'center');
+        this.drawText(CHARS[this.p2CharIdx].name, (GW * 3) / 4, 108, `rgb(${c2.join(',')})`, 32, 'center');
+
+        this.drawText('VS', GW / 2, GH / 2 + 20, 'rgb(255, 230, 30)', 52, 'center', true);
+
+        const cnt = Math.max(0, 3 - Math.floor(this.vsTimer / 40));
+        if (cnt > 0) {
+            this.drawText(String(cnt), GW / 2, GH - 90, 'rgb(255, 255, 255)', 52, 'center');
+        } else {
+            this.drawText('FIGHT!', GW / 2, GH - 90, 'rgb(220, 50, 50)', 52, 'center', true);
+        }
+    }
+
+    drawStage() {
+        for (let i = 0; i < ARENA_H; i++) {
+            const t = i / ARENA_H;
+            const r = Math.floor(20 + t * 10);
+            const g = Math.floor(20 + t * 20);
+            const b = Math.floor(60 + t * 60);
+            this.ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            this.ctx.fillRect(0, i, GW, 1);
+        }
+
+        for (let i = 0; i < 5; i++) {
+            const cx = (i * 193 + frameCount / 3) % 1000 - 50;
+            const cy = 40 + i * 35;
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            this.ctx.beginPath();
+            this.ctx.ellipse(cx + 40, cy + 15, 40, 15, 0, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+
+        STAGE.plats.forEach(plat => {
+            const { x, y, w, h, main } = plat;
+            if (main) {
+                this.ctx.fillStyle = 'rgb(60, 140, 60)';
+                this.ctx.fillRect(x, y, w, h);
+                this.ctx.fillStyle = 'rgb(80, 180, 80)';
+                this.ctx.fillRect(x, y, w, 6);
+                this.ctx.strokeStyle = 'rgb(40, 100, 40)';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(x, y, w, h);
+            } else {
+                this.ctx.fillStyle = 'rgb(120, 80, 40)';
+                this.ctx.fillRect(x, y, w, h);
+                this.ctx.fillStyle = 'rgb(160, 110, 60)';
+                this.ctx.fillRect(x, y, w, 5);
+                this.ctx.strokeStyle = 'rgb(80, 50, 20)';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(x, y, w, h);
+            }
+        });
+    }
+
+    drawHUD() {
+        this.ctx.fillStyle = 'rgb(15, 15, 15)';
+        this.ctx.fillRect(0, ARENA_H, GW, GH - ARENA_H);
+        this.ctx.strokeStyle = 'rgb(60, 60, 60)';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, ARENA_H);
+        this.ctx.lineTo(GW, ARENA_H);
+        this.ctx.stroke();
+
+        this.drawPlayerHUD(this.p1f, 30, ARENA_H + 10, 'P1');
+        this.drawPlayerHUD(this.p2f, GW - 30 - 180, ARENA_H + 10, this.p2Mode === 'cpu' ? 'CPU' : 'P2');
+    }
+
+    drawPlayerHUD(f, x, y, label) {
+        if (!f) return;
+        const c = rgb(f.cfg.c1);
+        drawCharacter(this.ctx, f.cfg, x + 30, y + 60, 1, 0, false, 'idle', 0.7);
+        this.drawText(label, x + 70, y + 6, 'rgb(150, 150, 150)', 10);
+        this.drawText(f.cfg.name, x + 70, y + 18, `rgb(${c.join(',')})`, 20);
+        const pct = Math.min(999, Math.floor(f.damage));
+        const col = pct < 50 ? 'rgb(50, 200, 50)' : pct < 120 ? 'rgb(230, 180, 30)' : 'rgb(230, 50, 30)';
+        this.drawText(pct + '%', x + 70, y + 35, col, 32);
+        for (let i = 0; i < f.stocks; i++) {
+            this.ctx.fillStyle = `rgb(${c.join(',')})`;
+            this.ctx.beginPath();
+            this.ctx.arc(x + 70 + i * 16, y + 66, 5, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#000';
+            this.ctx.lineWidth = 1;
+            this.ctx.stroke();
+        }
+    }
+
+    drawResults() {
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+        this.ctx.fillRect(0, 0, GW, GH);
+        this.drawText('GAME  SET!', GW / 2, 80, 'rgb(255, 230, 30)', 52, 'center', true);
+
+        if (this.winner) {
+            drawCharacter(this.ctx, this.winner.cfg, GW / 2, GH / 2 + 20, 1, frameCount / 8, false, 'idle', 2.5);
+            const wc = rgb(this.winner.cfg.c1);
+            this.drawText(this.winner.cfg.name + ' WINS!', GW / 2, GH / 2 + 140, `rgb(${wc.join(',')})`, 32, 'center');
+            const wlabel = this.winner.playerNum === 1 ? 'P1' : (this.p2Mode === 'cpu' ? 'CPU' : 'P2');
+            this.drawText('(' + wlabel + ')', GW / 2, GH / 2 + 168, 'rgb(150, 150, 150)', 20, 'center');
+        }
+
+        if (Math.floor(frameCount / 24) % 2 === 0) {
+            this.drawText('ENTER: play again    ESC: char select', GW / 2, GH - 30, 'rgb(200, 200, 200)', 20, 'center');
+        }
+    }
+
+    drawText(text, x, y, color, size = 20, align = 'left', shadow = false) {
+        this.ctx.font = `bold ${size}px Courier`;
+        this.ctx.fillStyle = color;
+        this.ctx.textAlign = align;
+        this.ctx.textBaseline = 'top';
+        if (shadow) {
+            this.ctx.fillStyle = '#000';
+            this.ctx.fillText(text, x + 2, y + 2);
+            this.ctx.fillStyle = color;
+        }
+        this.ctx.fillText(text, x, y);
+    }
+
+    startFight() {
+        particles = [];
+        projectiles = [];
+        screenShake = 0;
+        this.p1f = new Fighter(this.p1CharIdx, STAGE.spawn_p1, 1);
+        this.p2f = new Fighter(this.p2CharIdx, STAGE.spawn_p2, 2);
+        this.winner = null;
+        this.state = 'fight';
+    }
+
+    checkWinner() {
+        const p1d = this.p1f.stocks <= 0 && this.p1f.state === 'dead' && this.p1f.stateTimer <= 0;
+        const p2d = this.p2f.stocks <= 0 && this.p2f.state === 'dead' && this.p2f.stateTimer <= 0;
+
+        if (p1d && !p2d) {
+            this.winner = this.p2f;
+            this.state = 'results';
+        } else if (p2d && !p1d) {
+            this.winner = this.p1f;
+            this.state = 'results';
+        } else if (p1d && p2d) {
+            this.winner = this.p1f.damage < this.p2f.damage ? this.p1f : this.p2f;
+            this.state = 'results';
+        }
+    }
+
+    updateFight() {
+        const p1Inp = this.getPlayerInput(1);
+        this.p1f.update(this.p2f, p1Inp);
+
+        if (this.p2Mode === 'cpu') {
+            const cpuInp = this.p2f.getCpuInput(this.p1f);
+            this.p2f.update(this.p1f, cpuInp);
+        } else {
+            const p2Inp = this.getPlayerInput(2);
+            this.p2f.update(this.p1f, p2Inp);
+        }
+
+        projectiles.forEach(p => p.update(this.p1f, this.p2f));
+        projectiles = projectiles.filter(p => p.active);
+
+        updateParticles();
+
+        if (screenShake > 0) screenShake = Math.max(0, screenShake - 0.5);
+
+        this.checkWinner();
+    }
+
+    getPlayerInput(playerNum) {
+        const keyMap = playerNum === 1 ? P1_KEYS : P2_KEYS;
+        const fighter = playerNum === 1 ? this.p1f : this.p2f;
+        return {
+            left: this.keysPressed[keyMap.left],
+            right: this.keysPressed[keyMap.right],
+            up: this.keysPressed[keyMap.up],
+            down: this.keysPressed[keyMap.down],
+            jump: this.keysPressed[keyMap.up],
+            atk: this.keysPressed[keyMap.atk],
+            spc: this.keysPressed[keyMap.spc],
+            prevJump: fighter.prevJump,
+            prevAtk: fighter.prevAtk,
+            prevSpc: fighter.prevSpc
+        };
+    }
+
+    drawFight() {
+        this.ctx.fillStyle = '#000';
+        this.ctx.fillRect(0, 0, GW, GH);
+
+        let sx = 0, sy = 0;
+        if (screenShake > 0) {
+            sx = (Math.random() - 0.5) * screenShake * 2;
+            sy = (Math.random() - 0.5) * screenShake * 2;
+        }
+
+        if (sx !== 0 || sy !== 0) {
+            this.ctx.save();
+            this.ctx.translate(sx, sy);
+        }
+
+        this.drawStage();
+        projectiles.forEach(p => p.draw(this.ctx));
+        this.p1f.draw(this.ctx);
+        this.p2f.draw(this.ctx);
+        drawParticles(this.ctx);
+
+        if (sx !== 0 || sy !== 0) {
+            this.ctx.restore();
+        }
+
+        this.drawHUD();
+    }
+
+    run() {
+        const gameLoop = () => {
+            this.handleInput();
+
+            // Handle key events from this frame
+            const keysToProcess = Array.from(this.justPressed);
+            keysToProcess.forEach(key => {
+                if (this.state === 'results') {
+                    if (key === 'Enter') {
+                        this.state = 'charselect';
+                        this.justPressed.delete(key);
+                    } else if (key === 'Escape') {
+                        this.state = 'charselect';
+                        this.justPressed.delete(key);
+                    }
+                }
+            });
+
+            if (this.state === 'title') {
+                this.drawTitle();
+                if (this.justPressed.size > 0) {
+                    this.state = 'charselect';
+                }
+            } else if (this.state === 'charselect') {
+                this.handleCharSelect();
+                this.drawCharSelect();
+            } else if (this.state === 'vs') {
+                this.vsTimer++;
+                this.drawVs();
+                if (this.vsTimer >= 150) {
+                    this.startFight();
+                }
+            } else if (this.state === 'fight') {
+                this.updateFight();
+                this.drawFight();
+            } else if (this.state === 'results') {
+                this.drawStage();
+                if (this.p1f) this.p1f.draw(this.ctx);
+                if (this.p2f) this.p2f.draw(this.ctx);
+                this.drawResults();
+            }
+
+            frameCount++;
+            requestAnimationFrame(gameLoop);
+        };
+
+        gameLoop();
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  INPUT HANDLING
+// ═════════════════════════════════════════════════════════════════════════════
+
+const canvas = document.getElementById('game');
+const game = new Game(canvas);
+
+const getKeyName = (code) => {
+    const map = {
+        'KeyA': 'a', 'KeyD': 'd', 'KeyW': 'w', 'KeyS': 's',
+        'KeyZ': 'z', 'KeyX': 'x', 'KeyE': 'e',
+        'KeyK': 'k', 'KeyL': 'l',
+        'ArrowLeft': 'ArrowLeft', 'ArrowRight': 'ArrowRight', 'ArrowUp': 'ArrowUp', 'ArrowDown': 'ArrowDown',
+        'Enter': 'Enter', 'Escape': 'Escape'
+    };
+    return map[code] || code.toLowerCase();
+};
+
+window.addEventListener('keydown', (e) => {
+    const key = getKeyName(e.code);
+    game.keysPressed[key] = true;
+    game.justPressed.add(key);
+});
+
+window.addEventListener('keyup', (e) => {
+    const key = getKeyName(e.code);
+    game.keysPressed[key] = false;
+});
+
+game.run();
+</script>
+</body>
+</html>

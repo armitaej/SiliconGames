@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Wars: Galaxy Bounty</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #000;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            border: 3px solid #4FC3F7;
+            background: #000;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Constants
+const W = 900, H = 600;
+const GROUND_Y = H - 50;
+const FPS = 60;
+const GW = 50000;
+
+// Colors
+const BLACK   = '#000000';
+const WHITE   = '#FFFFFF';
+const YELLOW  = '#FFE81F';
+const CYAN    = '#4FC3F7';
+const RED     = '#EF5350';
+const GREEN   = '#4CAF50';
+const ORANGE  = '#FF6D00';
+const GRAY    = '#505A5A';
+const DGRAY   = '#161A24';
+const LGRAY   = '#B4B9C8';
+const PANEL   = '#0A0E1A';
+const BG_TOP  = '#030310';
+const BG_BOT  = '#0A1424';
+
+// Character definitions
+const CHARS = {
+    'jango': {name:'JANGO FETT', role:'Bounty Hunter', color:'#546E7A', accent:'#FF6D00', hp:100, speed:5, jump_power:12, w:30, h:50, has_jetpack:true, primary_label:'BLASTER', special_label:'ROCKET', special_cd:300, desc:'Jetpack + Rocket on E'},
+    'jabba': {name:'JABBA THE HUTT', role:'Crime Lord', color:'#8D6E37', accent:'#66BB6A', hp:250, speed:2, jump_power:7, w:55, h:38, has_jetpack:false, primary_label:'SLIME SPIT', special_label:'TAIL SLAM', special_cd:240, desc:'Massive HP. Slime slows. Tail slam AOE.'},
+    'grievous': {name:'GEN. GRIEVOUS', role:'Jedi Hunter', color:'#BDBDBD', accent:'#29B6F6', hp:80, speed:7, jump_power:13, w:28, h:52, has_jetpack:false, primary_label:'SABER STRIKE', special_label:'BLADE STORM', special_cd:280, desc:'Blazing speed. Spinning lightsaber storm.'},
+    'phasma': {name:'CAPTAIN PHASMA', role:'First Order', color:'#9E9E9E', accent:'#EF5350', hp:130, speed:4, jump_power:11, w:28, h:50, has_jetpack:false, primary_label:'POWER BLAST', special_label:'ENERGY SHIELD', special_cd:360, desc:'Heavy armor. Energy shield invincibility.'},
+    'poe': {name:'POE DAMERON', role:'Resistance Pilot', color:'#FF8A65', accent:'#FFA726', hp:90, speed:6, jump_power:12, w:26, h:48, has_jetpack:false, primary_label:'RAPID FIRE', special_label:'BARREL ROLL', special_cd:180, desc:'Fastest. Rapid fire. Dash through enemies.'},
+    'mace': {name:'MACE WINDU', role:'Jedi Master', color:'#6A1B9A', accent:'#CE93D8', hp:110, speed:5, jump_power:12, w:28, h:50, has_jetpack:false, primary_label:'PURPLE SABER', special_label:'FORCE PUSH', special_cd:300, desc:'Purple saber. Force push blasts all foes.'},
+    'ig88': {name:'IG-88', role:'Assassin Droid', color:'#78909C', accent:'#FF5722', hp:95, speed:4, jump_power:10, w:22, h:58, has_jetpack:false, primary_label:'DUAL BLASTERS', special_label:'360 SPRAY', special_cd:240, desc:'Dual blasters. 360 spray clears the room.'},
+    'carib': {name:'CARIB DISS', role:'Dark Mercenary', color:'#1A237E', accent:'#7986CB', hp:95, speed:5, jump_power:12, w:28, h:50, has_jetpack:false, primary_label:'FORCE LIGHTNING', special_label:'SHADOW STEP', special_cd:320, desc:'Force lightning. Shadow step teleport.'},
+};
+
+const LEVEL_CONFIG = [
+    {width:2800, max_gap:0, gap_chance:0.00, plat_hi:0.35, e_dens:0.35, e_speed:1.0, e_hp:1, e_shoot:110, coll:0.65},
+    {width:3200, max_gap:28, gap_chance:0.28, plat_hi:0.45, e_dens:0.52, e_speed:1.25, e_hp:1, e_shoot:90, coll:0.55},
+    {width:3600, max_gap:50, gap_chance:0.42, plat_hi:0.55, e_dens:0.68, e_speed:1.50, e_hp:1, e_shoot:72, coll:0.50},
+    {width:4000, max_gap:72, gap_chance:0.55, plat_hi:0.62, e_dens:0.82, e_speed:1.75, e_hp:2, e_shoot:55, coll:0.44},
+    {width:4500, max_gap:92, gap_chance:0.65, plat_hi:0.68, e_dens:1.00, e_speed:2.00, e_hp:2, e_shoot:42, coll:0.40},
+];
+
+// Utility functions
+function colorToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? [parseInt(result[1],16), parseInt(result[2],16), parseInt(result[3],16)] : [0,0,0];
+}
+
+function lighten(hex, f=1.4) {
+    const [r,g,b] = colorToRgb(hex);
+    return `rgb(${Math.min(255, Math.floor(r*f))}, ${Math.min(255, Math.floor(g*f))}, ${Math.min(255, Math.floor(b*f))})`;
+}
+
+function darken(hex, f=0.55) {
+    const [r,g,b] = colorToRgb(hex);
+    return `rgb(${Math.max(0, Math.floor(r*f))}, ${Math.max(0, Math.floor(g*f))}, ${Math.max(0, Math.floor(b*f))})`;
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function dist(ax,ay,bx,by) { return Math.sqrt((ax-bx)**2 + (ay-by)**2); }
+function rects_collide(ax,ay,aw,ah, bx,by,bw,bh) {
+    return ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by;
+}
+
+// Draw glow effect
+function drawGlow(cx, cy, r, col) {
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    const [cr, cg, cb] = colorToRgb(col);
+    grad.addColorStop(0, `rgba(${cr},${cg},${cb},0.3)`);
+    grad.addColorStop(0.5, `rgba(${cr},${cg},${cb},0.1)`);
+    grad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx - r, cy - r, r*2, r*2);
+}
+
+// Draw rounded rect
+function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fill();
+}
+
+// Draw circle
+function drawCircle(cx, cy, r, col) {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.fill();
+}
+
+// Draw line
+function drawLine(x1, y1, x2, y2, col, w=1) {
+    ctx.strokeStyle = col;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+}
+
+// World generation
+function generateWorld(level=1) {
+    const lc = LEVEL_CONFIG[Math.min(level-1, 4)];
+    const lw = lc.width;
+    const platforms = [], enemies = [], collectibles = [];
+
+    platforms.push({x:0, y:GROUND_Y, w:420, h:50, kind:'ground'});
+    let gx = 420;
+
+    while (gx < lw - 350) {
+        const sl = Math.max(120, Math.min(Math.random()*(480-180)+180, lw - gx - 350));
+        platforms.push({x:gx, y:GROUND_Y, w:sl, h:50, kind:'ground'});
+
+        if (Math.random() < lc.plat_hi) {
+            const py = GROUND_Y - 130 - Math.random()*120;
+            platforms.push({x:gx+50+Math.random()*80, y:py, w:80+Math.random()*70, h:16, kind:'platform'});
+        }
+        if (Math.random() > 0.6) {
+            const py = GROUND_Y - 210 - Math.random()*90;
+            platforms.push({x:gx+140+Math.random()*80, y:py, w:60+Math.random()*50, h:16, kind:'platform'});
+        }
+
+        const gap = (lc.max_gap > 0 && Math.random() < lc.gap_chance) ? Math.random()*lc.max_gap + 8 : 0;
+        gx += sl + gap;
+    }
+
+    platforms.push({x:lw-380, y:GROUND_Y, w:450, h:50, kind:'ground'});
+    const portal_x = lw - 200;
+
+    for (const p of platforms) {
+        if (p.x < 350 || p.x > lw - 320 || p.kind !== 'ground') continue;
+        if (Math.random() < lc.e_dens) {
+            const et = Math.random() > 0.38 ? 'trooper' : 'droid';
+            const base_hp = (et === 'trooper' ? 2 : 1) * lc.e_hp;
+            const ex = p.x + 50 + Math.random() * Math.max(0, p.w - 100);
+            enemies.push({
+                x: ex, y: p.y - 44, w: 28, h: 44, kind: et,
+                hp: base_hp, vx: (Math.random()>0.5 ? 1 : -1) * (1 + Math.random()) * lc.e_speed,
+                facing: 1, patrol_left: p.x + 10, patrol_right: p.x + p.w - 40,
+                shoot_timer: Math.random()*lc.e_shoot, shoot_interval: lc.e_shoot,
+                anim_frame: 0, anim_timer: 0, hit: 0, slowed: 0, dead: false
+            });
+        }
+    }
+
+    for (const p of platforms) {
+        if (p.x < 200 || p.x > lw - 200) continue;
+        if (Math.random() < lc.coll) {
+            const r = Math.random();
+            const ct = r > 0.85 ? 'health' : (r > 0.40 ? 'fuel' : 'crystal');
+            collectibles.push({
+                x: p.x + p.w/2, y: p.y - 40, w: 16, h: 16, kind: ct,
+                collected: false, bob: Math.random() * Math.PI * 2
+            });
+        }
+    }
+
+    return {platforms, enemies, collectibles, portal_x};
+}
+
+// Particles and floating text
+const particles = [];
+const floating_texts = [];
+
+function spawnParticles(x, y, col, count, speed=3) {
+    for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const s = Math.random() * speed + 1;
+        const [r,g,b] = colorToRgb(col);
+        particles.push({
+            x: x, y: y, vx: Math.cos(a)*s, vy: Math.sin(a)*s - 1,
+            life: 30 + Math.random()*30, max_life: 60,
+            r, g, b, size: 2 + Math.random()*3
+        });
+    }
+}
+
+function spawnText(x, y, text, col=YELLOW) {
+    floating_texts.push({x, y, text, col, life: 60, vy: -1.5});
+}
+
+// Draw functions for characters
+function drawCharacter(p, camera_x, game_time) {
+    if (p.invincible > 0 && Math.floor(p.invincible/3) % 2 === 0) return;
+    const sx = Math.floor(p.x - camera_x);
+    const sy = Math.floor(p.y);
+    const cfg = CHARS[p.char];
+    const [r, g, b] = colorToRgb(cfg.color);
+
+    // Glow effects
+    if (p.char === 'jango') {
+        if (p.jetpack_on && p.jetpack_fuel > 0) {
+            drawGlow(sx + 12, sy + 40, 12, ORANGE);
+            drawGlow(sx + 22, sy + 40, 12, ORANGE);
+        }
+        if (p.shoot_cd > 7) {
+            drawGlow(sx + (p.facing > 0 ? p.w + 5 : -5), sy + 15, 6, ORANGE);
+        }
+    } else if (p.char === 'phasma') {
+        if (p.shield_active) {
+            drawGlow(sx + p.w/2, sy + p.h/2, 40, RED);
+        }
+        if (p.shoot_cd > 6) {
+            drawGlow(sx + (p.facing > 0 ? p.w + 5 : -5), sy + 20, 6, RED);
+        }
+    } else if (p.char === 'poe') {
+        if (p.dash_active) {
+            ctx.fillStyle = `rgba(255, 167, 38, 0.2)`;
+            ctx.fillRect(sx - 5, sy, p.w + 10, p.h);
+        }
+        if (p.shoot_cd > 4) {
+            drawGlow(sx + (p.facing > 0 ? p.w + 5 : -5), sy + 20, 5, ORANGE);
+        }
+    } else if (p.char === 'grievous') {
+        if (p.spin_active) {
+            ctx.strokeStyle = `rgba(41, 182, 246, 0.4)`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(sx + p.w/2, sy + p.h/2, 35, 0, Math.PI*2);
+            ctx.stroke();
+        }
+    } else if (p.char === 'mace') {
+        if (p.special_cd > p.special_max_cd - 28) {
+            const r_ring = 65 + (p.special_max_cd - p.special_cd)*2.2;
+            ctx.strokeStyle = `rgba(121, 134, 203, 0.4)`;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(sx + p.w/2, sy + p.h/2, r_ring, 0, Math.PI*2);
+            ctx.stroke();
+        }
+    }
+
+    // Character body
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    roundRect(sx, sy, p.w, p.h, 3);
+
+    // Character accent stripe
+    ctx.fillStyle = cfg.accent;
+    ctx.fillRect(sx + 2, sy + p.h/3, p.w - 4, 2);
+
+    // Eyes/face
+    ctx.fillStyle = WHITE;
+    ctx.fillRect(sx + p.w*0.2, sy + p.h*0.2, 3, 3);
+    ctx.fillRect(sx + p.w*0.7, sy + p.h*0.2, 3, 3);
+
+    // Direction indicator
+    if (p.facing < 0) {
+        ctx.fillStyle = YELLOW;
+        ctx.fillRect(sx + 2, sy + p.h/2 - 2, 3, 4);
+    } else {
+        ctx.fillStyle = YELLOW;
+        ctx.fillRect(sx + p.w - 5, sy + p.h/2 - 2, 3, 4);
+    }
+}
+
+function drawEnemy(e, camera_x) {
+    if (e.dead && e.hit <= 0) return;
+    const sx = Math.floor(e.x - camera_x);
+    const sy = Math.floor(e.y);
+
+    let alpha = 255;
+    if (e.hit > 0) alpha = Math.floor(140 + Math.sin(e.hit*0.6)*115);
+    if (e.slowed > 0) alpha = Math.min(alpha, 175);
+
+    ctx.globalAlpha = alpha / 255;
+
+    if (e.kind === 'trooper') {
+        // Trooper body
+        ctx.fillStyle = '#D8D8D8';
+        roundRect(sx + 3, sy + 15, 18, 22, 2);
+
+        // Legs
+        ctx.fillStyle = '#C8C8C8';
+        ctx.fillRect(sx+4, sy+34, 8, 12);
+        ctx.fillRect(sx+16, sy+34, 8, 12);
+
+        // Head
+        ctx.fillStyle = '#DCDCDC';
+        ctx.beginPath();
+        ctx.arc(sx+14, sy+8, 8, 0, Math.PI*2);
+        ctx.fill();
+
+        // Eyes
+        ctx.fillStyle = '#1A1A14';
+        ctx.fillRect(sx+7, sy+5, 4, 6);
+        ctx.fillRect(sx+15, sy+5, 4, 6);
+
+        // Chest plate
+        ctx.strokeStyle = CYAN;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx+5, sy+18, 14, 12);
+    } else {
+        // Droid body
+        ctx.fillStyle = '#B8956A';
+        roundRect(sx + 5, sy + 12, 14, 22, 2);
+
+        // Droid head
+        ctx.fillStyle = '#D4A574';
+        ctx.beginPath();
+        ctx.arc(sx+14, sy+7, 7, 0, Math.PI*2);
+        ctx.fill();
+
+        // Optical sensors
+        ctx.fillStyle = '#FF5722';
+        ctx.fillRect(sx+9, sy+4, 4, 3);
+        ctx.fillRect(sx+15, sy+4, 4, 3);
+
+        // Legs
+        ctx.fillStyle = '#A89066';
+        ctx.fillRect(sx+9, sy+34, 4, 10);
+        ctx.fillRect(sx+15, sy+34, 4, 10);
+    }
+
+    if (e.slowed > 0) {
+        ctx.fillStyle = `rgba(80, 200, 80, 0.3)`;
+        ctx.fillRect(sx, sy, e.w, e.h);
+    }
+
+    ctx.globalAlpha = 1;
+
+    if (!e.dead) {
+        const max_hp = e.kind === 'trooper' ? 2 : 1;
+        const r = Math.min(1, e.hp / max_hp);
+        const hcol = r > 0.5 ? GREEN : (r > 0.25 ? ORANGE : RED);
+        ctx.fillStyle = '#141419';
+        ctx.fillRect(sx+1, sy-9, 26, 5);
+        ctx.fillStyle = hcol;
+        ctx.fillRect(sx+1, sy-9, 26*r, 5);
+        ctx.strokeStyle = lighten(hcol, 1.3);
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx+1, sy-9, 26*r, 2);
+    }
+}
+
+function drawCollectible(c, camera_x, game_time) {
+    if (c.collected) return;
+    const sx = Math.floor(c.x - camera_x);
+    const bob = Math.floor(Math.sin(game_time*0.055 + c.bob)*5);
+    const sy = Math.floor(c.y + bob);
+
+    if (c.kind === 'crystal') {
+        drawGlow(sx+8, sy+8, 15, YELLOW);
+        ctx.fillStyle = YELLOW;
+        ctx.fillRect(sx+6, sy+6, 4, 4);
+    } else if (c.kind === 'fuel') {
+        drawGlow(sx+8, sy+8, 12, ORANGE);
+        ctx.fillStyle = ORANGE;
+        roundRect(sx+4, sy+3, 8, 10, 2);
+    } else {
+        drawGlow(sx+8, sy+8, 12, GREEN);
+        ctx.fillStyle = GREEN;
+        roundRect(sx+3, sy+3, 10, 10, 3);
+    }
+}
+
+function drawPlatform(p, camera_x) {
+    const sx = Math.floor(p.x - camera_x);
+    const sw = Math.floor(p.w);
+    const sy = Math.floor(p.y);
+    const sh = Math.floor(p.h);
+
+    if (p.kind === 'ground') {
+        ctx.fillStyle = '#212A34';
+        ctx.fillRect(sx, sy, sw, sh);
+        ctx.strokeStyle = CYAN;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(sx, sy, sw, sh);
+    } else {
+        ctx.fillStyle = '#326450';
+        ctx.fillRect(sx, sy, sw, sh);
+        ctx.strokeStyle = CYAN;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(sx, sy, sw, sh);
+    }
+}
+
+function drawProjectile(p, camera_x) {
+    const sx = Math.floor(p.x - camera_x);
+    const sy = Math.floor(p.y);
+
+    if (p.ptype === 'slime') {
+        const col = '#50C878';
+        drawGlow(sx+7, sy+7, 12, col);
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(sx+7, sy+7, 6, 0, Math.PI*2);
+        ctx.fill();
+    } else if (p.ptype === 'lightning') {
+        ctx.strokeStyle = '#3E41F5';
+        ctx.lineWidth = 3;
+        let px = sx, py = sy+3;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        for (let i = 0; i < 4; i++) {
+            px += (p.vx > 0 ? 9 : -9);
+            py += (Math.random()-0.5)*10;
+            ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = '#8291FF';
+        ctx.lineWidth = 1;
+        px = sx;
+        py = sy+3;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        for (let i = 0; i < 4; i++) {
+            px += (p.vx > 0 ? 9 : -9);
+            py += (Math.random()-0.5)*10;
+            ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+    } else if (p.ptype === 'rocket') {
+        const mid_y = sy + 3;
+        drawGlow(sx+8, mid_y, 14, ORANGE);
+        ctx.fillStyle = '#A03700';
+        roundRect(sx, sy, 16, 7, 2);
+        ctx.fillStyle = ORANGE;
+        ctx.fillRect(sx+2, sy+1, 10, 5);
+
+        const nose_x = p.vx > 0 ? sx - 4 : sx + 16;
+        ctx.fillStyle = '#FF3700';
+        ctx.beginPath();
+        ctx.moveTo(nose_x, mid_y);
+        ctx.lineTo(nose_x + (p.vx > 0 ? 5 : -5), sy);
+        ctx.lineTo(nose_x + (p.vx > 0 ? 5 : -5), sy+7);
+        ctx.closePath();
+        ctx.fill();
+
+        const ex = p.vx > 0 ? sx - 2 : sx + 18;
+        drawGlow(ex, mid_y, 8, ORANGE);
+        ctx.fillStyle = '#FFDC64';
+        ctx.beginPath();
+        ctx.arc(ex, mid_y, 3, 0, Math.PI*2);
+        ctx.fill();
+    } else {
+        const col = p.friendly ? ORANGE : RED;
+        drawGlow(sx+p.w/2, sy+p.h/2, Math.max(p.w, p.h)/2 + 5, col);
+        ctx.fillStyle = col;
+        roundRect(sx, sy, p.w, p.h, 1);
+        ctx.fillStyle = lighten(col, 2.0);
+        ctx.fillRect(sx+1, sy, Math.max(1, p.w-2), p.h);
+    }
+}
+
+// Game class
+class Game {
+    constructor() {
+        this.state = 'menu';
+        this.level = 1;
+        this.score = 0;
+        this.high_score = 0;
+        this.camera_x = 0;
+        this.game_time = 0;
+        this.shake_timer = 0;
+        this.shake_intensity = 0;
+        this.selected_char = 'jango';
+        this.char_keys = Object.keys(CHARS);
+        this.char_cursor = 0;
+        this.player = null;
+        this.platforms = [];
+        this.enemies = [];
+        this.collectibles = [];
+        this.projectiles = [];
+        this.melee_hits = [];
+        this.portal_x = 9999;
+        this.keys_held = {};
+        this.keys_just_pressed = new Set();
+    }
+
+    makePlayer(char_key='jango') {
+        const cfg = CHARS[char_key];
+        return {
+            x: 100, y: 300, w: cfg.w, h: cfg.h,
+            vx: 0, vy: 0, on_ground: false, hp: cfg.hp, max_hp: cfg.hp,
+            facing: 1, shoot_cd: 0, jetpack_fuel: 100, jetpack_max_fuel: 100,
+            jetpack_on: false, invincible: 0, double_jump: true,
+            anim_frame: 0, anim_timer: 0, running: false, char: char_key,
+            special_cd: 0, special_max_cd: cfg.special_cd,
+            melee_active: false, melee_timer: 0, shield_active: false, shield_timer: 0,
+            dash_active: false, dash_timer: 0, spin_active: false, spin_timer: 0,
+            _jump_released: true, _special_released: true
+        };
+    }
+
+    reset(char_key=null, level=1) {
+        if (char_key) this.selected_char = char_key;
+        this.level = level;
+        this.player = this.makePlayer(this.selected_char);
+        this.score = 0;
+        this.camera_x = 0;
+        this.game_time = 0;
+        this.shake_timer = 0;
+        this.projectiles = [];
+        this.melee_hits = [];
+        particles.length = 0;
+        floating_texts.length = 0;
+
+        const {platforms, enemies, collectibles, portal_x} = generateWorld(level);
+        this.platforms = platforms;
+        this.enemies = enemies;
+        this.collectibles = collectibles;
+        this.portal_x = portal_x;
+    }
+
+    update() {
+        if (this.state === 'menu') {
+            this._updateMenu();
+        } else if (this.state === 'charselect') {
+            this._updateCharSelect();
+        } else if (this.state === 'playing') {
+            this._updateGame();
+        } else if (this.state === 'gameover') {
+            this._updateGameOver();
+        } else if (this.state === 'levelcomplete') {
+            this._updateLevelComplete();
+        } else if (this.state === 'victory') {
+            this._updateVictory();
+        }
+        this.game_time++;
+        if (this.shake_timer > 0) this.shake_timer--;
+        this.keys_just_pressed.clear();
+    }
+
+    _updateMenu() {
+        if (this.keys_just_pressed.has('Enter') || this.keys_just_pressed.has(' ')) {
+            this.state = 'charselect';
+            this.char_cursor = this.char_keys.indexOf(this.selected_char);
+        }
+    }
+
+    _updateCharSelect() {
+        const n = this.char_keys.length;
+        let moved = false;
+
+        for (const key of this.keys_just_pressed) {
+            if (key === 'ArrowRight' || key.toLowerCase() === 'd') {
+                this.char_cursor = (this.char_cursor + 1) % n;
+                moved = true;
+            }
+            if (key === 'ArrowLeft' || key.toLowerCase() === 'a') {
+                this.char_cursor = (this.char_cursor - 1 + n) % n;
+                moved = true;
+            }
+            if (key === 'ArrowDown' || key.toLowerCase() === 's') {
+                this.char_cursor = (this.char_cursor + 4) % n;
+                moved = true;
+            }
+            if (key === 'ArrowUp' || key.toLowerCase() === 'w') {
+                this.char_cursor = (this.char_cursor - 4 + n*4) % n;
+                moved = true;
+            }
+        }
+
+        this.selected_char = this.char_keys[this.char_cursor];
+
+        for (const key of this.keys_just_pressed) {
+            if (key === 'Enter' || key === ' ') {
+                this.reset(this.selected_char, 1);
+                this.state = 'playing';
+            }
+        }
+    }
+
+    _updateGame() {
+        if (this.shake_timer > 0) this.shake_timer--;
+
+        // Physics
+        this.player.vy += 0.6;
+        this.player.x += this.player.vx;
+        this.player.y += this.player.vy;
+        if (this.player.invincible > 0) this.player.invincible--;
+        this.player.on_ground = false;
+
+        // Collision with platforms
+        for (const p of this.platforms) {
+            if (this.player.x + this.player.w > p.x && this.player.x < p.x + p.w) {
+                if (this.player.vy > 0 && this.player.y + this.player.h > p.y &&
+                    this.player.y + this.player.h < p.y + p.h + this.player.vy + 4) {
+                    this.player.y = p.y - this.player.h;
+                    this.player.vy = 0;
+                    this.player.on_ground = true;
+                    this.player.double_jump = true;
+                }
+            }
+        }
+
+        if (this.player.y > H + 100) this.player.hp = 0;
+
+        // Player input
+        this.player.running = false;
+        if (this.keys_held['ArrowLeft'] || this.keys_held['a']) {
+            this.player.vx = -CHARS[this.player.char].speed;
+            this.player.facing = -1;
+            this.player.running = true;
+        } else if (this.keys_held['ArrowRight'] || this.keys_held['d']) {
+            this.player.vx = CHARS[this.player.char].speed;
+            this.player.facing = 1;
+            this.player.running = true;
+        } else {
+            this.player.vx *= 0.7;
+        }
+
+        if (this.player.running) {
+            this.player.anim_timer++;
+            if (this.player.anim_timer > 4) {
+                this.player.anim_timer = 0;
+                this.player.anim_frame++;
+            }
+        }
+
+        // Jump
+        const cfg = CHARS[this.player.char];
+        const jump_pressed = this.keys_held['ArrowUp'] || this.keys_held['w'] || this.keys_held['W'];
+        const jump_just = this.keys_just_pressed.has('ArrowUp') || this.keys_just_pressed.has('w') || this.keys_just_pressed.has('W');
+
+        if (jump_pressed) {
+            if (this.player.on_ground && this.player._jump_released) {
+                this.player.vy = -cfg.jump_power;
+                this.player.on_ground = false;
+                this.player.double_jump = this.player.char !== 'jabba';
+                this.player._jump_released = false;
+            }
+        } else {
+            this.player._jump_released = true;
+        }
+
+        // Double jump
+        if (jump_pressed && !this.player.on_ground && this.player.double_jump && jump_just) {
+            this.player.vy = -cfg.jump_power * 0.85;
+            this.player.double_jump = false;
+            spawnParticles(this.player.x + this.player.w/2, this.player.y + this.player.h, ORANGE, 6, 2);
+        }
+
+        // Jetpack (Jango)
+        if (this.player.char === 'jango') {
+            this.player.jetpack_on = false;
+            const jetpack_pressed = this.keys_held['Shift'];
+            if (jetpack_pressed && this.player.jetpack_fuel > 0) {
+                this.player.jetpack_on = true;
+                this.player.vy -= 0.9;
+                if (this.player.vy < -7) this.player.vy = -7;
+                this.player.jetpack_fuel = Math.max(0, this.player.jetpack_fuel - 0.4);
+                if (this.game_time % 2 === 0) {
+                    spawnParticles(this.player.x + 10, this.player.y + this.player.h, ORANGE, 2, 2);
+                }
+            }
+            if (this.player.on_ground && this.player.jetpack_fuel < this.player.jetpack_max_fuel) {
+                this.player.jetpack_fuel = Math.min(this.player.jetpack_max_fuel, this.player.jetpack_fuel + 0.5);
+            }
+        }
+
+        // Primary attack
+        if (this.keys_held[' '] && this.player.shoot_cd <= 0) {
+            this._doPrimary();
+        }
+        if (this.player.shoot_cd > 0) this.player.shoot_cd--;
+
+        // Special
+        const special_pressed = this.keys_held['e'] || this.keys_held['E'];
+        if (special_pressed && this.player._special_released && this.player.special_cd <= 0) {
+            this.player._special_released = false;
+            this._doSpecial();
+        }
+        if (!special_pressed) this.player._special_released = true;
+        if (this.player.special_cd > 0) this.player.special_cd--;
+
+        // Update enemies
+        for (const e of this.enemies) {
+            if (e.dead) {
+                if (e.hit > 0) e.hit--;
+                continue;
+            }
+            if (e.hit > 0) e.hit--;
+            if (e.slowed > 0) e.slowed--;
+            e.x += e.vx * (e.slowed > 0 ? 0.5 : 1.0);
+            if (Math.abs(e.vx) > 2) e.vx *= 0.9;
+            if (e.x <= e.patrol_left) {
+                e.vx = Math.abs(e.vx) || 1.5;
+                e.facing = 1;
+            }
+            if (e.x >= e.patrol_right) {
+                e.vx = -(Math.abs(e.vx) || 1.5);
+                e.facing = -1;
+            }
+
+            if (e.kind === 'trooper') {
+                e.shoot_timer--;
+                if (e.shoot_timer <= 0) {
+                    const dx = this.player.x - e.x;
+                    if (Math.abs(dx) < 400) {
+                        const d2 = dx > 0 ? 1 : -1;
+                        this.projectiles.push({
+                            x: e.x + e.w/2 + d2*15, y: e.y + 18,
+                            w: 8, h: 3, vx: d2*7, vy: 0,
+                            friendly: false, ptype: 'bolt', life: 100
+                        });
+                    }
+                    e.shoot_timer = e.shoot_interval + Math.random()*Math.max(10, e.shoot_interval/3);
+                }
+            }
+        }
+
+        // Projectiles
+        const keep_proj = [];
+        for (const p of this.projectiles) {
+            p.x += p.vx;
+            if (p.vy !== undefined) {
+                p.y += p.vy;
+                if (p.gravity) p.vy += p.gravity;
+            }
+            p.life--;
+            let remove = false;
+
+            if (!p.friendly && this.player.invincible <= 0) {
+                if (rects_collide(this.player.x, this.player.y, this.player.w, this.player.h,
+                                 p.x, p.y, p.w, p.h)) {
+                    this.player.hp -= 10;
+                    this.player.invincible = 30;
+                    spawnParticles(this.player.x + this.player.w/2, this.player.y + this.player.h/2, RED, 6);
+                    remove = true;
+                }
+            }
+
+            if (p.friendly && !remove) {
+                for (const e of this.enemies) {
+                    if (e.dead) continue;
+                    if (rects_collide(p.x, p.y, p.w, p.h, e.x, e.y, e.w, e.h)) {
+                        const dmg = p.dmg || 1;
+                        e.hp -= dmg;
+                        e.hit = 10;
+                        e.vx = (p.vx > 0 ? 1 : -1) * 4;
+                        e.patrol_left = e.x - 80;
+                        e.patrol_right = e.x + 80;
+                        if (p.ptype === 'slime') e.slowed = 120;
+                        spawnParticles(e.x + e.w/2, e.y + e.h/2, ORANGE, 8);
+                        if (e.hp <= 0) {
+                            e.dead = true;
+                            const pts = e.kind === 'trooper' ? 100 : 50;
+                            this.score += pts;
+                            spawnText(e.x, e.y, `+${pts}`);
+                            spawnParticles(e.x + e.w/2, e.y + e.h/2, YELLOW, 15, 5);
+                        }
+                        if (p.explodes) {
+                            spawnParticles(p.x, p.y, ORANGE, 25, 7);
+                            spawnParticles(p.x, p.y, YELLOW, 15, 5);
+                            spawnText(p.x, p.y, 'BOOM!', ORANGE);
+                            for (const e2 of this.enemies) {
+                                if (e2.dead || e2 === e) continue;
+                                if (dist(p.x, p.y, e2.x + e2.w/2, e2.y + e2.h/2) < 80) {
+                                    e2.hp -= 1;
+                                    e2.hit = 10;
+                                    if (e2.hp <= 0) {
+                                        e2.dead = true;
+                                        const pts2 = e2.kind === 'trooper' ? 100 : 50;
+                                        this.score += pts2;
+                                        spawnText(e2.x, e2.y, '+BOOM', ORANGE);
+                                    }
+                                }
+                            }
+                            remove = true;
+                            break;
+                        }
+                        remove = true;
+                        break;
+                    }
+                }
+            }
+
+            if (p.explodes && p.life <= 0) {
+                spawnParticles(p.x, p.y, ORANGE, 20, 6);
+                remove = true;
+            }
+
+            if (!remove && p.life > 0 && p.x > this.camera_x - 100 && p.x < this.camera_x + W + 100) {
+                keep_proj.push(p);
+            }
+        }
+        this.projectiles = keep_proj;
+
+        // Melee hits
+        const keep_melee = [];
+        for (const mh of this.melee_hits) {
+            mh.life--;
+            if (mh.life > 0 && mh.friendly) {
+                for (const e of this.enemies) {
+                    if (e.dead || e.hit > 0) continue;
+                    if (rects_collide(mh.x, mh.y, mh.w, mh.h, e.x, e.y, e.w, e.h)) {
+                        const dmg = mh.dmg || 1;
+                        e.hp -= dmg;
+                        e.hit = 10;
+                        e.vx = (mh.x < e.x ? 1 : -1) * 5;
+                        e.patrol_left = e.x - 60;
+                        e.patrol_right = e.x + 60;
+                        if (e.hp <= 0) {
+                            e.dead = true;
+                            const pts = e.kind === 'trooper' ? 110 : 55;
+                            this.score += pts;
+                            spawnText(e.x, e.y, `+${pts}`);
+                            spawnParticles(e.x + e.w/2, e.y + e.h/2, YELLOW, 15, 5);
+                        }
+                        spawnParticles(e.x + e.w/2, e.y + e.h/2, ORANGE, 6, 3);
+                    }
+                }
+            }
+            if (mh.life > 0) keep_melee.push(mh);
+        }
+        this.melee_hits = keep_melee;
+
+        // Handle spin attack (Grievous)
+        if (this.player.spin_active) {
+            this.player.spin_timer--;
+            if (this.player.spin_timer <= 0) {
+                this.player.spin_active = false;
+            } else if (this.game_time % 6 === 0) {
+                for (const e of this.enemies) {
+                    if (e.dead) continue;
+                    const d = dist(
+                        this.player.x + this.player.w/2, this.player.y + this.player.h/2,
+                        e.x + e.w/2, e.y + e.h/2
+                    );
+                    if (d < 60) {
+                        e.hp -= 1;
+                        e.hit = 8;
+                        const a = Math.atan2(e.y - this.player.y, e.x - this.player.x);
+                        e.vx = Math.cos(a) * 6;
+                        e.patrol_left = e.x - 50;
+                        e.patrol_right = e.x + 50;
+                        if (e.hp <= 0) {
+                            e.dead = true;
+                            const pts = e.kind === 'trooper' ? 100 : 50;
+                            this.score += pts;
+                            spawnText(e.x, e.y, `+${pts}`);
+                        }
+                        spawnParticles(e.x + e.w/2, e.y + e.h/2, '#29B6F6', 6, 3);
+                    }
+                }
+            }
+        }
+
+        // Handle dash (Poe)
+        if (this.player.dash_active) {
+            this.player.dash_timer--;
+            if (this.player.dash_timer <= 0) {
+                this.player.dash_active = false;
+            } else {
+                this.player.vx = this.player.facing * (18 - (30-this.player.dash_timer)*0.4);
+            }
+        }
+
+        // Handle shield (Phasma)
+        if (this.player.shield_active) {
+            this.player.shield_timer--;
+            if (this.player.shield_timer <= 0) {
+                this.player.shield_active = false;
+            }
+        }
+
+        if (this.player.melee_timer > 0) {
+            this.player.melee_timer--;
+        } else {
+            this.player.melee_active = false;
+        }
+
+        // Collectibles
+        for (const c of this.collectibles) {
+            if (c.collected) continue;
+            if (rects_collide(this.player.x, this.player.y, this.player.w, this.player.h,
+                             c.x, c.y, c.w, c.h)) {
+                c.collected = true;
+                if (c.kind === 'crystal') {
+                    this.score += 50;
+                    spawnText(c.x, c.y, '+50');
+                    spawnParticles(c.x + 8, c.y + 8, YELLOW, 10, 3);
+                } else if (c.kind === 'fuel') {
+                    if (this.player.char === 'jango') {
+                        this.player.jetpack_fuel = Math.min(this.player.jetpack_fuel + 40, this.player.jetpack_max_fuel);
+                    } else {
+                        this.player.special_cd = Math.max(0, this.player.special_cd - 80);
+                        spawnText(c.x, c.y, '-COOLDOWN', ORANGE);
+                    }
+                    spawnParticles(c.x + 8, c.y + 8, ORANGE, 10, 3);
+                } else {
+                    this.player.hp = Math.min(this.player.hp + 25, this.player.max_hp);
+                    spawnText(c.x, c.y, '+25 HP', GREEN);
+                    spawnParticles(c.x + 8, c.y + 8, GREEN, 10, 3);
+                }
+            }
+        }
+
+        // Particle updates
+        for (const p of particles) {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.05;
+            p.life--;
+        }
+        particles.length = particles.filter(p => p.life > 0).length;
+
+        // Floating text updates
+        for (const t of floating_texts) {
+            t.y += t.vy;
+            t.life--;
+        }
+        floating_texts.length = floating_texts.filter(t => t.life > 0).length;
+
+        // Camera
+        const target = this.player.x - W * 0.35;
+        this.camera_x += (target - this.camera_x) * 0.1;
+        if (this.camera_x < 0) this.camera_x = 0;
+
+        // Portal exit check
+        const pcx = this.player.x + this.player.w/2;
+        if (Math.abs(pcx - (this.portal_x + 33)) < 55 && this.player.y > GROUND_Y - 120) {
+            if (this.score > this.high_score) this.high_score = this.score;
+            spawnParticles(this.player.x + this.player.w/2, this.player.y + this.player.h/2, CYAN, 25, 6);
+            this.state = 'levelcomplete';
+        } else if (this.player.hp <= 0) {
+            this.state = 'gameover';
+            if (this.score > this.high_score) this.high_score = this.score;
+            spawnParticles(this.player.x + this.player.w/2, this.player.y + this.player.h/2, RED, 30, 6);
+            this.shake_timer = 15;
+            this.shake_intensity = 6;
+        }
+
+        // Score increment
+        if (this.game_time % 30 === 0) this.score++;
+    }
+
+    _doPrimary() {
+        const cfg = CHARS[this.player.char];
+        const f = this.player.facing;
+
+        if (this.player.char === 'jango') {
+            this.player.shoot_cd = 12;
+            this.projectiles.push({
+                x: this.player.x + (f>0 ? this.player.w+8 : -12),
+                y: this.player.y + 22,
+                w: 10, h: 3, vx: f*12, vy: 0,
+                friendly: true, ptype: 'bolt', life: 100, dmg: 1
+            });
+        } else if (this.player.char === 'jabba') {
+            this.player.shoot_cd = 25;
+            this.projectiles.push({
+                x: this.player.x + (f>0 ? this.player.w+4 : -14),
+                y: this.player.y + 8,
+                w: 14, h: 14, vx: f*6, vy: -3, gravity: 0.2,
+                friendly: true, ptype: 'slime', life: 90, dmg: 1
+            });
+        } else if (this.player.char === 'grievous') {
+            this.player.shoot_cd = 20;
+            this.player.melee_active = true;
+            this.player.melee_timer = 12;
+            const mx = f > 0 ? this.player.x + this.player.w : this.player.x - 36;
+            this.melee_hits.push({
+                x: mx, y: this.player.y + 10,
+                w: 36, h: 38, life: 12, friendly: true, dmg: 2
+            });
+            spawnParticles(this.player.x + (f>0 ? this.player.w : 0), this.player.y + 20, '#29B6F6', 8, 3);
+        } else if (this.player.char === 'phasma') {
+            this.player.shoot_cd = 18;
+            this.projectiles.push({
+                x: this.player.x + (f>0 ? this.player.w+10 : -16),
+                y: this.player.y + 24,
+                w: 14, h: 4, vx: f*11, vy: 0,
+                friendly: true, ptype: 'bolt', life: 110, dmg: 2
+            });
+        } else if (this.player.char === 'poe') {
+            this.player.shoot_cd = 7;
+            this.projectiles.push({
+                x: this.player.x + (f>0 ? this.player.w+5 : -10),
+                y: this.player.y + 24,
+                w: 8, h: 3, vx: f*14, vy: 0,
+                friendly: true, ptype: 'bolt', life: 80, dmg: 1
+            });
+        } else if (this.player.char === 'mace') {
+            this.player.shoot_cd = 18;
+            this.player.melee_active = true;
+            this.player.melee_timer = 14;
+            const mx = f > 0 ? this.player.x + this.player.w : this.player.x - 32;
+            this.melee_hits.push({
+                x: mx, y: this.player.y + 4,
+                w: 32, h: 44, life: 14, friendly: true, dmg: 2
+            });
+            spawnParticles(this.player.x + (f>0 ? this.player.w : 0), this.player.y + 18, '#CE93D8', 8, 3);
+        } else if (this.player.char === 'ig88') {
+            this.player.shoot_cd = 14;
+            this.projectiles.push({
+                x: this.player.x + (f>0 ? this.player.w : -8),
+                y: this.player.y + 42,
+                w: 9, h: 3, vx: f*11, vy: 0,
+                friendly: true, ptype: 'bolt', life: 90, dmg: 1
+            });
+            this.projectiles.push({
+                x: this.player.x + (f<0 ? this.player.w : -8),
+                y: this.player.y + 42,
+                w: 9, h: 3, vx: -f*9, vy: 0,
+                friendly: true, ptype: 'bolt', life: 90, dmg: 1
+            });
+        } else if (this.player.char === 'carib') {
+            this.player.shoot_cd = 16;
+            this.projectiles.push({
+                x: this.player.x + (f>0 ? this.player.w+2 : -16),
+                y: this.player.y + 30,
+                w: 20, h: 6, vx: f*11, vy: 0,
+                friendly: true, ptype: 'lightning', life: 80, dmg: 1
+            });
+        }
+    }
+
+    _doSpecial() {
+        const cfg = CHARS[this.player.char];
+        this.player.special_cd = this.player.special_max_cd;
+        const f = this.player.facing;
+
+        if (this.player.char === 'jango') {
+            this.projectiles.push({
+                x: this.player.x + (f>0 ? this.player.w+4 : -14),
+                y: this.player.y + 22,
+                w: 16, h: 6, vx: f*10, vy: 0,
+                friendly: true, ptype: 'rocket', life: 120, explodes: true, dmg: 1
+            });
+        } else if (this.player.char === 'jabba') {
+            spawnParticles(this.player.x + 27, this.player.y + 30, '#66BB6A', 30, 6);
+            spawnText(this.player.x, this.player.y, 'TAIL SLAM!', '#66BB6A');
+            const cx = this.player.x + 27, cy = this.player.y + 30;
+            for (const e of this.enemies) {
+                if (e.dead) continue;
+                const d = dist(cx, cy, e.x + e.w/2, e.y + e.h/2);
+                if (d < 120) {
+                    e.hp -= 2;
+                    e.hit = 15;
+                    const a = Math.atan2(e.y - this.player.y, e.x - this.player.x);
+                    e.vx = Math.cos(a) * 10;
+                    e.patrol_left = e.x - 80;
+                    e.patrol_right = e.x + 80;
+                    spawnParticles(e.x + e.w/2, e.y + e.h/2, '#66BB6A', 12, 4);
+                    if (e.hp <= 0) {
+                        e.dead = true;
+                        const pts = e.kind === 'trooper' ? 150 : 75;
+                        this.score += pts;
+                        spawnText(e.x, e.y, `+${pts}`);
+                    }
+                }
+            }
+        } else if (this.player.char === 'grievous') {
+            this.player.spin_active = true;
+            this.player.spin_timer = 60;
+            spawnText(this.player.x, this.player.y, 'BLADE STORM!', '#29B6F6');
+        } else if (this.player.char === 'phasma') {
+            this.player.shield_active = true;
+            this.player.shield_timer = 180;
+            this.player.invincible = 180;
+            spawnText(this.player.x, this.player.y, 'SHIELD UP!', RED);
+        } else if (this.player.char === 'poe') {
+            this.player.dash_active = true;
+            this.player.dash_timer = 30;
+            this.player.invincible = 30;
+            this.player.vx = f * 18;
+            spawnText(this.player.x, this.player.y, 'ROLL!', ORANGE);
+            spawnParticles(this.player.x + 13, this.player.y + 24, ORANGE, 15, 4);
+        } else if (this.player.char === 'mace') {
+            spawnText(this.player.x, this.player.y, 'FORCE PUSH!', '#CE93D8');
+            for (const e of this.enemies) {
+                if (e.dead) continue;
+                const d = dist(this.player.x, this.player.y + 25, e.x + e.w/2, e.y + e.h/2);
+                if (d < 200) {
+                    e.hp -= 1;
+                    e.hit = 12;
+                    const a = Math.atan2(e.y - this.player.y, e.x - this.player.x);
+                    e.vx = Math.cos(a) * 14;
+                    e.patrol_left = e.x - 100;
+                    e.patrol_right = e.x + 100;
+                    spawnParticles(e.x + e.w/2, e.y + e.h/2, '#CE93D8', 12, 5);
+                    if (e.hp <= 0) {
+                        e.dead = true;
+                        const pts = e.kind === 'trooper' ? 120 : 60;
+                        this.score += pts;
+                        spawnText(e.x, e.y, `+${pts}`);
+                    }
+                }
+            }
+            for (let i = 0; i < 16; i++) {
+                const ag = (i/16) * Math.PI * 2;
+                spawnParticles(
+                    this.player.x + this.player.w/2 + Math.cos(ag)*30,
+                    this.player.y + 25 + Math.sin(ag)*30,
+                    '#CE93D8', 1, 0.1
+                );
+            }
+        } else if (this.player.char === 'ig88') {
+            spawnText(this.player.x, this.player.y, '360 SPRAY!', '#FF5722');
+            for (let i = 0; i < 8; i++) {
+                const ag = (i/8) * Math.PI * 2;
+                this.projectiles.push({
+                    x: this.player.x + this.player.w/2,
+                    y: this.player.y + 30,
+                    w: 8, h: 3,
+                    vx: Math.cos(ag)*10,
+                    vy: Math.sin(ag)*10,
+                    friendly: true, ptype: 'bolt', life: 60, dmg: 1
+                });
+            }
+        } else if (this.player.char === 'carib') {
+            let nearest = null, near_d = 999999;
+            for (const e of this.enemies) {
+                if (e.dead) continue;
+                const d = dist(this.player.x, this.player.y, e.x, e.y);
+                if (d < near_d && d < 400) {
+                    near_d = d;
+                    nearest = e;
+                }
+            }
+            if (nearest) {
+                spawnParticles(this.player.x + 14, this.player.y + 25, '#3F51B5', 20, 5);
+                this.player.x = nearest.x + (f>0 ? nearest.w+5 : -this.player.w-5);
+                this.player.y = nearest.y;
+                spawnParticles(this.player.x + 14, this.player.y + 25, '#7986CB', 20, 5);
+                nearest.hp -= 3;
+                nearest.hit = 15;
+                if (nearest.hp <= 0) {
+                    nearest.dead = true;
+                    const pts = nearest.kind === 'trooper' ? 200 : 100;
+                    this.score += pts;
+                    spawnText(nearest.x, nearest.y, `+${pts}`, '#7986CB');
+                }
+                spawnText(this.player.x, this.player.y, 'SHADOW STEP!', '#7986CB');
+            } else {
+                spawnParticles(this.player.x + 14, this.player.y + 25, '#3F51B5', 15, 4);
+                this.player.x += f * 120;
+                spawnParticles(this.player.x + 14, this.player.y + 25, '#7986CB', 15, 4);
+                spawnText(this.player.x, this.player.y, 'SHADOW STEP!', '#7986CB');
+            }
+        }
+    }
+
+    _updateGameOver() {
+        if (this.keys_just_pressed.has('Enter') || this.keys_just_pressed.has(' ')) {
+            this.state = 'charselect';
+            this.char_cursor = this.char_keys.indexOf(this.selected_char);
+        }
+    }
+
+    _updateLevelComplete() {
+        if (this.keys_just_pressed.has('Enter') || this.keys_just_pressed.has(' ')) {
+            if (this.level >= 5) {
+                this.state = 'victory';
+            } else {
+                this.level++;
+                this.player.hp = Math.min(this.player.max_hp, this.player.hp + 35);
+                this.player.x = 150;
+                this.player.y = 300;
+                this.player.vx = 0;
+                this.player.vy = 0;
+                this.player.on_ground = false;
+                this.camera_x = 0;
+                this.projectiles = [];
+                this.melee_hits = [];
+                particles.length = 0;
+                floating_texts.length = 0;
+                const {platforms, enemies, collectibles, portal_x} = generateWorld(this.level);
+                this.platforms = platforms;
+                this.enemies = enemies;
+                this.collectibles = collectibles;
+                this.portal_x = portal_x;
+                this.state = 'playing';
+            }
+        }
+    }
+
+    _updateVictory() {
+        if (this.keys_just_pressed.has('Enter') || this.keys_just_pressed.has(' ')) {
+            this.state = 'charselect';
+            this.char_cursor = this.char_keys.indexOf(this.selected_char);
+        }
+    }
+
+    draw() {
+        if (this.state === 'menu') {
+            this._drawMenu();
+        } else if (this.state === 'charselect') {
+            this._drawCharSelect();
+        } else if (this.state === 'playing') {
+            this._drawGame();
+        } else if (this.state === 'gameover') {
+            this._drawGameOver();
+        } else if (this.state === 'levelcomplete') {
+            this._drawLevelComplete();
+        } else if (this.state === 'victory') {
+            this._drawVictory();
+        }
+    }
+
+    _drawMenu() {
+        ctx.fillStyle = BLACK;
+        ctx.fillRect(0, 0, W, H);
+        this._drawBackground(0, this.game_time);
+
+        ctx.font = 'bold 52px Courier New';
+        ctx.fillStyle = YELLOW;
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = YELLOW;
+        ctx.fillText('GALAXY BOUNTY', W/2, 130);
+        ctx.shadowBlur = 0;
+
+        ctx.font = '36px Courier New';
+        ctx.fillStyle = CYAN;
+        ctx.fillText('Star Wars', W/2, 190);
+
+        ctx.font = '14px Courier New';
+        ctx.fillStyle = LGRAY;
+        ctx.fillText('5 Levels. Choose your warrior. Fight across the galaxy.', W/2, 240);
+
+        const controls = [
+            ['ARROW KEYS / WASD', 'Move & Jump'],
+            ['SPACE', 'Primary Attack'],
+            ['SHIFT', 'Jetpack (Jango only)'],
+            ['E', 'Special Ability'],
+            ['ESC', 'Pause / Back']
+        ];
+
+        ctx.textAlign = 'left';
+        let cy = 280;
+        for (const [k, v] of controls) {
+            ctx.fillStyle = YELLOW;
+            ctx.fillText(k, 300, cy);
+            ctx.fillStyle = LGRAY;
+            ctx.fillText(' — ' + v, 500, cy);
+            cy += 25;
+        }
+
+        const t = 0.5 + 0.5*Math.sin(this.game_time*0.06);
+        ctx.fillStyle = `rgba(255, 232, 31, ${t})`;
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 22px Courier New';
+        ctx.fillText('[ PRESS ENTER TO SELECT CHARACTER ]', W/2, 480);
+
+        if (this.high_score > 0) {
+            ctx.fillStyle = GRAY;
+            ctx.font = '14px Courier New';
+            ctx.fillText(`BEST SCORE: ${this.high_score}`, W/2, 530);
+        }
+    }
+
+    _drawCharSelect() {
+        ctx.fillStyle = '#070714';
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.font = 'bold 36px Courier New';
+        ctx.fillStyle = YELLOW;
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = YELLOW;
+        ctx.fillText('SELECT YOUR WARRIOR', W/2, 50);
+        ctx.shadowBlur = 0;
+
+        ctx.font = '12px Courier New';
+        ctx.fillStyle = CYAN;
+        ctx.fillText('CHOOSE WISELY — EACH HAS UNIQUE ABILITIES', W/2, 75);
+
+        const cols = 4, card_w = 210, card_h = 145, gap = 8;
+        const start_x = (W - (cols*card_w + (cols-1)*gap))/2;
+        const start_y = 95;
+
+        let idx = 0;
+        for (const key of this.char_keys) {
+            const cfg = CHARS[key];
+            const col_idx = idx % cols;
+            const row_idx = Math.floor(idx / cols);
+            const cx = start_x + col_idx * (card_w + gap);
+            const cy = start_y + row_idx * (card_h + gap);
+            const selected = idx === this.char_cursor;
+
+            ctx.fillStyle = selected ? '#18180E' : '#0E101E';
+            ctx.fillRect(cx, cy, card_w, card_h);
+            ctx.strokeStyle = selected ? YELLOW : '#2A304E';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cx, cy, card_w, card_h);
+
+            if (selected) {
+                drawGlow(cx + card_w/2, cy + card_h/2, 50, YELLOW);
+            }
+
+            ctx.fillStyle = cfg.color;
+            roundRect(cx + 8, cy + 8, 42, 42, 4);
+
+            ctx.font = 'bold 22px Courier New';
+            ctx.fillStyle = WHITE;
+            ctx.textAlign = 'center';
+            ctx.fillText(cfg.name.slice(0,2), cx + 29, cy + 35);
+
+            ctx.font = '12px Courier New';
+            ctx.fillStyle = YELLOW;
+            ctx.textAlign = 'center';
+            ctx.fillText(cfg.name, cx + card_w/2, cy + 60);
+
+            ctx.fillStyle = CYAN;
+            ctx.fillText(cfg.role, cx + card_w/2, cy + 75);
+
+            ctx.fillStyle = GRAY;
+            let desc = cfg.desc;
+            if (desc.length > 30) {
+                ctx.fillText(desc.slice(0,30), cx + card_w/2, cy + 85);
+                ctx.fillText(desc.slice(30), cx + card_w/2, cy + 95);
+            } else {
+                ctx.fillText(desc, cx + card_w/2, cy + 90);
+            }
+
+            idx++;
+        }
+
+        ctx.font = '12px Courier New';
+        ctx.fillStyle = GRAY;
+        ctx.textAlign = 'center';
+        ctx.fillText('ARROW KEYS — Navigate    |    ENTER / SPACE — Begin Mission', W/2, H - 20);
+    }
+
+    _drawGame() {
+        let ox = 0, oy = 0;
+        if (this.shake_timer > 0) {
+            ox = Math.floor(Math.random() * this.shake_intensity * 2 - this.shake_intensity);
+            oy = Math.floor(Math.random() * this.shake_intensity * 2 - this.shake_intensity);
+        }
+
+        ctx.save();
+        ctx.translate(ox, oy);
+
+        this._drawBackground(this.camera_x, this.game_time);
+
+        for (const p of this.platforms) {
+            if (p.x - this.camera_x > -100 && p.x - this.camera_x < W + 100) {
+                drawPlatform(p, this.camera_x);
+            }
+        }
+
+        for (const c of this.collectibles) {
+            if (!c.collected && c.x - this.camera_x > -50 && c.x - this.camera_x < W + 50) {
+                drawCollectible(c, this.camera_x, this.game_time);
+            }
+        }
+
+        this._drawPortal(this.portal_x, this.camera_x, this.game_time);
+
+        for (const e of this.enemies) {
+            if (e.x - this.camera_x > -60 && e.x - this.camera_x < W + 60) {
+                drawEnemy(e, this.camera_x);
+            }
+        }
+
+        for (const p of this.projectiles) {
+            drawProjectile(p, this.camera_x);
+        }
+
+        for (const p of particles) {
+            const a = Math.max(0, Math.min(255, Math.floor(p.life / p.max_life * 255)));
+            const r = Math.max(1, Math.floor(p.size * 0.5));
+            const px = Math.floor(p.x - this.camera_x);
+            const py = Math.floor(p.y);
+            if (px > 0 && px < W && py > 0 && py < H) {
+                if (r >= 2) drawGlow(px, py, r+4, `rgb(${p.r},${p.g},${p.b})`);
+                drawCircle(px, py, r, `rgba(${p.r},${p.g},${p.b},${a/255})`);
+            }
+        }
+
+        for (const t of floating_texts) {
+            const a = Math.max(0, Math.min(255, Math.floor(t.life / 60 * 255)));
+            const tx = Math.floor(t.x - this.camera_x);
+            const ty = Math.floor(t.y);
+            if (tx > -50 && tx < W + 50) {
+                drawGlow(tx, ty + 8, 15, t.col);
+                ctx.font = '14px Courier New';
+                ctx.fillStyle = t.col;
+                ctx.globalAlpha = a / 255;
+                ctx.textAlign = 'left';
+                ctx.fillText(t.text, tx, ty + 20);
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        drawCharacter(this.player, this.camera_x, this.game_time);
+
+        ctx.restore();
+
+        this._drawHUD();
+    }
+
+    _drawPortal(portal_x, camera_x, game_time) {
+        const px = Math.floor(portal_x - camera_x);
+        if (px < -100 || px > W + 100) return;
+
+        const t = 0.5 + 0.5 * Math.sin(game_time * 0.07);
+        const t2 = 0.5 + 0.5 * Math.sin(game_time * 0.05 + 1.2);
+
+        drawGlow(px + 33, GROUND_Y - 84, 52 + t*22, CYAN);
+
+        const shapes = [
+            [px, GROUND_Y - 168, 16, 168],
+            [px + 50, GROUND_Y - 168, 16, 168],
+            [px, GROUND_Y - 168, 66, 18]
+        ];
+
+        for (const [x, y, w, h] of shapes) {
+            ctx.fillStyle = '#0A0E1E';
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = CYAN;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, w, h);
+        }
+
+        ctx.fillStyle = `rgba(79, 195, 247, ${0.3 + t*0.4})`;
+        ctx.fillRect(px + 16, GROUND_Y - 150, 34, 150);
+
+        ctx.font = '14px Courier New';
+        ctx.fillStyle = CYAN;
+        ctx.textAlign = 'center';
+        ctx.fillText('[ EXIT ]', px + 33, GROUND_Y - 160);
+    }
+
+    _drawHUD() {
+        const cfg = CHARS[this.player.char];
+        const panel_w = 220;
+
+        ctx.fillStyle = `rgba(8, 12, 22, 0.8)`;
+        ctx.fillRect(8, 8, panel_w, 28);
+
+        const hr = clamp(this.player.hp / this.player.max_hp, 0, 1);
+        const hcol = hr > 0.5 ? GREEN : (hr > 0.25 ? ORANGE : RED);
+
+        ctx.fillStyle = '#0F121C';
+        ctx.fillRect(10, 10, panel_w - 2, 20);
+
+        const fw = (panel_w - 4) * hr;
+        ctx.fillStyle = hcol;
+        ctx.fillRect(11, 11, fw, 18);
+
+        ctx.strokeStyle = '#374150';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(10, 10, panel_w - 2, 20);
+
+        ctx.font = '11px Courier New';
+        ctx.fillStyle = WHITE;
+        ctx.textAlign = 'left';
+        ctx.fillText(`HP  ${Math.floor(this.player.hp)}/${this.player.max_hp}`, 14, 24);
+
+        if (this.player.char === 'jango') {
+            ctx.fillStyle = `rgba(8, 12, 22, 0.7)`;
+            ctx.fillRect(8, 36, panel_w, 18);
+
+            const fr = clamp(this.player.jetpack_fuel / this.player.jetpack_max_fuel, 0, 1);
+            const fcol = fr > 0.4 ? ORANGE : (fr > 0.15 ? '#FF8F00' : '#DC2800');
+
+            ctx.fillStyle = '#0F121C';
+            ctx.fillRect(10, 37, panel_w - 2, 15);
+
+            const fw2 = (panel_w - 4) * fr;
+            ctx.fillStyle = fcol;
+            ctx.fillRect(11, 38, fw2, 13);
+
+            ctx.strokeStyle = '#374150';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(10, 37, panel_w - 2, 15);
+
+            ctx.fillStyle = WHITE;
+            ctx.fillText(`JET  ${Math.floor(this.player.jetpack_fuel)}%`, 14, 50);
+        }
+
+        const sc = this.player.special_cd;
+        const smc = this.player.special_max_cd;
+        const sr = sc <= 0 ? 1.0 : clamp(1 - sc/smc, 0, 1);
+
+        let row_y = this.player.char === 'jango' ? 58 : 36;
+        ctx.fillStyle = `rgba(8, 12, 22, 0.7)`;
+        ctx.fillRect(8, row_y, panel_w, 18);
+
+        ctx.fillStyle = '#0F121C';
+        ctx.fillRect(10, row_y + 1, panel_w - 2, 15);
+
+        const fw3 = (panel_w - 4) * sr;
+        ctx.fillStyle = cfg.accent;
+        ctx.fillRect(11, row_y + 2, fw3, 13);
+
+        ctx.strokeStyle = '#374150';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(10, row_y + 1, panel_w - 2, 15);
+
+        ctx.font = '11px Courier New';
+        if (sr >= 1.0) {
+            ctx.fillStyle = cfg.accent;
+            ctx.fillText(`[E] ${cfg.special_label} READY`, 14, row_y + 14);
+        } else {
+            ctx.fillStyle = LGRAY;
+            ctx.fillText(`${cfg.special_label}  ${Math.floor(sr*100)}%`, 14, row_y + 14);
+        }
+    }
+
+    _drawGameOver() {
+        ctx.fillStyle = BLACK;
+        ctx.fillRect(0, 0, W, H);
+        this._drawBackground(this.camera_x, this.game_time);
+
+        drawGlow(W/2, 155, 100, RED);
+
+        ctx.font = 'bold 52px Courier New';
+        ctx.fillStyle = RED;
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = RED;
+        ctx.fillText('GAME OVER', W/2, 155);
+        ctx.shadowBlur = 0;
+
+        ctx.font = '36px Courier New';
+        ctx.fillStyle = CYAN;
+        ctx.fillText(`Reached Level ${this.level}`, W/2, 240);
+
+        ctx.font = 'bold 22px Courier New';
+        ctx.fillStyle = YELLOW;
+        ctx.fillText(`Score:  ${this.score}`, W/2, 295);
+        drawGlow(W/2, 280, 30, YELLOW);
+
+        if (this.score >= this.high_score && this.score > 0) {
+            ctx.fillText('NEW BEST!', W/2, 330);
+        }
+
+        if (this.high_score > 0) {
+            ctx.font = '14px Courier New';
+            ctx.fillStyle = GRAY;
+            ctx.fillText(`Best:  ${this.high_score}`, W/2, 380);
+        }
+
+        const t = 0.5 + 0.5*Math.sin(this.game_time*0.06);
+        ctx.font = 'bold 22px Courier New';
+        ctx.fillStyle = `rgba(180, 185, 200, ${t})`;
+        ctx.fillText('[ PRESS ENTER TO TRY AGAIN ]', W/2, 450);
+    }
+
+    _drawLevelComplete() {
+        ctx.fillStyle = BLACK;
+        ctx.fillRect(0, 0, W, H);
+        this._drawBackground(this.camera_x, this.game_time);
+
+        const lv_cols = [CYAN, GREEN, YELLOW, ORANGE, RED];
+        const col = lv_cols[Math.min(this.level - 1, 4)];
+
+        drawGlow(W/2, 145, 110, col);
+
+        ctx.font = 'bold 52px Courier New';
+        ctx.fillStyle = col;
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = col;
+        ctx.fillText(`LEVEL ${this.level}  COMPLETE!`, W/2, 160);
+        ctx.shadowBlur = 0;
+
+        if (this.level < 5) {
+            ctx.font = '36px Courier New';
+            ctx.fillStyle = WHITE;
+            ctx.fillText(`Next: Level ${this.level + 1}  of  5`, W/2, 240);
+        }
+
+        ctx.font = 'bold 22px Courier New';
+        ctx.fillStyle = YELLOW;
+        drawGlow(W/2, 316, 28, YELLOW);
+        ctx.fillText(`Score:  ${this.score}`, W/2, 330);
+
+        ctx.font = '14px Courier New';
+        ctx.fillStyle = GREEN;
+        ctx.fillText('+35 HP restored!', W/2, 370);
+
+        const t = 0.5 + 0.5*Math.sin(this.game_time*0.07);
+        ctx.font = 'bold 22px Courier New';
+        ctx.fillStyle = `rgba(180, 185, 200, ${t})`;
+        const lbl = this.level < 5 ? '[ PRESS ENTER TO CONTINUE ]' : '[ PRESS ENTER TO SEE RESULTS ]';
+        ctx.fillText(lbl, W/2, 450);
+    }
+
+    _drawVictory() {
+        ctx.fillStyle = BLACK;
+        ctx.fillRect(0, 0, W, H);
+        this._drawBackground(this.camera_x, this.game_time);
+
+        drawGlow(W/2, 130, 130, YELLOW);
+
+        ctx.font = 'bold 52px Courier New';
+        ctx.fillStyle = YELLOW;
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = YELLOW;
+        ctx.fillText('VICTORY!', W/2, 155);
+        ctx.shadowBlur = 0;
+
+        ctx.font = '36px Courier New';
+        ctx.fillStyle = CYAN;
+        ctx.fillText('All 5 Levels Conquered!', W/2, 240);
+
+        ctx.font = 'bold 22px Courier New';
+        ctx.fillStyle = YELLOW;
+        drawGlow(W/2, 278, 32, YELLOW);
+        ctx.fillText(`Final Score:  ${this.score}`, W/2, 300);
+
+        if (this.score >= this.high_score && this.score > 0) {
+            ctx.fillText('NEW BEST!', W/2, 340);
+        }
+
+        if (this.high_score > 0) {
+            ctx.font = '14px Courier New';
+            ctx.fillStyle = GRAY;
+            ctx.fillText(`Best:  ${this.high_score}`, W/2, 390);
+        }
+
+        const t = 0.5 + 0.5*Math.sin(this.game_time*0.05);
+        ctx.font = 'bold 22px Courier New';
+        ctx.fillStyle = `rgba(255, 232, 31, ${t})`;
+        ctx.fillText('[ PRESS ENTER TO PLAY AGAIN ]', W/2, 460);
+    }
+
+    _drawBackground(camera_x, game_time) {
+        // Gradient background
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        const [r1, g1, b1] = colorToRgb(BG_TOP);
+        const [r2, g2, b2] = colorToRgb(BG_BOT);
+        grad.addColorStop(0, `rgb(${r1},${g1},${b1})`);
+        grad.addColorStop(1, `rgb(${r2},${g2},${b2})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        // Simple stars parallax
+        ctx.fillStyle = CYAN;
+        for (let i = 0; i < 30; i++) {
+            const x = (Math.sin(i*2.7 + game_time*0.01)*W + W) % W;
+            const y = (i*20) % H;
+            const size = Math.sin(i*0.3 + game_time*0.005) + 1.5;
+            ctx.fillRect(x, y, size, size);
+        }
+    }
+}
+
+// Event listeners
+document.addEventListener('keydown', (e) => {
+    game.keys_held[e.key] = true;
+    game.keys_just_pressed.add(e.key);
+
+    if (e.key === 'Escape') {
+        if (game.state === 'playing') {
+            game.state = 'menu';
+        } else if (['gameover', 'levelcomplete', 'victory'].includes(game.state)) {
+            game.state = 'charselect';
+            game.char_cursor = game.char_keys.indexOf(game.selected_char);
+        } else if (game.state === 'charselect') {
+            game.state = 'menu';
+        }
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    game.keys_held[e.key] = false;
+});
+
+// Game loop
+let game = new Game();
+game.reset('jango', 1);
+
+function gameLoop() {
+    game.update();
+    game.draw();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+    </script>
+</body>
+</html>
