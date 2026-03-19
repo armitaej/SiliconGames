@@ -251,6 +251,18 @@ header {
 .cabinet[data-game="swbounty"] .game-title { color: var(--neon-cyan); text-shadow: 0 0 10px rgba(0,240,255,0.5); }
 .cabinet[data-game="swbounty"] .play-btn { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(0,240,255,0.4); }
 
+.cabinet[data-game="jetfighter"] .screen-art { color: var(--neon-cyan); }
+.cabinet[data-game="jetfighter"] .game-title { color: var(--neon-cyan); text-shadow: 0 0 10px rgba(0,240,255,0.5); }
+.cabinet[data-game="jetfighter"] .play-btn { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(0,240,255,0.4); }
+
+.cabinet[data-game="maze"] .screen-art { color: var(--neon-purple); }
+.cabinet[data-game="maze"] .game-title { color: var(--neon-purple); text-shadow: 0 0 10px rgba(180,77,255,0.5); }
+.cabinet[data-game="maze"] .play-btn { background: var(--neon-purple); box-shadow: 0 0 20px rgba(180,77,255,0.4); }
+
+.cabinet[data-game="moto"] .screen-art { color: var(--neon-green); }
+.cabinet[data-game="moto"] .game-title { color: var(--neon-green); text-shadow: 0 0 10px rgba(57,255,20,0.5); }
+.cabinet[data-game="moto"] .play-btn { background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57,255,20,0.4); }
+
 .cabinet-info {
   padding: 20px;
   text-align: center;
@@ -491,6 +503,57 @@ footer a:hover { color: var(--neon-pink); }
           <span class="tag">Platformer</span>
           <span class="tag">Shooter</span>
           <span class="tag">5 Levels</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+      </div>
+    </div>
+
+    <!-- Storm Eagle: Jet Combat -->
+    <div class="cabinet" data-game="jetfighter" onclick="launchGame('games/jet-fighter.html', 'STORM EAGLE: JET COMBAT')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x2708;&#xFE0F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Storm Eagle</div>
+        <div class="game-desc">Pilot a jet fighter through intense aerial combat. Dodge missiles, take down enemy squadrons, and rule the skies.</div>
+        <div class="game-tags">
+          <span class="tag">Shooter</span>
+          <span class="tag">Arcade</span>
+          <span class="tag">Combat</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+      </div>
+    </div>
+
+    <!-- Shadow Labyrinth: 3D Maze -->
+    <div class="cabinet" data-game="maze" onclick="launchGame('games/maze-game.html', 'SHADOW LABYRINTH')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F30C;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Shadow Labyrinth</div>
+        <div class="game-desc">Find your way through a shifting 3D maze. Each turn could be a dead end — or the exit. Can you escape?</div>
+        <div class="game-tags">
+          <span class="tag">3D</span>
+          <span class="tag">Maze</span>
+          <span class="tag">Puzzle</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+      </div>
+    </div>
+
+    <!-- Pixel Moto: Excite Racer -->
+    <div class="cabinet" data-game="moto" onclick="launchGame('games/moto-racer.html', 'PIXEL MOTO: EXCITE RACER')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3CD;&#xFE0F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Pixel Moto</div>
+        <div class="game-desc">Tear through pixel-art tracks on your motorbike. Hit ramps, avoid crashes, and push for the fastest time.</div>
+        <div class="game-tags">
+          <span class="tag">Racing</span>
+          <span class="tag">Arcade</span>
+          <span class="tag">Pixel Art</span>
         </div>
         <button class="play-btn">PLAY</button>
       </div>
