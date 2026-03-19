@@ -936,14 +936,18 @@ class Game {
             p.vy += 0.05;
             p.life--;
         }
-        particles.length = particles.filter(p => p.life > 0).length;
+        for (let i = particles.length - 1; i >= 0; i--) {
+            if (particles[i].life <= 0) particles.splice(i, 1);
+        }
 
         // Floating text updates
         for (const t of floating_texts) {
             t.y += t.vy;
             t.life--;
         }
-        floating_texts.length = floating_texts.filter(t => t.life > 0).length;
+        for (let i = floating_texts.length - 1; i >= 0; i--) {
+            if (floating_texts[i].life <= 0) floating_texts.splice(i, 1);
+        }
 
         // Camera
         const target = this.player.x - W * 0.35;
@@ -1275,7 +1279,7 @@ class Game {
         ctx.fillStyle = `rgba(255, 232, 31, ${t})`;
         ctx.textAlign = 'center';
         ctx.font = 'bold 22px Courier New';
-        ctx.fillText('[ PRESS ENTER TO SELECT CHARACTER ]', W/2, 480);
+        ctx.fillText('[ CLICK OR PRESS ENTER TO START ]', W/2, 480);
 
         if (this.high_score > 0) {
             ctx.fillStyle = GRAY;
@@ -1696,6 +1700,69 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keyup', (e) => {
     game.keys_held[e.key] = false;
 });
+
+// Mouse/touch support for menus
+canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    if (game.state === 'menu') {
+        game.state = 'charselect';
+        game.char_cursor = game.char_keys.indexOf(game.selected_char);
+    } else if (game.state === 'charselect') {
+        // Check if click is on a character card
+        const cols = 4, cardW = 195, cardH = 80, startX = 40, startY = 75, gap = 12;
+        for (let i = 0; i < game.char_keys.length; i++) {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const cx = startX + col * (cardW + gap);
+            const cy = startY + row * (cardH + gap);
+            if (mx >= cx && mx <= cx + cardW && my >= cy && my <= cy + cardH) {
+                if (i === game.char_cursor) {
+                    // Double click same = select
+                    game.selected_char = game.char_keys[i];
+                    game.reset(game.selected_char, 1);
+                    game.state = 'playing';
+                } else {
+                    game.char_cursor = i;
+                    game.selected_char = game.char_keys[i];
+                }
+                return;
+            }
+        }
+        // Click "START" area at bottom
+        if (my > 500) {
+            game.reset(game.selected_char, 1);
+            game.state = 'playing';
+        }
+    } else if (game.state === 'gameover') {
+        game.reset(game.selected_char, 1);
+        game.state = 'playing';
+    } else if (game.state === 'levelcomplete') {
+        if (game.level >= 5) {
+            game.state = 'victory';
+        } else {
+            const next_level = game.level + 1;
+            const hp_keep = game.player.hp;
+            const score_keep = game.score;
+            game.reset(game.selected_char, next_level);
+            game.player.hp = Math.min(game.player.max_hp, hp_keep + 25);
+            game.score = score_keep;
+            game.state = 'playing';
+        }
+    } else if (game.state === 'victory') {
+        game.state = 'charselect';
+        game.char_cursor = game.char_keys.indexOf(game.selected_char);
+    }
+});
+
+// Auto-focus canvas
+canvas.setAttribute('tabindex', '0');
+canvas.focus();
+canvas.addEventListener('mouseenter', () => canvas.focus());
 
 // Game loop
 let game = new Game();

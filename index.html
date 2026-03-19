@@ -509,7 +509,7 @@ footer a:hover { color: var(--neon-pink); }
     <button class="back-btn" onclick="closeGame()">&#9664; BACK TO ARCADE</button>
     <div id="game-topbar-title"></div>
   </div>
-  <iframe id="game-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+  <iframe id="game-frame" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
 </div>
 
 <script>
@@ -540,6 +540,8 @@ function launchGame(url, title) {
   titleEl.textContent = title;
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
+  // Auto-focus iframe so keyboard works immediately
+  frame.addEventListener('load', () => { frame.focus(); frame.contentWindow.focus(); }, { once: true });
 }
 
 function closeGame() {

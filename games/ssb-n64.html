@@ -1476,7 +1476,7 @@ class Game {
         });
 
         if (Math.floor(frameCount / 24) % 2 === 0) {
-            this.drawText('PRESS ANY KEY TO START', GW / 2, GH - 60, 'rgb(255, 230, 30)', 20, 'center');
+            this.drawText('CLICK OR PRESS ANY KEY TO START', GW / 2, GH - 60, 'rgb(255, 230, 30)', 20, 'center');
         }
         this.drawText('P1: WASD + Z(atk) + X(spc)    P2: ARROWS + K(atk) + L(spc)', GW / 2, GH - 28, 'rgb(80, 80, 80)', 10, 'center');
     }
@@ -1883,11 +1883,59 @@ window.addEventListener('keydown', (e) => {
     const key = getKeyName(e.code);
     game.keysPressed[key] = true;
     game.justPressed.add(key);
+    e.preventDefault();
 });
 
 window.addEventListener('keyup', (e) => {
     const key = getKeyName(e.code);
     game.keysPressed[key] = false;
+});
+
+// Click/touch support for iframe focus + menu navigation
+canvas.setAttribute('tabindex', '0');
+canvas.focus();
+canvas.addEventListener('mouseenter', () => canvas.focus());
+
+canvas.addEventListener('click', (e) => {
+    canvas.focus();
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = GW / rect.width;
+    const scaleY = GH / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    if (game.state === 'title') {
+        game.state = 'charselect';
+    } else if (game.state === 'charselect') {
+        // Click on character grid
+        const cols = 6, rows = 3;
+        const cardW = GW / cols, cardH = 280 / rows;
+        const gridY = 140;
+        const col = Math.floor(mx / cardW);
+        const row = Math.floor((my - gridY) / cardH);
+        if (row >= 0 && row < rows && col >= 0 && col < cols) {
+            const idx = row * cols + col;
+            if (idx < CHARS.length) {
+                // Left half = P1, right half = P2
+                if (mx < GW / 2) {
+                    game.p1Cursor = idx;
+                    game.p1CharIdx = idx;
+                } else {
+                    game.p2Cursor = idx;
+                    game.p2CharIdx = idx;
+                }
+            }
+        }
+        // Click bottom area to start fight
+        if (my > 480) {
+            game.p1CharIdx = game.p1Cursor;
+            game.p2CharIdx = game.p2Cursor;
+            game.vsTimer = 0;
+            game.state = 'vs';
+        }
+    } else if (game.state === 'results') {
+        game.state = 'charselect';
+    }
 });
 
 game.run();
