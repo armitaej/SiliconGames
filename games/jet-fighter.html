@@ -18,7 +18,6 @@ canvas{display:block;touch-action:none}
 #dpad-jet .empty{visibility:hidden}
 .jet-action-btn{background:rgba(255,153,0,0.7);border:2px solid #FF9900;border-radius:8px;color:#000;padding:10px 14px;font-size:12px;font-weight:bold;cursor:pointer;touch-action:none;min-width:56px;text-align:center}
 .jet-action-btn:active{background:rgba(255,153,0,1);transform:scale(0.95)}
-@media(max-width:900px){#mobile-controls-jet{display:flex!important}}
 </style>
 </head>
 <body>
@@ -146,7 +145,8 @@ let keys={},mx=0,my=0,useTouch=false;
 addEventListener('keydown',e=>{keys[e.code]=true;e.preventDefault()});
 addEventListener('keyup',e=>{keys[e.code]=false});
 addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY});
-addEventListener('touchstart',e=>{useTouch=true;const t=e.touches[0];mx=t.clientX;my=t.clientY},{passive:true});
+addEventListener('touchstart',e=>{const t=e.touches[0];mx=t.clientX;my=t.clientY},{passive:true});
+if('ontouchstart' in window||navigator.maxTouchPoints>0){document.getElementById('mobile-controls-jet').style.display='flex';}
 addEventListener('touchmove',e=>{const t=e.touches[0];mx=t.clientX;my=t.clientY},{passive:true});
 
 // Touch button handler
@@ -660,7 +660,7 @@ function update(dt){
 
   // Shooting
   player.shootCd-=dt;
-  if((keys.Space||keys.KeyZ||useTouch)&&player.shootCd<=0){
+  if((keys.Space||keys.KeyZ)&&player.shootCd<=0){
     const lvl=player.weaponLvl;player.shootCd=lvl>=3?0.06:0.1;
     sfxShoot();
     player.bullets.push({x:player.x,y:player.y-16,vy:-600,type:'player',angle:0,dmg:10});

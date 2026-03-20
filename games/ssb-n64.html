@@ -138,13 +138,13 @@ window.addEventListener('resize', fitCanvas);
 
 // Key handling for touch controls
 function touchKeyDown(key) {
-    if (!window.game) return;
+    if (!game) return;
     game.keysPressed[key] = true;
     if (!game.justPressed) game.justPressed = new Set();
     game.justPressed.add(key);
 }
 function touchKeyUp(key) {
-    if (!window.game) return;
+    if (!game) return;
     game.keysPressed[key] = false;
 }
 const ARENA_H = 510;

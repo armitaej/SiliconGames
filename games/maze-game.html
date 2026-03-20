@@ -105,7 +105,7 @@
     <button onmousedown="mazeKey('s',1)" onmouseup="mazeKey('s',0)" ontouchstart="mazeKey('s',1);event.preventDefault()" ontouchend="mazeKey('s',0);event.preventDefault()" style="touch-action:none">▼</button>
     <div class="empty"></div>
   </div>
-  <button class="maze-action-btn" onmousedown="mazeKey(' ',1)" onmouseup="mazeKey(' ',0)" ontouchstart="mazeKey(' ',1);event.preventDefault()" ontouchend="mazeKey(' ',0);event.preventDefault()" style="touch-action:none">ATTACK</button>
+  <button class="maze-action-btn" onmousedown="playerAttack()" ontouchstart="playerAttack();event.preventDefault()" style="touch-action:none">ATTACK</button>
   <button class="maze-action-btn" onmousedown="mazeKey('shift',1)" onmouseup="mazeKey('shift',0)" ontouchstart="mazeKey('shift',1);event.preventDefault()" ontouchend="mazeKey('shift',0);event.preventDefault()" style="touch-action:none">SPRINT</button>
 </div>
 <div id="ui">
