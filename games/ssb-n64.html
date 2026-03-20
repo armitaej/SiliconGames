@@ -105,16 +105,17 @@
 <div id="mobile-controls">
     <div class="dpad">
         <div class="empty"></div>
-        <button onmousedown="touchKeyDown('ArrowUp')" onmouseup="touchKeyUp('ArrowUp')" ontouchstart="touchKeyDown('ArrowUp'); event.preventDefault();" ontouchend="touchKeyUp('ArrowUp'); event.preventDefault();" style="touch-action:none;">▲</button>
+        <button onmousedown="touchKeyDown('w')" onmouseup="touchKeyUp('w')" ontouchstart="touchKeyDown('w'); event.preventDefault();" ontouchend="touchKeyUp('w'); event.preventDefault();" style="touch-action:none;">▲</button>
         <div class="empty"></div>
-        <button onmousedown="touchKeyDown('ArrowLeft')" onmouseup="touchKeyUp('ArrowLeft')" ontouchstart="touchKeyDown('ArrowLeft'); event.preventDefault();" ontouchend="touchKeyUp('ArrowLeft'); event.preventDefault();" style="touch-action:none;">◀</button>
-        <button onmousedown="touchKeyDown('ArrowDown')" onmouseup="touchKeyUp('ArrowDown')" ontouchstart="touchKeyDown('ArrowDown'); event.preventDefault();" ontouchend="touchKeyUp('ArrowDown'); event.preventDefault();" style="touch-action:none;">▼</button>
-        <button onmousedown="touchKeyDown('ArrowRight')" onmouseup="touchKeyUp('ArrowRight')" ontouchstart="touchKeyDown('ArrowRight'); event.preventDefault();" ontouchend="touchKeyUp('ArrowRight'); event.preventDefault();" style="touch-action:none;">▶</button>
+        <button onmousedown="touchKeyDown('a')" onmouseup="touchKeyUp('a')" ontouchstart="touchKeyDown('a'); event.preventDefault();" ontouchend="touchKeyUp('a'); event.preventDefault();" style="touch-action:none;">◀</button>
+        <button onmousedown="touchKeyDown('s')" onmouseup="touchKeyUp('s')" ontouchstart="touchKeyDown('s'); event.preventDefault();" ontouchend="touchKeyUp('s'); event.preventDefault();" style="touch-action:none;">▼</button>
+        <button onmousedown="touchKeyDown('d')" onmouseup="touchKeyUp('d')" ontouchstart="touchKeyDown('d'); event.preventDefault();" ontouchend="touchKeyUp('d'); event.preventDefault();" style="touch-action:none;">▶</button>
         <div class="empty"></div>
     </div>
     <div id="action-buttons">
-        <button onmousedown="touchKeyDown('z')" onmouseup="touchKeyUp('z')" ontouchstart="touchKeyDown('z'); event.preventDefault();" ontouchend="touchKeyUp('z'); event.preventDefault();" style="touch-action:none;">Jump</button>
-        <button onmousedown="touchKeyDown(' ')" onmouseup="touchKeyUp(' ')" ontouchstart="touchKeyDown(' '); event.preventDefault();" ontouchend="touchKeyUp(' '); event.preventDefault();" style="touch-action:none;">Attack</button>
+        <button onmousedown="touchKeyDown('z')" onmouseup="touchKeyUp('z')" ontouchstart="touchKeyDown('z'); event.preventDefault();" ontouchend="touchKeyUp('z'); event.preventDefault();" style="touch-action:none;">Attack</button>
+        <button onmousedown="touchKeyDown('x')" onmouseup="touchKeyUp('x')" ontouchstart="touchKeyDown('x'); event.preventDefault();" ontouchend="touchKeyUp('x'); event.preventDefault();" style="touch-action:none;">Special</button>
+        <button onmousedown="touchStartGame()" ontouchstart="touchStartGame(); event.preventDefault();" style="touch-action:none;">START</button>
     </div>
 </div>
 
@@ -146,6 +147,19 @@ function touchKeyDown(key) {
 function touchKeyUp(key) {
     if (!game) return;
     game.keysPressed[key] = false;
+}
+function touchStartGame() {
+    if (!game) return;
+    if (game.state === 'title') {
+        game.state = 'charselect';
+    } else if (game.state === 'charselect') {
+        game.p1CharIdx = game.p1Cursor;
+        game.p2CharIdx = game.p2Cursor;
+        game.vsTimer = 0;
+        game.state = 'vs';
+    } else if (game.state === 'results') {
+        game.state = 'charselect';
+    }
 }
 const ARENA_H = 510;
 const FPS = 60;
