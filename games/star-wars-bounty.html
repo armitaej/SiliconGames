@@ -5,18 +5,26 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Star Wars: Galaxy Bounty</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             background: #000;
             font-family: 'Courier New', monospace;
-            overflow: hidden;
+            overflow-y: auto;
+        }
+        #game-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
         }
         canvas {
             display: block;
@@ -24,12 +32,107 @@
             background: #000;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            touch-action: none;
+        }
+        #mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 12px;
+            right: 12px;
+            z-index: 100;
+            gap: 8px;
+            flex-direction: column;
+        }
+        .mobile-btn {
+            background: rgba(79, 195, 247, 0.8);
+            border: 2px solid #4FC3F7;
+            border-radius: 8px;
+            color: #000;
+            padding: 10px 14px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: none;
+            min-width: 56px;
+            text-align: center;
+        }
+        .mobile-btn:active {
+            background: rgba(79, 195, 247, 1);
+            transform: scale(0.95);
+        }
+        #dpad-mobile {
+            display: grid;
+            grid-template-columns: 50px 50px 50px;
+            grid-template-rows: 50px 50px 50px;
+            gap: 4px;
+        }
+        #dpad-mobile button {
+            background: rgba(79, 195, 247, 0.8);
+            border: 2px solid #4FC3F7;
+            border-radius: 8px;
+            color: #000;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: none;
+        }
+        #dpad-mobile button:active {
+            background: rgba(79, 195, 247, 1);
+            transform: scale(0.95);
+        }
+        #dpad-mobile .empty {
+            visibility: hidden;
+        }
+        @media (max-width: 900px) {
+            #mobile-controls {
+                display: flex !important;
+            }
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="game-wrapper">
+        <canvas id="gameCanvas" width="900" height="600"></canvas>
+    </div>
+    <div id="mobile-controls">
+        <div id="dpad-mobile">
+            <div class="empty"></div>
+            <button onmousedown="touchKey('ArrowUp', true)" onmouseup="touchKey('ArrowUp', false)" ontouchstart="touchKey('ArrowUp', true); event.preventDefault();" ontouchend="touchKey('ArrowUp', false); event.preventDefault();" style="touch-action:none;">▲</button>
+            <div class="empty"></div>
+            <button onmousedown="touchKey('ArrowLeft', true)" onmouseup="touchKey('ArrowLeft', false)" ontouchstart="touchKey('ArrowLeft', true); event.preventDefault();" ontouchend="touchKey('ArrowLeft', false); event.preventDefault();" style="touch-action:none;">◀</button>
+            <div class="empty"></div>
+            <button onmousedown="touchKey('ArrowRight', true)" onmouseup="touchKey('ArrowRight', false)" ontouchstart="touchKey('ArrowRight', true); event.preventDefault();" ontouchend="touchKey('ArrowRight', false); event.preventDefault();" style="touch-action:none;">▶</button>
+            <div class="empty"></div>
+            <button onmousedown="touchKey('ArrowDown', true)" onmouseup="touchKey('ArrowDown', false)" ontouchstart="touchKey('ArrowDown', true); event.preventDefault();" ontouchend="touchKey('ArrowDown', false); event.preventDefault();" style="touch-action:none;">▼</button>
+            <div class="empty"></div>
+        </div>
+        <button class="mobile-btn" onmousedown="touchKey(' ', true)" onmouseup="touchKey(' ', false)" ontouchstart="touchKey(' ', true); event.preventDefault();" ontouchend="touchKey(' ', false); event.preventDefault();" style="touch-action:none;">ATTACK</button>
+        <button class="mobile-btn" onmousedown="touchKey('e', true)" onmouseup="touchKey('e', false)" ontouchstart="touchKey('e', true); event.preventDefault();" ontouchend="touchKey('e', false); event.preventDefault();" style="touch-action:none;">SPECIAL</button>
+    </div>
     <script>
+const canvas = document.getElementById('gameCanvas');
+
+// Canvas scaling for mobile
+function fitCanvas() {
+    const wrapper = document.getElementById('game-wrapper');
+    const scale = Math.min((window.innerWidth - 16) / 900, (window.innerHeight - 16) / 600, 1);
+    canvas.style.width = Math.floor(900 * scale) + 'px';
+    canvas.style.height = Math.floor(600 * scale) + 'px';
+}
+fitCanvas();
+window.addEventListener('resize', fitCanvas);
+
+// Touch key handling
+const touchKeys = {};
+function touchKey(key, isDown) {
+    if (isDown) {
+        const event = new KeyboardEvent('keydown', { key: key });
+        document.dispatchEvent(event);
+    } else {
+        const event = new KeyboardEvent('keyup', { key: key });
+        document.dispatchEvent(event);
+    }
+}
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -1776,6 +1879,29 @@ function gameLoop() {
     game.draw();
     requestAnimationFrame(gameLoop);
 }
+
+// Swipe gesture support
+let swipeStartX = 0, swipeStartY = 0;
+canvas.addEventListener('touchstart', (e) => {
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+    const swipeEndX = e.changedTouches[0].clientX;
+    const swipeEndY = e.changedTouches[0].clientY;
+    const dx = swipeEndX - swipeStartX;
+    const dy = swipeEndY - swipeStartY;
+    if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+            touchKey(dx > 0 ? 'ArrowRight' : 'ArrowLeft', true);
+            setTimeout(() => touchKey(dx > 0 ? 'ArrowRight' : 'ArrowLeft', false), 100);
+        } else {
+            touchKey(dy > 0 ? 'ArrowDown' : 'ArrowUp', true);
+            setTimeout(() => touchKey(dy > 0 ? 'ArrowDown' : 'ArrowUp', false), 100);
+        }
+    }
+}, { passive: false });
 
 gameLoop();
     </script>

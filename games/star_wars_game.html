@@ -5,12 +5,20 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Star Wars: Galaxy Bounty</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
-#game { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; image-rendering: crisp-edges; }
+#game { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+#mobile-controls-game { display: none; position: fixed; bottom: 12px; right: 12px; z-index: 100; gap: 8px; flex-direction: column; }
+#dpad-game { display: grid; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px; gap: 4px; }
+#dpad-game button { background: rgba(255, 232, 31, 0.7); border: 2px solid #FFE81F; border-radius: 8px; color: #000; font-size: 18px; font-weight: bold; cursor: pointer; touch-action: none; }
+#dpad-game button:active { background: rgba(255, 232, 31, 1); transform: scale(0.95); }
+#dpad-game .empty { visibility: hidden; }
+.game-action-btn { background: rgba(255, 232, 31, 0.7); border: 2px solid #FFE81F; border-radius: 8px; color: #000; padding: 10px 14px; font-size: 12px; font-weight: bold; cursor: pointer; touch-action: none; min-width: 56px; text-align: center; }
+.game-action-btn:active { background: rgba(255, 232, 31, 1); transform: scale(0.95); }
+@media (max-width: 900px) { #mobile-controls-game { display: flex !important; } }
 #ui-overlay {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   text-align: center; color: #FFE81F; z-index: 10; display: none;
@@ -63,6 +71,21 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="mobile-controls-game">
+  <div id="dpad-game">
+    <div class="empty"></div>
+    <button onmousedown="dispatchKey('ArrowUp', true)" onmouseup="dispatchKey('ArrowUp', false)" ontouchstart="dispatchKey('ArrowUp', true); event.preventDefault();" ontouchend="dispatchKey('ArrowUp', false); event.preventDefault();" style="touch-action:none;">▲</button>
+    <div class="empty"></div>
+    <button onmousedown="dispatchKey('ArrowLeft', true)" onmouseup="dispatchKey('ArrowLeft', false)" ontouchstart="dispatchKey('ArrowLeft', true); event.preventDefault();" ontouchend="dispatchKey('ArrowLeft', false); event.preventDefault();" style="touch-action:none;">◀</button>
+    <div class="empty"></div>
+    <button onmousedown="dispatchKey('ArrowRight', true)" onmouseup="dispatchKey('ArrowRight', false)" ontouchstart="dispatchKey('ArrowRight', true); event.preventDefault();" ontouchend="dispatchKey('ArrowRight', false); event.preventDefault();" style="touch-action:none;">▶</button>
+    <div class="empty"></div>
+    <button onmousedown="dispatchKey('ArrowDown', true)" onmouseup="dispatchKey('ArrowDown', false)" ontouchstart="dispatchKey('ArrowDown', true); event.preventDefault();" ontouchend="dispatchKey('ArrowDown', false); event.preventDefault();" style="touch-action:none;">▼</button>
+    <div class="empty"></div>
+  </div>
+  <button class="game-action-btn" onmousedown="dispatchKey(' ', true)" onmouseup="dispatchKey(' ', false)" ontouchstart="dispatchKey(' ', true); event.preventDefault();" ontouchend="dispatchKey(' ', false); event.preventDefault();" style="touch-action:none;">ATTACK</button>
+  <button class="game-action-btn" onmousedown="dispatchKey('e', true)" onmouseup="dispatchKey('e', false)" ontouchstart="dispatchKey('e', true); event.preventDefault();" ontouchend="dispatchKey('e', false); event.preventDefault();" style="touch-action:none;">SPECIAL</button>
+</div>
 <div id="ui-overlay">
   <h1>GALAXY BOUNTY</h1>
   <h2>Star Wars</h2>
@@ -88,6 +111,22 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const overlay = document.getElementById('ui-overlay');
 const startBtn = document.getElementById('startBtn');
+
+// Canvas scaling for mobile
+function fitCanvas() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    canvas.width = w;
+    canvas.height = h;
+}
+fitCanvas();
+window.addEventListener('resize', fitCanvas);
+
+// Touch key dispatch
+function dispatchKey(key, isDown) {
+    const event = new KeyboardEvent(isDown ? 'keydown' : 'keyup', { key: key });
+    document.dispatchEvent(event);
+}
 const finalScoreEl = document.getElementById('finalScore');
 const charSelectEl = document.getElementById('char-select');
 const charGrid = document.getElementById('charGrid');
@@ -1510,6 +1549,29 @@ generateBackgroundLayers();
 overlay.style.display = 'block';
 startBtn.addEventListener('click', () => { initAudio(); overlay.style.display = 'none'; charSelectEl.style.display = 'flex'; buildCharSelect(); });
 beginBtn.addEventListener('click', () => { charSelectEl.style.display = 'none'; resetGame(selectedCharKey); gameState = 'playing'; finalScoreEl.style.display = 'none'; });
+
+// Swipe gesture support
+let swipeX = 0, swipeY = 0;
+canvas.addEventListener('touchstart', (e) => {
+    swipeX = e.touches[0].clientX;
+    swipeY = e.touches[0].clientY;
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const dx = endX - swipeX;
+    const dy = endY - swipeY;
+    if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+            dispatchKey(dx > 0 ? 'ArrowRight' : 'ArrowLeft', true);
+            setTimeout(() => dispatchKey(dx > 0 ? 'ArrowRight' : 'ArrowLeft', false), 100);
+        } else {
+            dispatchKey(dy > 0 ? 'ArrowDown' : 'ArrowUp', true);
+            setTimeout(() => dispatchKey(dy > 0 ? 'ArrowDown' : 'ArrowUp', false), 100);
+        }
+    }
+}, { passive: false });
 
 draw();
 gameLoop();

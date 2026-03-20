@@ -5,12 +5,21 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Shadow Labyrinth - 3D Maze Game</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
-  canvas { display: block; }
+  body { background: #000; overflow-y: auto; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+  #game-wrapper { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; }
+  canvas { display: block; touch-action: none; }
+  #mobile-controls-maze { display: none; margin-top: 12px; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  #dpad-maze { display: grid; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px; gap: 4px; }
+  #dpad-maze button { background: rgba(255, 136, 0, 0.7); border: 2px solid #f80; border-radius: 8px; color: #000; font-size: 18px; font-weight: bold; cursor: pointer; touch-action: none; }
+  #dpad-maze button:active { background: rgba(255, 136, 0, 1); transform: scale(0.95); }
+  #dpad-maze .empty { visibility: hidden; }
+  .maze-action-btn { background: rgba(255, 136, 0, 0.7); border: 2px solid #f80; border-radius: 8px; color: #000; padding: 10px 14px; font-size: 12px; font-weight: bold; cursor: pointer; touch-action: none; min-width: 56px; text-align: center; }
+  .maze-action-btn:active { background: rgba(255, 136, 0, 1); transform: scale(0.95); }
+  @media (max-width: 900px) { #mobile-controls-maze { display: flex !important; } }
   #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
   #startScreen, #deathScreen, #winScreen {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -81,7 +90,24 @@
 </style>
 </head>
 <body>
-<canvas id="game"></canvas>
+<div id="game-wrapper">
+  <canvas id="game"></canvas>
+</div>
+<div id="mobile-controls-maze">
+  <div id="dpad-maze">
+    <div class="empty"></div>
+    <button onmousedown="mazeKey('w',1)" onmouseup="mazeKey('w',0)" ontouchstart="mazeKey('w',1);event.preventDefault()" ontouchend="mazeKey('w',0);event.preventDefault()" style="touch-action:none">▲</button>
+    <div class="empty"></div>
+    <button onmousedown="mazeKey('a',1)" onmouseup="mazeKey('a',0)" ontouchstart="mazeKey('a',1);event.preventDefault()" ontouchend="mazeKey('a',0);event.preventDefault()" style="touch-action:none">◀</button>
+    <div class="empty"></div>
+    <button onmousedown="mazeKey('d',1)" onmouseup="mazeKey('d',0)" ontouchstart="mazeKey('d',1);event.preventDefault()" ontouchend="mazeKey('d',0);event.preventDefault()" style="touch-action:none">▶</button>
+    <div class="empty"></div>
+    <button onmousedown="mazeKey('s',1)" onmouseup="mazeKey('s',0)" ontouchstart="mazeKey('s',1);event.preventDefault()" ontouchend="mazeKey('s',0);event.preventDefault()" style="touch-action:none">▼</button>
+    <div class="empty"></div>
+  </div>
+  <button class="maze-action-btn" onmousedown="mazeKey(' ',1)" onmouseup="mazeKey(' ',0)" ontouchstart="mazeKey(' ',1);event.preventDefault()" ontouchend="mazeKey(' ',0);event.preventDefault()" style="touch-action:none">ATTACK</button>
+  <button class="maze-action-btn" onmousedown="mazeKey('shift',1)" onmouseup="mazeKey('shift',0)" ontouchstart="mazeKey('shift',1);event.preventDefault()" ontouchend="mazeKey('shift',0);event.preventDefault()" style="touch-action:none">SPRINT</button>
+</div>
 <div id="ui">
   <div id="startScreen">
     <h1>SHADOW LABYRINTH</h1>
@@ -870,6 +896,12 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault();
 });
 document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+// Touch button handler
+function mazeKey(key, isDown) {
+  const lowerKey = key.toLowerCase();
+  keys[lowerKey] = isDown;
+}
 document.addEventListener('mousemove', e => {
   if (pointerLocked) {
     mouse.dx += e.movementX;
@@ -1300,6 +1332,27 @@ function gameLoop(time) {
   renderMinimap();
   updateHUD();
 }
+
+// Swipe gesture support
+let mazeSwipeX = 0, mazeSwipeY = 0;
+game.addEventListener('touchstart', (e) => {
+    mazeSwipeX = e.touches[0].clientX;
+    mazeSwipeY = e.touches[0].clientY;
+}, { passive: false });
+
+game.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - mazeSwipeX;
+    const dy = e.changedTouches[0].clientY - mazeSwipeY;
+    if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+            mazeKey(dx > 0 ? 'd' : 'a', 1);
+            setTimeout(() => mazeKey(dx > 0 ? 'd' : 'a', 0), 100);
+        } else {
+            mazeKey(dy > 0 ? 's' : 'w', 1);
+            setTimeout(() => mazeKey(dy > 0 ? 's' : 'w', 0), 100);
+        }
+    }
+}, { passive: false });
 
 requestAnimationFrame(gameLoop);
 </script>

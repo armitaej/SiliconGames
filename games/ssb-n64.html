@@ -5,19 +5,27 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Super Smash Bros N64 - HTML5</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             width: 100vw;
-            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #000;
+            font-family: 'Courier New', monospace;
+            overflow-y: auto;
+        }
+        #game-wrapper {
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #000;
-            font-family: 'Courier New', monospace;
-            overflow: hidden;
+            width: 100%;
+            flex: 1;
         }
         canvas {
             display: block;
@@ -25,11 +33,90 @@
             image-rendering: pixelated;
             image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
+            touch-action: none;
+        }
+        #mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 12px;
+            border-radius: 8px;
+            gap: 8px;
+        }
+        .dpad {
+            display: grid;
+            grid-template-columns: 50px 50px 50px;
+            grid-template-rows: 50px 50px 50px;
+            gap: 3px;
+        }
+        .dpad button {
+            background: #1a3a5c;
+            border: 2px solid #0f3460;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            touch-action: none;
+            min-width: 50px;
+            min-height: 50px;
+        }
+        .dpad button:active {
+            background: #0f3460;
+            transform: scale(0.95);
+        }
+        .dpad .empty {
+            visibility: hidden;
+        }
+        #action-buttons {
+            display: flex;
+            gap: 6px;
+            flex-direction: column;
+        }
+        #action-buttons button {
+            background: #1a3a5c;
+            border: 2px solid #0f3460;
+            border-radius: 8px;
+            color: #fff;
+            padding: 10px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            touch-action: none;
+            min-width: 50px;
+        }
+        #action-buttons button:active {
+            background: #0f3460;
+            transform: scale(0.95);
+        }
+        @media (max-width: 900px) {
+            #mobile-controls {
+                display: flex !important;
+            }
         }
     </style>
 </head>
 <body>
-<canvas id="game" width="900" height="600"></canvas>
+<div id="game-wrapper">
+    <canvas id="game" width="900" height="600"></canvas>
+</div>
+<div id="mobile-controls">
+    <div class="dpad">
+        <div class="empty"></div>
+        <button onmousedown="touchKeyDown('ArrowUp')" onmouseup="touchKeyUp('ArrowUp')" ontouchstart="touchKeyDown('ArrowUp'); event.preventDefault();" ontouchend="touchKeyUp('ArrowUp'); event.preventDefault();" style="touch-action:none;">▲</button>
+        <div class="empty"></div>
+        <button onmousedown="touchKeyDown('ArrowLeft')" onmouseup="touchKeyUp('ArrowLeft')" ontouchstart="touchKeyDown('ArrowLeft'); event.preventDefault();" ontouchend="touchKeyUp('ArrowLeft'); event.preventDefault();" style="touch-action:none;">◀</button>
+        <button onmousedown="touchKeyDown('ArrowDown')" onmouseup="touchKeyUp('ArrowDown')" ontouchstart="touchKeyDown('ArrowDown'); event.preventDefault();" ontouchend="touchKeyUp('ArrowDown'); event.preventDefault();" style="touch-action:none;">▼</button>
+        <button onmousedown="touchKeyDown('ArrowRight')" onmouseup="touchKeyUp('ArrowRight')" ontouchstart="touchKeyDown('ArrowRight'); event.preventDefault();" ontouchend="touchKeyUp('ArrowRight'); event.preventDefault();" style="touch-action:none;">▶</button>
+        <div class="empty"></div>
+    </div>
+    <div id="action-buttons">
+        <button onmousedown="touchKeyDown('z')" onmouseup="touchKeyUp('z')" ontouchstart="touchKeyDown('z'); event.preventDefault();" ontouchend="touchKeyUp('z'); event.preventDefault();" style="touch-action:none;">Jump</button>
+        <button onmousedown="touchKeyDown(' ')" onmouseup="touchKeyUp(' ')" ontouchstart="touchKeyDown(' '); event.preventDefault();" ontouchend="touchKeyUp(' '); event.preventDefault();" style="touch-action:none;">Attack</button>
+    </div>
+</div>
 
 <script>
 // ═════════════════════════════════════════════════════════════════════════════
@@ -37,6 +124,29 @@
 // ═════════════════════════════════════════════════════════════════════════════
 
 const GW = 900, GH = 600;
+const canvas = document.getElementById('game');
+
+// Canvas scaling for mobile
+function fitCanvas() {
+    const wrapper = document.getElementById('game-wrapper');
+    const scale = Math.min((window.innerWidth - 16) / GW, (window.innerHeight - 16) / GH, 1);
+    canvas.style.width = Math.floor(GW * scale) + 'px';
+    canvas.style.height = Math.floor(GH * scale) + 'px';
+}
+fitCanvas();
+window.addEventListener('resize', fitCanvas);
+
+// Key handling for touch controls
+function touchKeyDown(key) {
+    if (!window.game) return;
+    game.keysPressed[key] = true;
+    if (!game.justPressed) game.justPressed = new Set();
+    game.justPressed.add(key);
+}
+function touchKeyUp(key) {
+    if (!window.game) return;
+    game.keysPressed[key] = false;
+}
 const ARENA_H = 510;
 const FPS = 60;
 const STOCKS = 3;
@@ -1940,6 +2050,29 @@ canvas.addEventListener('click', (e) => {
         game.state = 'charselect';
     }
 });
+
+// Swipe gesture support for mobile
+let touchStartX = 0, touchStartY = 0;
+canvas.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const dx = touchEndX - touchStartX;
+    const dy = touchEndY - touchStartY;
+    if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+            touchKeyDown({ key: dx > 0 ? 'ArrowRight' : 'ArrowLeft' });
+            setTimeout(() => touchKeyUp({ key: dx > 0 ? 'ArrowRight' : 'ArrowLeft' }), 100);
+        } else {
+            touchKeyDown({ key: dy > 0 ? 'ArrowDown' : 'ArrowUp' });
+            setTimeout(() => touchKeyUp({ key: dy > 0 ? 'ArrowDown' : 'ArrowUp' }), 100);
+        }
+    }
+}, { passive: false });
 
 game.run();
 </script>

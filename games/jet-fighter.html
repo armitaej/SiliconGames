@@ -5,16 +5,39 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>STORM EAGLE - Jet Combat</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif}
-canvas{display:block}
+body{background:#000;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh}
+canvas{display:block;touch-action:none}
+#mobile-controls-jet{display:none;position:fixed;bottom:12px;right:12px;z-index:100;gap:8px;flex-direction:column}
+#dpad-jet{display:grid;grid-template-columns:50px 50px 50px;grid-template-rows:50px 50px 50px;gap:4px}
+#dpad-jet button{background:rgba(255,153,0,0.7);border:2px solid #FF9900;border-radius:8px;color:#000;font-size:18px;font-weight:bold;cursor:pointer;touch-action:none}
+#dpad-jet button:active{background:rgba(255,153,0,1);transform:scale(0.95)}
+#dpad-jet .empty{visibility:hidden}
+.jet-action-btn{background:rgba(255,153,0,0.7);border:2px solid #FF9900;border-radius:8px;color:#000;padding:10px 14px;font-size:12px;font-weight:bold;cursor:pointer;touch-action:none;min-width:56px;text-align:center}
+.jet-action-btn:active{background:rgba(255,153,0,1);transform:scale(0.95)}
+@media(max-width:900px){#mobile-controls-jet{display:flex!important}}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="mobile-controls-jet">
+  <div id="dpad-jet">
+    <div class="empty"></div>
+    <button onmousedown="jetKey('ArrowUp',1)" onmouseup="jetKey('ArrowUp',0)" ontouchstart="jetKey('ArrowUp',1);event.preventDefault()" ontouchend="jetKey('ArrowUp',0);event.preventDefault()" style="touch-action:none">▲</button>
+    <div class="empty"></div>
+    <button onmousedown="jetKey('ArrowLeft',1)" onmouseup="jetKey('ArrowLeft',0)" ontouchstart="jetKey('ArrowLeft',1);event.preventDefault()" ontouchend="jetKey('ArrowLeft',0);event.preventDefault()" style="touch-action:none">◀</button>
+    <div class="empty"></div>
+    <button onmousedown="jetKey('ArrowRight',1)" onmouseup="jetKey('ArrowRight',0)" ontouchstart="jetKey('ArrowRight',1);event.preventDefault()" ontouchend="jetKey('ArrowRight',0);event.preventDefault()" style="touch-action:none">▶</button>
+    <div class="empty"></div>
+    <button onmousedown="jetKey('ArrowDown',1)" onmouseup="jetKey('ArrowDown',0)" ontouchstart="jetKey('ArrowDown',1);event.preventDefault()" ontouchend="jetKey('ArrowDown',0);event.preventDefault()" style="touch-action:none">▼</button>
+    <div class="empty"></div>
+  </div>
+  <button class="jet-action-btn" onmousedown="jetKey(' ',1)" onmouseup="jetKey(' ',0)" ontouchstart="jetKey(' ',1);event.preventDefault()" ontouchend="jetKey(' ',0);event.preventDefault()" style="touch-action:none">SHOOT</button>
+  <button class="jet-action-btn" onmousedown="jetKey('m',1)" onmouseup="jetKey('m',0)" ontouchstart="jetKey('m',1);event.preventDefault()" ontouchend="jetKey('m',0);event.preventDefault()" style="touch-action:none">MISSILE</button>
+</div>
 <script>
 const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight}
@@ -125,6 +148,13 @@ addEventListener('keyup',e=>{keys[e.code]=false});
 addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY});
 addEventListener('touchstart',e=>{useTouch=true;const t=e.touches[0];mx=t.clientX;my=t.clientY},{passive:true});
 addEventListener('touchmove',e=>{const t=e.touches[0];mx=t.clientX;my=t.clientY},{passive:true});
+
+// Touch button handler
+function jetKey(key,isDown){
+  const codeMap={'ArrowUp':'ArrowUp','ArrowDown':'ArrowDown','ArrowLeft':'ArrowLeft','ArrowRight':'ArrowRight',' ':'Space','m':'KeyM'};
+  const code=codeMap[key]||('Key'+key.toUpperCase());
+  keys[code]=isDown;
+}
 
 // ===== ENVIRONMENT =====
 // Stars
@@ -951,6 +981,18 @@ function loop(t){
 
   update(dt);render();
 }
+
+// Swipe gesture support
+let jetSwipeX=0,jetSwipeY=0;
+C.addEventListener('touchstart',(e)=>{jetSwipeX=e.touches[0].clientX;jetSwipeY=e.touches[0].clientY},{passive:false});
+C.addEventListener('touchend',(e)=>{
+  const dx=e.changedTouches[0].clientX-jetSwipeX,dy=e.changedTouches[0].clientY-jetSwipeY;
+  if(Math.abs(dx)>30||Math.abs(dy)>30){
+    if(Math.abs(dx)>Math.abs(dy))jetKey(dx>0?'ArrowRight':'ArrowLeft',1),setTimeout(()=>jetKey(dx>0?'ArrowRight':'ArrowLeft',0),100);
+    else jetKey(dy>0?'ArrowDown':'ArrowUp',1),setTimeout(()=>jetKey(dy>0?'ArrowDown':'ArrowUp',0),100);
+  }
+},{passive:false});
+
 requestAnimationFrame(loop);
 </script>
 </body>
