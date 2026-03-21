@@ -266,6 +266,10 @@ header {
 .cabinet[data-game="moto"] .game-title { color: var(--neon-green); text-shadow: 0 0 10px rgba(57,255,20,0.5); }
 .cabinet[data-game="moto"] .play-btn { background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57,255,20,0.4); }
 
+.cabinet[data-game="towerdef"] .screen-art { color: var(--neon-yellow); }
+.cabinet[data-game="towerdef"] .game-title { color: var(--neon-yellow); text-shadow: 0 0 10px rgba(255,230,0,0.5); }
+.cabinet[data-game="towerdef"] .play-btn { background: var(--neon-yellow); color: #000; box-shadow: 0 0 20px rgba(255,230,0,0.4); }
+
 .cabinet-info {
   padding: 20px;
   text-align: center;
@@ -639,6 +643,27 @@ footer a:hover { color: var(--neon-pink); }
         <div class="game-stats">
           <button class="like-btn" data-like="moto" onclick="event.stopPropagation(); toggleLike('moto')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
           <span class="hs-badge" data-hs="moto"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tower Command: Tower Defense -->
+    <div class="cabinet" data-game="towerdef" onclick="launchGame('games/tower-defense.html', 'TOWER COMMAND')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3F0;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Tower Command</div>
+        <div class="game-desc">Build archer towers, mage spires, and cannons to defend your castle from waves of goblins, knights, and dragons.</div>
+        <div class="game-tags">
+          <span class="tag">Strategy</span>
+          <span class="tag">Tower Defense</span>
+          <span class="tag">Medieval</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="towerdef" onclick="event.stopPropagation(); toggleLike('towerdef')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="towerdefense"></span>
         </div>
       </div>
     </div>
