@@ -1458,6 +1458,7 @@ function update() {
   if (player.hp <= 0) {
     gameState = 'gameover'; if (score > highScore) highScore = score;
     playDeathSound(); spawnParticles(player.x + player.w / 2, player.y + player.h / 2, '#FF1744', 30, 6); screenShake(6, 15);
+    showHS(score);
     overlay.style.display = 'block'; overlay.querySelector('h1').textContent = 'GAME OVER';
     overlay.querySelector('h2').textContent = 'The mission has failed...';
     finalScoreEl.style.display = 'block'; finalScoreEl.textContent = 'Score: ' + score + (score >= highScore && score > 0 ? ' (NEW BEST!)' : '');
@@ -1573,9 +1574,65 @@ canvas.addEventListener('touchend', (e) => {
     }
 }, { passive: false });
 
+// ── High Score System ─────────────────────────────────────────────────────
+const HS_KEY='sg_hs_starwars';
+const HS_MAX=5;
+function getHS(){return JSON.parse(localStorage.getItem(HS_KEY)||'[]');}
+function showHS(currentScore){
+  const ol=document.getElementById('hs-overlay');
+  ol.style.display='flex';
+  document.getElementById('hs-game-score').textContent='YOUR SCORE: '+currentScore;
+  const scores=getHS();
+  const qualifies=scores.length<HS_MAX||currentScore>(scores[scores.length-1]?.score||0);
+  const listEl=document.getElementById('hs-list');
+  listEl.innerHTML=scores.length===0?'<div style="color:#666;text-align:center;padding:12px">No scores yet</div>':
+    scores.map((s,i)=>'<div style="display:flex;justify-content:space-between;padding:4px 8px;color:'+(i===0?'#ff0':'#0ff')+';font-size:13px"><span>'+(i+1)+'. '+s.name+'</span><span>'+s.score+'</span></div>').join('');
+  if(qualifies&&currentScore>0){
+    document.getElementById('hs-input').style.display='block';
+    document.getElementById('hs-save-btn').style.display='inline-block';
+    document.getElementById('hs-name').value=localStorage.getItem('sg_player_name')||'';
+    document.getElementById('hs-name').focus();
+    window._hsCurrentScore=currentScore;
+  }else{
+    document.getElementById('hs-input').style.display='none';
+    document.getElementById('hs-save-btn').style.display='none';
+  }
+}
+function saveHS(){
+  const name=(document.getElementById('hs-name').value||'ANONYMOUS').slice(0,16).toUpperCase();
+  localStorage.setItem('sg_player_name',name);
+  let scores=getHS();
+  scores.push({name,score:window._hsCurrentScore});
+  scores.sort((a,b)=>b.score-a.score);
+  scores=scores.slice(0,HS_MAX);
+  localStorage.setItem(HS_KEY,JSON.stringify(scores));
+  document.getElementById('hs-input').style.display='none';
+  document.getElementById('hs-save-btn').style.display='none';
+  const listEl=document.getElementById('hs-list');
+  listEl.innerHTML=scores.map((s,i)=>'<div style="display:flex;justify-content:space-between;padding:4px 8px;color:'+(i===0?'#ff0':'#0ff')+';font-size:13px"><span>'+(i+1)+'. '+s.name+'</span><span>'+s.score+'</span></div>').join('');
+}
+function closeHS(){document.getElementById('hs-overlay').style.display='none';}
+document.getElementById('hs-save-btn')?.addEventListener('click',saveHS);
+document.getElementById('hs-close-btn')?.addEventListener('click',closeHS);
+document.getElementById('hs-name')?.addEventListener('keypress',(e)=>{if(e.key==='Enter')saveHS();});
+
 draw();
 gameLoop();
 </script>
+<div id="hs-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:none;justify-content:center;align-items:center;z-index:10000;flex-direction:column">
+  <div style="background:#1a1a2e;border:3px solid #0ff;border-radius:8px;padding:24px;max-width:320px;width:90%;box-shadow:0 0 20px #0ff">
+    <h2 style="color:#fff;text-align:center;margin:0 0 12px 0;font-size:18px;font-family:Courier New">HIGH SCORES</h2>
+    <div id="hs-game-score" style="color:#ff0;text-align:center;font-size:14px;margin-bottom:16px;font-family:Courier New;font-weight:bold">YOUR SCORE: 0</div>
+    <div id="hs-list" style="margin-bottom:16px;font-family:Courier New;max-height:180px;overflow-y:auto"></div>
+    <div id="hs-input" style="display:none;margin-bottom:12px">
+      <input id="hs-name" type="text" placeholder="Enter name..." maxlength="16" style="width:100%;padding:8px;background:#0a0a1a;border:2px solid #0ff;color:#0ff;font-family:Courier New;font-size:12px;box-sizing:border-box">
+    </div>
+    <div style="text-align:center">
+      <button id="hs-save-btn" style="display:none;padding:8px 16px;margin-right:8px;background:#0ff;color:#000;border:none;border-radius:4px;cursor:pointer;font-family:Courier New;font-weight:bold;font-size:12px">SAVE</button>
+      <button id="hs-close-btn" style="padding:8px 16px;background:#ff0;color:#000;border:none;border-radius:4px;cursor:pointer;font-family:Courier New;font-weight:bold;font-size:12px">CLOSE</button>
+    </div>
+  </div>
+</div>
 <div style="position:fixed;bottom:6px;left:8px;font-family:monospace;font-size:10px;color:rgba(255,255,255,0.35);pointer-events:none;z-index:9999;">Updated: Mar 20, 2026</div>
 </body>
 </html>

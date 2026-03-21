@@ -396,6 +396,54 @@ footer a {
 }
 footer a:hover { color: var(--neon-pink); }
 
+/* Visit counter */
+.visit-counter {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: var(--neon-green);
+  text-shadow: 0 0 8px rgba(57,255,20,0.5);
+  margin-top: 8px;
+}
+
+/* Like button */
+.game-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.like-btn {
+  background: none;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #888;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.like-btn:hover {
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+}
+.like-btn.liked {
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+  text-shadow: 0 0 6px rgba(255,45,117,0.5);
+}
+.like-btn .heart { font-size: 14px; }
+.hs-badge {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 6px rgba(255,230,0,0.4);
+}
+
 /* Responsive */
 @media (max-width: 700px) {
   .games-grid {
@@ -419,6 +467,7 @@ footer a:hover { color: var(--neon-pink); }
   <div class="logo">SILICON GAMES</div>
   <div class="tagline">Digital Arcade</div>
   <div class="coin-counter">INSERT COIN TO PLAY</div>
+  <div class="visit-counter" id="visit-counter"></div>
 </header>
 
 <div class="neon-line"></div>
@@ -440,6 +489,10 @@ footer a:hover { color: var(--neon-pink); }
           <span class="tag">10 Levels</span>
         </div>
         <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="lolo" onclick="event.stopPropagation(); toggleLike('lolo')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="lolo"></span>
+        </div>
       </div>
     </div>
 
@@ -457,6 +510,10 @@ footer a:hover { color: var(--neon-pink); }
           <span class="tag">Shooter</span>
         </div>
         <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="starwars" onclick="event.stopPropagation(); toggleLike('starwars')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="starwars"></span>
+        </div>
       </div>
     </div>
 
@@ -474,6 +531,10 @@ footer a:hover { color: var(--neon-pink); }
           <span class="tag">Survival</span>
         </div>
         <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="snake" onclick="event.stopPropagation(); toggleLike('snake')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="snake"></span>
+        </div>
       </div>
     </div>
 
@@ -491,6 +552,10 @@ footer a:hover { color: var(--neon-pink); }
           <span class="tag">16 Fighters</span>
         </div>
         <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="ssb" onclick="event.stopPropagation(); toggleLike('ssb')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="ssb"></span>
+        </div>
       </div>
     </div>
 
@@ -508,6 +573,10 @@ footer a:hover { color: var(--neon-pink); }
           <span class="tag">5 Levels</span>
         </div>
         <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="swbounty" onclick="event.stopPropagation(); toggleLike('swbounty')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="swbounty"></span>
+        </div>
       </div>
     </div>
 
@@ -525,6 +594,10 @@ footer a:hover { color: var(--neon-pink); }
           <span class="tag">Combat</span>
         </div>
         <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="jetfighter" onclick="event.stopPropagation(); toggleLike('jetfighter')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="jetfighter"></span>
+        </div>
       </div>
     </div>
 
@@ -542,6 +615,10 @@ footer a:hover { color: var(--neon-pink); }
           <span class="tag">Puzzle</span>
         </div>
         <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="maze" onclick="event.stopPropagation(); toggleLike('maze')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="maze"></span>
+        </div>
       </div>
     </div>
 
@@ -559,6 +636,10 @@ footer a:hover { color: var(--neon-pink); }
           <span class="tag">Pixel Art</span>
         </div>
         <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="moto" onclick="event.stopPropagation(); toggleLike('moto')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="moto"></span>
+        </div>
       </div>
     </div>
 
@@ -610,18 +691,70 @@ function launchGame(url, title) {
   frame.addEventListener('load', () => { frame.focus(); frame.contentWindow.focus(); }, { once: true });
 }
 
+// ESC key to close game
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeGame();
+});
+
+// Visit counter
+(function() {
+  let visits = parseInt(localStorage.getItem('sg_visits') || '0') + 1;
+  localStorage.setItem('sg_visits', visits);
+  document.getElementById('visit-counter').textContent = 'VISITS: ' + visits;
+})();
+
+// Like system
+function toggleLike(gameKey) {
+  const lsKey = 'sg_liked_' + gameKey;
+  const countKey = 'sg_likes_' + gameKey;
+  const isLiked = localStorage.getItem(lsKey) === '1';
+  let count = parseInt(localStorage.getItem(countKey) || '0');
+  if (isLiked) {
+    count = Math.max(0, count - 1);
+    localStorage.setItem(lsKey, '0');
+  } else {
+    count++;
+    localStorage.setItem(lsKey, '1');
+  }
+  localStorage.setItem(countKey, count);
+  refreshLikes();
+}
+
+function refreshLikes() {
+  document.querySelectorAll('.like-btn').forEach(btn => {
+    const key = btn.dataset.like;
+    const liked = localStorage.getItem('sg_liked_' + key) === '1';
+    const count = parseInt(localStorage.getItem('sg_likes_' + key) || '0');
+    btn.classList.toggle('liked', liked);
+    btn.querySelector('.heart').innerHTML = liked ? '&#9829;' : '&#9825;';
+    btn.querySelector('.like-count').textContent = count;
+  });
+}
+
+// High score badges on cards
+function refreshHighScoreBadges() {
+  document.querySelectorAll('[data-hs]').forEach(el => {
+    const key = el.dataset.hs;
+    const scores = JSON.parse(localStorage.getItem('sg_hs_' + key) || '[]');
+    if (scores.length > 0) {
+      el.textContent = 'BEST: ' + scores[0].score + ' (' + scores[0].name + ')';
+    }
+  });
+}
+
+refreshLikes();
+refreshHighScoreBadges();
+
+// Refresh badges when returning from a game
 function closeGame() {
   const overlay = document.getElementById('game-overlay');
   const frame = document.getElementById('game-frame');
   frame.src = '';
   overlay.classList.remove('active');
   document.body.style.overflow = '';
+  refreshLikes();
+  refreshHighScoreBadges();
 }
-
-// ESC key to close game
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeGame();
-});
 
 // Coin counter text cycle
 const coinTexts = ['INSERT COIN TO PLAY', 'SELECT A GAME', 'PRESS START', 'PLAYER 1 READY'];

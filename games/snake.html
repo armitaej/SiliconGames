@@ -547,6 +547,7 @@ function die(reason) {
   screenShake = 12;
   spawnParticles(snake[0].x, snake[0].y, '#e94560', 25, 7);
   render();
+  showHS(score);
   setTimeout(() => {
     showOverlay("Game Over", reason,
       `Score: ${score} | Level ${currentLevel + 1}: ${LEVEL_CONFIG[currentLevel].name}`,
@@ -972,7 +973,60 @@ canvas.addEventListener('touchend', e => {
 }, { passive: false });
 
 init();
+
+// High Score System
+const HS_KEY='sg_hs_snake';
+const HS_MAX=5;
+function getHS(){return JSON.parse(localStorage.getItem(HS_KEY)||'[]');}
+function showHS(currentScore){
+  const ol=document.getElementById('hs-overlay');
+  ol.style.display='flex';
+  document.getElementById('hs-game-score').textContent='YOUR SCORE: '+currentScore;
+  const scores=getHS();
+  const qualifies=scores.length<HS_MAX||currentScore>(scores[scores.length-1]?.score||0);
+  const listEl=document.getElementById('hs-list');
+  listEl.innerHTML=scores.length===0?'<div style="color:#666;text-align:center;padding:12px">No scores yet</div>':
+    scores.map((s,i)=>'<div style="display:flex;justify-content:space-between;padding:4px 8px;color:'+(i===0?'#ff0':'#0ff')+';font-size:13px"><span>'+(i+1)+'. '+s.name+'</span><span>'+s.score+'</span></div>').join('');
+  if(qualifies&&currentScore>0){
+    document.getElementById('hs-input').style.display='block';
+    document.getElementById('hs-save-btn').style.display='inline-block';
+    document.getElementById('hs-name').value=localStorage.getItem('sg_player_name')||'';
+    document.getElementById('hs-name').focus();
+    window._hsCurrentScore=currentScore;
+  }else{
+    document.getElementById('hs-input').style.display='none';
+    document.getElementById('hs-save-btn').style.display='none';
+  }
+}
+function saveHS(){
+  const name=document.getElementById('hs-name').value.trim()||'PLAYER';
+  localStorage.setItem('sg_player_name',name);
+  const scores=getHS();
+  scores.push({name:name,score:window._hsCurrentScore});
+  scores.sort((a,b)=>b.score-a.score);
+  if(scores.length>HS_MAX)scores.length=HS_MAX;
+  localStorage.setItem(HS_KEY,JSON.stringify(scores));
+  document.getElementById('hs-input').style.display='none';
+  document.getElementById('hs-save-btn').style.display='none';
+  showHS(window._hsCurrentScore);
+}
+function closeHS(){document.getElementById('hs-overlay').style.display='none';}
 </script>
 <div style="position:fixed;bottom:6px;left:8px;font-family:monospace;font-size:10px;color:rgba(255,255,255,0.35);pointer-events:none;z-index:9999;">Updated: Mar 20, 2026</div>
+<div id="hs-overlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.88);align-items:center;justify-content:center;font-family:'Courier New',monospace">
+  <div style="background:#0a0a1a;border:2px solid #0ff;border-radius:12px;padding:28px;max-width:360px;width:92%;text-align:center;box-shadow:0 0 30px rgba(0,255,255,0.2)">
+    <div style="color:#0ff;font-size:20px;font-weight:bold;margin-bottom:4px;text-shadow:0 0 10px rgba(0,255,255,0.5)">HIGH SCORES</div>
+    <div id="hs-game-score" style="color:#ff0;font-size:14px;margin-bottom:16px"></div>
+    <div id="hs-list" style="text-align:left;margin-bottom:16px"></div>
+    <div id="hs-input" style="display:none;margin-bottom:16px">
+      <div style="color:#ff0;font-size:13px;margin-bottom:8px">NEW HIGH SCORE!</div>
+      <input id="hs-name" maxlength="12" placeholder="Enter your name" style="background:#111;border:2px solid #0ff;color:#0ff;padding:8px 12px;border-radius:6px;font-family:inherit;font-size:14px;width:80%;text-align:center;outline:none">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button id="hs-save-btn" onclick="saveHS()" style="display:none;background:#0ff;color:#000;border:none;padding:8px 20px;border-radius:6px;font-family:inherit;font-size:12px;font-weight:bold;cursor:pointer">SAVE</button>
+      <button onclick="closeHS()" style="background:none;border:2px solid #888;color:#888;padding:8px 20px;border-radius:6px;font-family:inherit;font-size:12px;cursor:pointer">CLOSE</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
