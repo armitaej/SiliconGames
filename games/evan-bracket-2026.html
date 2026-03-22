@@ -384,13 +384,13 @@
 
     // === PERSISTENCE ===
     function loadBracket() {
-        const saved = localStorage.getItem('evanBracket2026_v2');
+        const saved = localStorage.getItem('evanBracket2026_v3');
         if (saved) {
             try { Object.assign(bracketData, JSON.parse(saved)); } catch(e) {}
         }
     }
     function saveBracket() {
-        localStorage.setItem('evanBracket2026_v2', JSON.stringify(bracketData));
+        localStorage.setItem('evanBracket2026_v3', JSON.stringify(bracketData));
     }
 
     // === WINNER LOGIC ===
@@ -431,12 +431,76 @@
     }
 
     // === SCORING ===
+    // Build Evan's predicted bracket path for a region.
+    // Returns arrays of predicted teams per round slot.
+    function buildEvanPath(reg) {
+        const d = bracketData[reg];
+        // R64 picks
+        const r64winners = d.r64.map(m => m.evanPick);
+        // R32: Evan expected these matchups from his R64 picks
+        const r32winners = [];
+        for (let i = 0; i < r64winners.length; i += 2) {
+            // The R32 game at slot i/2 has Evan's expected teams: r64winners[i] vs r64winners[i+1]
+            r32winners.push(d.r32[i / 2] ? d.r32[i / 2].evanPick : null);
+        }
+        // S16: from R32 picks
+        const s16winners = [];
+        for (let i = 0; i < r32winners.length; i += 2) {
+            s16winners.push(d.s16[i / 2] ? d.s16[i / 2].evanPick : null);
+        }
+        // E8: from S16 picks
+        const e8winners = [];
+        for (let i = 0; i < s16winners.length; i += 2) {
+            e8winners.push(d.e8[i / 2] ? d.e8[i / 2].evanPick : null);
+        }
+        return { r64: r64winners, r32: r32winners, s16: s16winners, e8: e8winners };
+    }
+
+    // Check if Evan correctly predicted BOTH teams in this matchup.
+    // A pick only counts if Evan got BOTH feeder games right in the prior round,
+    // meaning the actual matchup is exactly what he predicted.
+    function isPathCorrect(reg, round, index) {
+        const d = bracketData[reg];
+        const rounds = ['r64', 'r32', 's16', 'e8'];
+        const ri = rounds.indexOf(round);
+        if (ri === 0) return true; // R64 has no prior path to check
+
+        // Check that both feeder games from the prior round were picked correctly
+        const priorRound = rounds[ri - 1];
+        const feeder1Idx = index * 2;
+        const feeder2Idx = index * 2 + 1;
+        const feeder1 = d[priorRound][feeder1Idx];
+        const feeder2 = d[priorRound][feeder2Idx];
+
+        if (!feeder1 || !feeder2) return false;
+
+        // Both feeders must have actual results matching Evan's picks
+        const feeder1Ok = feeder1.actual && feeder1.evanPick === feeder1.actual;
+        const feeder2Ok = feeder2.actual && feeder2.evanPick === feeder2.actual;
+
+        if (!feeder1Ok || !feeder2Ok) return false;
+
+        // Recursively check that feeders' paths are also correct
+        if (ri >= 2) {
+            if (!isPathCorrect(reg, priorRound, feeder1Idx)) return false;
+            if (!isPathCorrect(reg, priorRound, feeder2Idx)) return false;
+        }
+        return true;
+    }
+
     function updateScore() {
         let sc = { r64: 0, r32: 0, s16: 0, e8: 0, f4: 0, champ: 0 };
         ['east','south','west','midwest'].forEach(reg => {
-            ['r64','r32','s16','e8'].forEach(rd => {
-                bracketData[reg][rd].forEach(m => {
-                    if (m.actual && m.actual !== 'TBD' && m.evanPick === m.actual) sc[rd]++;
+            // R64: simple check (no path dependency)
+            bracketData[reg].r64.forEach(m => {
+                if (m.actual && m.actual !== 'TBD' && m.evanPick === m.actual) sc.r64++;
+            });
+            // R32, S16, E8: only count if the winner's path matches Evan's picks
+            ['r32','s16','e8'].forEach(rd => {
+                bracketData[reg][rd].forEach((m, i) => {
+                    if (m.actual && m.actual !== 'TBD' && m.evanPick === m.actual) {
+                        if (isPathCorrect(reg, rd, i)) sc[rd]++;
+                    }
                 });
             });
         });
@@ -500,7 +564,10 @@
             box.style.height = BOX_H + 'px';
 
             const hasResult = matchup.actual && matchup.actual !== 'TBD' && matchup.actual !== '';
-            const isCorrect = hasResult && matchup.evanPick === matchup.actual;
+            const pickMatches = hasResult && matchup.evanPick === matchup.actual;
+            // For R32+, only show correct if Evan's full path to this game was right
+            const isRegionalRound = ['east','south','west','midwest'].includes(region);
+            const isCorrect = pickMatches && (!isRegionalRound || round === 'r64' || isPathCorrect(region, round, index));
 
             if (hasResult) box.classList.add(isCorrect ? 'correct' : 'wrong');
             else box.classList.add('pending');
