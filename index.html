@@ -250,9 +250,6 @@ header {
 .cabinet[data-game="ssb"] .game-title { color: var(--neon-purple); text-shadow: 0 0 10px rgba(180,77,255,0.5); }
 .cabinet[data-game="ssb"] .play-btn { background: var(--neon-purple); box-shadow: 0 0 20px rgba(180,77,255,0.4); }
 
-.cabinet[data-game="swbounty"] .screen-art { color: var(--neon-cyan); }
-.cabinet[data-game="swbounty"] .game-title { color: var(--neon-cyan); text-shadow: 0 0 10px rgba(0,240,255,0.5); }
-.cabinet[data-game="swbounty"] .play-btn { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(0,240,255,0.4); }
 
 .cabinet[data-game="jetfighter"] .screen-art { color: var(--neon-cyan); }
 .cabinet[data-game="jetfighter"] .game-title { color: var(--neon-cyan); text-shadow: 0 0 10px rgba(0,240,255,0.5); }
@@ -265,6 +262,10 @@ header {
 .cabinet[data-game="moto"] .screen-art { color: var(--neon-green); }
 .cabinet[data-game="moto"] .game-title { color: var(--neon-green); text-shadow: 0 0 10px rgba(57,255,20,0.5); }
 .cabinet[data-game="moto"] .play-btn { background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57,255,20,0.4); }
+
+.cabinet[data-game="kingdom"] .screen-art { color: var(--neon-green); }
+.cabinet[data-game="kingdom"] .game-title { color: var(--neon-green); text-shadow: 0 0 10px rgba(57,255,20,0.5); }
+.cabinet[data-game="kingdom"] .play-btn { background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57,255,20,0.4); }
 
 .cabinet[data-game="towerdef"] .screen-art { color: var(--neon-yellow); }
 .cabinet[data-game="towerdef"] .game-title { color: var(--neon-yellow); text-shadow: 0 0 10px rgba(255,230,0,0.5); }
@@ -563,27 +564,6 @@ footer a:hover { color: var(--neon-pink); }
       </div>
     </div>
 
-    <!-- Star Wars: Galaxy Bounty (Side-Scroller) -->
-    <div class="cabinet" data-game="swbounty" onclick="launchGame('games/star-wars-bounty.html', 'STAR WARS: GALAXY BOUNTY')">
-      <div class="cabinet-screen">
-        <div class="screen-art">&#x2694;&#xFE0F;</div>
-      </div>
-      <div class="cabinet-info">
-        <div class="game-title">Galaxy Bounty II</div>
-        <div class="game-desc">8 Star Wars characters, 5 levels of increasing danger. Jetpacks, lightsabers, and force powers await.</div>
-        <div class="game-tags">
-          <span class="tag">Platformer</span>
-          <span class="tag">Shooter</span>
-          <span class="tag">5 Levels</span>
-        </div>
-        <button class="play-btn">PLAY</button>
-        <div class="game-stats">
-          <button class="like-btn" data-like="swbounty" onclick="event.stopPropagation(); toggleLike('swbounty')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
-          <span class="hs-badge" data-hs="swbounty"></span>
-        </div>
-      </div>
-    </div>
-
     <!-- Storm Eagle: Jet Combat -->
     <div class="cabinet" data-game="jetfighter" onclick="launchGame('games/jet-fighter.html', 'STORM EAGLE: JET COMBAT')">
       <div class="cabinet-screen">
@@ -647,6 +627,27 @@ footer a:hover { color: var(--neon-pink); }
       </div>
     </div>
 
+    <!-- Legend of the Lost Kingdom -->
+    <div class="cabinet" data-game="kingdom" onclick="launchGame('games/legend-kingdom.html', 'LEGEND OF THE LOST KINGDOM')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F5E1;&#xFE0F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Legend of the Lost Kingdom</div>
+        <div class="game-desc">Explore a vast overworld and conquer 3 dungeons in this top-down Zelda-style adventure. Slay monsters, find keys, defeat bosses!</div>
+        <div class="game-tags">
+          <span class="tag">Adventure</span>
+          <span class="tag">RPG</span>
+          <span class="tag">3 Dungeons</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="kingdom" onclick="event.stopPropagation(); toggleLike('kingdom')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="kingdom"></span>
+        </div>
+      </div>
+    </div>
+
     <!-- Tower Command: Tower Defense -->
     <div class="cabinet" data-game="towerdef" onclick="launchGame('games/tower-defense.html', 'TOWER COMMAND')">
       <div class="cabinet-screen">
@@ -672,7 +673,7 @@ footer a:hover { color: var(--neon-pink); }
 </main>
 
 <footer>
-  SILICON GAMES &copy; 2026 &mdash; Built by Cooper, Eli and Lucas Armitage &nbsp;&mdash;&nbsp; Last updated March 20, 2026
+  SILICON GAMES &copy; 2026 &mdash; Built by Cooper, Eli and Lucas Armitage &nbsp;&mdash;&nbsp; Last updated March 21, 2026
 </footer>
 
 <!-- Game Overlay -->

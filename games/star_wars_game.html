@@ -706,6 +706,7 @@ window.addEventListener('resize', resizeCanvas);
 let gameState = 'menu', score = 0, highScore = 0, cameraX = 0, gameTime = 0;
 let shakeTimer = 0, shakeIntensity = 0, particles = [], floatingTexts = [];
 let selectedCharKey = 'jango';
+let currentLevel = 1, enemiesKilledThisLevel = 0, levelTransitionTimer = 0;
 
 let audioCtx = null;
 function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -731,7 +732,10 @@ function playShieldSound()  { playSound(800,0.2,'sine',0.1); setTimeout(()=>play
 function playForceSound()   { playSound(180,0.4,'sine',0.18); setTimeout(()=>playSound(120,0.5,'sawtooth',0.12),100); }
 
 const keys = {};
-document.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); });
+document.addEventListener('keydown', e => {
+  if (document.getElementById('hs-overlay')?.style.display === 'flex') return;
+  keys[e.code] = true; e.preventDefault();
+});
 document.addEventListener('keyup',   e => { keys[e.code] = false; });
 
 const stars = [];
@@ -739,6 +743,14 @@ for (let i = 0; i < 300; i++)
   stars.push({ x: Math.random()*W*4, y: Math.random()*H*0.7, size: Math.random()*2+0.5, speed: Math.random()*0.5+0.1, brightness: Math.random() });
 
 let platforms = [], enemies = [], collectibles = [], projectiles = [], meleeHits = [];
+
+const LEVEL_CONFIG = [
+  { killsNeeded: 15, hpMult: 1.0, speedMult: 1.0, spawnRate: 1.0, scoreMult: 1, name: 'TATOOINE OUTPOST' },
+  { killsNeeded: 25, hpMult: 1.4, speedMult: 1.1, spawnRate: 0.85, scoreMult: 2, name: 'CORUSCANT DEPTHS' },
+  { killsNeeded: 35, hpMult: 1.8, speedMult: 1.2, spawnRate: 0.7, scoreMult: 3, name: 'MUSTAFAR MINES' },
+  { killsNeeded: 45, hpMult: 2.5, speedMult: 1.3, spawnRate: 0.55, scoreMult: 4, name: 'DEATH STAR CORRIDORS' },
+  { killsNeeded: 60, hpMult: 3.5, speedMult: 1.4, spawnRate: 0.4, scoreMult: 5, name: 'EMPEROR\'S THRONE' },
+];
 
 const CHARS = {
   jango:   { name:'JANGO FETT',      role:'Bounty Hunter',    color:'#546E7A', accent:'#FF6D00', hp:100, speed:5,   jumpPower:12, w:30, h:50, hasJetpack:true,  primaryLabel:'BLASTER',         specialLabel:'ROCKET',        specialCooldownMax:300, desc:'Jetpack + Rocket on E' },
@@ -760,6 +772,19 @@ const player = {
   dashActive:false, dashTimer:0, spinActive:false, spinTimer:0,
 };
 
+function getLevelConfig() {
+  const idx = Math.min(currentLevel - 1, LEVEL_CONFIG.length - 1);
+  return LEVEL_CONFIG[idx];
+}
+
+function scoreKill(baseScore) {
+  const lvlCfg = getLevelConfig();
+  const finalScore = Math.floor(baseScore * lvlCfg.scoreMult);
+  score += finalScore;
+  enemiesKilledThisLevel++;
+  return finalScore;
+}
+
 function generateWorld() {
   platforms=[]; enemies=[]; collectibles=[]; projectiles=[]; meleeHits=[];
   let gx=0;
@@ -770,13 +795,15 @@ function generateWorld() {
     if(Math.random()>0.6){const py=H-200-Math.random()*100;platforms.push({x:gx+150+Math.random()*100,y:py,w:60+Math.random()*60,h:16,type:'platform'});}
     gx+=sl+60+Math.random()*80;
   }
+  const lvlCfg = getLevelConfig();
   for(let i=0;i<platforms.length;i++){
     const p=platforms[i];
     if(p.x<300)continue;
-    if(Math.random()>0.4&&p.type==='ground'){
+    if(Math.random()>(0.4/lvlCfg.spawnRate)&&p.type==='ground'){
       const et=Math.random()>0.6?'trooper':'droid';
-      enemies.push({x:p.x+50+Math.random()*(p.w-100),y:p.y-45,w:28,h:44,type:et,hp:et==='trooper'?2:1,
-        vx:(Math.random()>0.5?1:-1)*(1+Math.random()),facing:1,patrolLeft:p.x+10,patrolRight:p.x+p.w-40,
+      const baseHp = et==='trooper'?2:1;
+      enemies.push({x:p.x+50+Math.random()*(p.w-100),y:p.y-45,w:28,h:44,type:et,hp:Math.ceil(baseHp*lvlCfg.hpMult),
+        vx:(Math.random()>0.5?1:-1)*(1+Math.random())*lvlCfg.speedMult,facing:1,patrolLeft:p.x+10,patrolRight:p.x+p.w-40,
         shootTimer:Math.random()*120,animFrame:0,animTimer:0,hit:0,slowed:0});
     }
   }
@@ -801,6 +828,7 @@ function resetGame(charKey) {
   player.meleeActive=false;player.meleeTimer=0;player.shieldActive=false;player.shieldTimer=0;
   player.dashActive=false;player.dashTimer=0;player.spinActive=false;player.spinTimer=0;
   score=0;cameraX=0;gameTime=0;particles=[];floatingTexts=[];projectiles=[];meleeHits=[];
+  currentLevel=1;enemiesKilledThisLevel=0;levelTransitionTimer=0;
   generateWorld();
 }
 
@@ -1173,12 +1201,14 @@ function drawHUD() {
   ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(12, 12, 200 * hr, 8);
   ctx.fillStyle = '#fff'; ctx.font = '12px Courier New'; ctx.fillText('HP: ' + player.hp + '/' + player.maxHp, 16, 26);
 
-  // Score
+  // Score and Level
   ctx.fillStyle = '#FFE81F'; ctx.font = 'bold 20px Courier New'; ctx.textAlign = 'right';
   ctx.shadowBlur = 6; ctx.shadowColor = '#FFE81F';
   ctx.fillText('SCORE: ' + score, W - 15, 28); ctx.shadowBlur = 0;
+  ctx.fillStyle = '#29B6F6'; ctx.font = 'bold 14px Courier New'; ctx.shadowBlur = 4; ctx.shadowColor = '#29B6F6';
+  ctx.fillText('LVL ' + currentLevel + '  KILLS: ' + enemiesKilledThisLevel + '/' + getLevelConfig().killsNeeded, W - 15, 46); ctx.shadowBlur = 0;
   ctx.textAlign = 'left';
-  if (highScore > 0) { ctx.fillStyle = '#888'; ctx.font = '14px Courier New'; ctx.textAlign = 'right'; ctx.fillText('BEST: ' + highScore, W - 15, 46); ctx.textAlign = 'left'; }
+  if (highScore > 0) { ctx.fillStyle = '#888'; ctx.font = '14px Courier New'; ctx.textAlign = 'right'; ctx.fillText('BEST: ' + highScore, W - 15, 62); ctx.textAlign = 'left'; }
 
   // Jetpack bar (Jango only)
   if (player.char === 'jango') {
@@ -1227,7 +1257,7 @@ function doSpecial() {
         if (e.hp <= 0) return;
         const d = dist2(player.x + 27, player.y + 30, e.x + e.w / 2, e.y + e.h / 2);
         if (d < 120) { e.hp -= 2; e.hit = 15; const a = Math.atan2(e.y - player.y, e.x - player.x); e.vx = Math.cos(a) * 10; e.patrolLeft = e.x - 80; e.patrolRight = e.x + 80;
-          if (e.hp <= 0) { score += e.type === 'trooper' ? 150 : 75; spawnFloatingText(e.x, e.y, e.type === 'trooper' ? '+150' : '+75'); }
+          if (e.hp <= 0) { const pts = scoreKill(e.type === 'trooper' ? 150 : 75); spawnFloatingText(e.x, e.y, e.type === 'trooper' ? '+150' : '+75'); }
           spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#66BB6A', 12, 4); }
       }); break;
     case 'grievous':
@@ -1269,7 +1299,7 @@ function doSpecial() {
         player.x = nearest.x + (player.facing > 0 ? nearest.w + 5 : -player.w - 5); player.y = nearest.y;
         spawnParticles(player.x + 14, player.y + 25, '#7986CB', 20, 5);
         nearest.hp -= 3; nearest.hit = 15;
-        if (nearest.hp <= 0) { score += nearest.type === 'trooper' ? 200 : 100; spawnFloatingText(nearest.x, nearest.y, nearest.type === 'trooper' ? '+200' : '+100', '#7986CB'); }
+        if (nearest.hp <= 0) { const pts = scoreKill(nearest.type === 'trooper' ? 200 : 100); spawnFloatingText(nearest.x, nearest.y, nearest.type === 'trooper' ? '+200' : '+100', '#7986CB'); }
         spawnFloatingText(player.x, player.y, 'SHADOW STEP!', '#7986CB'); screenShake(4, 8);
       } else {
         spawnParticles(player.x + 14, player.y + 25, '#3F51B5', 15, 4);
@@ -1360,7 +1390,7 @@ function update() {
       enemies.forEach(e => { if (e.hp <= 0) return;
         const d = dist2(player.x + player.w / 2, player.y + player.h / 2, e.x + e.w / 2, e.y + e.h / 2);
         if (d < 60) { e.hp -= 1; e.hit = 8; const a = Math.atan2(e.y - player.y, e.x - player.x); e.vx = Math.cos(a) * 6; e.patrolLeft = e.x - 50; e.patrolRight = e.x + 50;
-          if (e.hp <= 0) { score += e.type === 'trooper' ? 100 : 50; spawnFloatingText(e.x, e.y, e.type === 'trooper' ? '+100' : '+50'); }
+          if (e.hp <= 0) { const pts = scoreKill(e.type === 'trooper' ? 100 : 50); spawnFloatingText(e.x, e.y, e.type === 'trooper' ? '+100' : '+50'); }
           spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#29B6F6', 6, 3); }
       });
     }
@@ -1405,7 +1435,7 @@ function update() {
       enemies.forEach(e => { if (e.hp <= 0 || e.hit > 0) return;
         if (rectsCollide({ x: mh.x, y: mh.y, w: mh.w, h: mh.h }, e)) {
           e.hp -= (mh.dmg || 1); e.hit = 10; e.vx = (mh.x < e.x ? 1 : -1) * 5; e.patrolLeft = e.x - 60; e.patrolRight = e.x + 60;
-          if (e.hp <= 0) { score += e.type === 'trooper' ? 110 : 55; spawnFloatingText(e.x, e.y, e.type === 'trooper' ? '+110' : '+55', '#FFE81F'); spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#FFE81F', 15, 5); }
+          if (e.hp <= 0) { const pts = scoreKill(e.type === 'trooper' ? 110 : 55); spawnFloatingText(e.x, e.y, e.type === 'trooper' ? '+110' : '+55', '#FFE81F'); spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#FFE81F', 15, 5); }
           spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#FF6D00', 6, 3); playHitSound(); screenShake(2, 4);
         }
       });
@@ -1423,10 +1453,10 @@ function update() {
           const dm = p.dmg || 1; e.hp -= dm; e.hit = 10; e.vx = (p.vx > 0 ? 1 : -1) * 4; e.patrolLeft = e.x - 80; e.patrolRight = e.x + 80;
           if (p.ptype === 'slime') e.slowed = 120;
           playHitSound(); screenShake(2, 4); spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#FF6D00', 8);
-          if (e.hp <= 0) { score += e.type === 'trooper' ? 100 : 50; spawnFloatingText(e.x, e.y, e.type === 'trooper' ? '+100' : '+50', '#FFE81F'); spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#FFE81F', 15, 5); }
+          if (e.hp <= 0) { const pts = scoreKill(e.type === 'trooper' ? 100 : 50); spawnFloatingText(e.x, e.y, e.type === 'trooper' ? '+100' : '+50', '#FFE81F'); spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#FFE81F', 15, 5); }
           if (p.explodes) {
             playRocketSound(); screenShake(6, 12); spawnParticles(p.x, p.y, '#FF6D00', 25, 7); spawnParticles(p.x, p.y, '#FFE81F', 15, 5); spawnFloatingText(p.x, p.y, 'BOOM!', '#FF6D00');
-            enemies.forEach(e2 => { if (e2.hp <= 0 || e2 === e) return; if (dist2(p.x, p.y, e2.x + e2.w / 2, e2.y + e2.h / 2) < 80) { e2.hp -= 1; e2.hit = 10; if (e2.hp <= 0) { score += e2.type === 'trooper' ? 100 : 50; spawnFloatingText(e2.x, e2.y, '+BOOM', '#FF6D00'); } } });
+            enemies.forEach(e2 => { if (e2.hp <= 0 || e2 === e) return; if (dist2(p.x, p.y, e2.x + e2.w / 2, e2.y + e2.h / 2) < 80) { e2.hp -= 1; e2.hit = 10; if (e2.hp <= 0) { const pts2 = scoreKill(e2.type === 'trooper' ? 100 : 50); spawnFloatingText(e2.x, e2.y, '+BOOM', '#FF6D00'); } } });
             return false;
           }
           return false;
@@ -1450,6 +1480,80 @@ function update() {
     }
   });
   if (gameTime % 30 === 0) score += 1;
+
+  // Respawn enemies ahead of the player so there are always enough to kill
+  const aliveEnemies = enemies.filter(e => e.hp > 0);
+  if (aliveEnemies.length < 4 && levelTransitionTimer === 0) {
+    const lvlCfgSpawn = getLevelConfig();
+    // Find ground platforms ahead of the player
+    const aheadPlatforms = platforms.filter(p => p.type === 'ground' && p.x > player.x + W * 0.3 && p.x < player.x + W * 2);
+    if (aheadPlatforms.length > 0) {
+      const count = 2 + Math.floor(Math.random() * 3);
+      for (let si = 0; si < count && si < aheadPlatforms.length; si++) {
+        const sp = aheadPlatforms[Math.floor(Math.random() * aheadPlatforms.length)];
+        const et = Math.random() > 0.6 ? 'trooper' : 'droid';
+        const baseHp = et === 'trooper' ? 2 : 1;
+        enemies.push({
+          x: sp.x + 50 + Math.random() * (sp.w - 100), y: sp.y - 45, w: 28, h: 44, type: et,
+          hp: Math.ceil(baseHp * lvlCfgSpawn.hpMult),
+          vx: (Math.random() > 0.5 ? 1 : -1) * (1 + Math.random()) * lvlCfgSpawn.speedMult,
+          facing: 1, patrolLeft: sp.x + 10, patrolRight: sp.x + sp.w - 40,
+          shootTimer: Math.random() * 120, animFrame: 0, animTimer: 0, hit: 0, slowed: 0
+        });
+      }
+    }
+    // Also spawn near player if no ahead platforms (e.g. end of world) — extend the world
+    if (aheadPlatforms.length === 0) {
+      const lastPlat = platforms.filter(p => p.type === 'ground').sort((a, b) => b.x - a.x)[0];
+      if (lastPlat) {
+        const newX = lastPlat.x + lastPlat.w + 60 + Math.random() * 80;
+        const newW = 200 + Math.random() * 400;
+        platforms.push({ x: newX, y: H - 50, w: newW, h: 50, type: 'ground' });
+        if (Math.random() > 0.4) {
+          const py = H - 130 - Math.random() * 120;
+          platforms.push({ x: newX + 50 + Math.random() * 100, y: py, w: 80 + Math.random() * 80, h: 16, type: 'platform' });
+        }
+        for (let si = 0; si < 3; si++) {
+          const et = Math.random() > 0.6 ? 'trooper' : 'droid';
+          const baseHp = et === 'trooper' ? 2 : 1;
+          enemies.push({
+            x: newX + 50 + Math.random() * (newW - 100), y: H - 50 - 45, w: 28, h: 44, type: et,
+            hp: Math.ceil(baseHp * lvlCfgSpawn.hpMult),
+            vx: (Math.random() > 0.5 ? 1 : -1) * (1 + Math.random()) * lvlCfgSpawn.speedMult,
+            facing: 1, patrolLeft: newX + 10, patrolRight: newX + newW - 40,
+            shootTimer: Math.random() * 120, animFrame: 0, animTimer: 0, hit: 0, slowed: 0
+          });
+        }
+        // Add collectibles on new platforms
+        if (Math.random() > 0.5) {
+          collectibles.push({ x: newX + newW / 2, y: H - 50 - 40, w: 16, h: 16,
+            type: Math.random() > 0.85 ? 'health' : Math.random() > 0.6 ? 'fuel' : 'crystal',
+            collected: false, bobOffset: Math.random() * Math.PI * 2 });
+        }
+      }
+    }
+  }
+
+  // Check for level completion
+  const lvlCfg = getLevelConfig();
+  if (enemiesKilledThisLevel >= lvlCfg.killsNeeded && levelTransitionTimer === 0) {
+    levelTransitionTimer = 180; // 3 seconds at 60fps
+  }
+  if (levelTransitionTimer > 0) {
+    levelTransitionTimer--;
+    if (levelTransitionTimer === 0) {
+      if (currentLevel < LEVEL_CONFIG.length) {
+        currentLevel++;
+        enemiesKilledThisLevel = 0;
+        generateWorld();
+      } else {
+        currentLevel++;
+        enemiesKilledThisLevel = 0;
+        generateWorld();
+      }
+    }
+  }
+
   particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life--; });
   particles = particles.filter(p => p.life > 0);
   floatingTexts.forEach(t => { t.y += t.vy; t.life--; });
@@ -1495,6 +1599,35 @@ function draw() {
   });
   ctx.globalAlpha = 1;
   if (gameState === 'playing') { drawCharacter(player); drawHUD(); }
+
+  // Level transition screen
+  if (levelTransitionTimer > 0) {
+    const progress = 1 - (levelTransitionTimer / 180);
+    const opacity = progress < 0.5 ? progress * 2 : (1 - progress) * 2;
+    ctx.globalAlpha = opacity * 0.85;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = opacity;
+
+    const lvlCfg = getLevelConfig();
+    ctx.fillStyle = '#FFE81F';
+    ctx.font = 'bold 48px Courier New';
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 8; ctx.shadowColor = '#FFE81F';
+    ctx.fillText('LEVEL ' + currentLevel, W / 2, H / 2 - 60);
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#29B6F6';
+    ctx.font = 'bold 32px Courier New';
+    ctx.fillText(lvlCfg.name, W / 2, H / 2 + 20);
+
+    ctx.fillStyle = '#aaa';
+    ctx.font = '16px Courier New';
+    ctx.fillText('Kills: ' + enemiesKilledThisLevel + ' / ' + lvlCfg.killsNeeded, W / 2, H / 2 + 60);
+
+    ctx.globalAlpha = 1;
+  }
+
   ctx.restore();
 }
 
@@ -1612,10 +1745,6 @@ function saveHS(){
   listEl.innerHTML=scores.map((s,i)=>'<div style="display:flex;justify-content:space-between;padding:4px 8px;color:'+(i===0?'#ff0':'#0ff')+';font-size:13px"><span>'+(i+1)+'. '+s.name+'</span><span>'+s.score+'</span></div>').join('');
 }
 function closeHS(){document.getElementById('hs-overlay').style.display='none';}
-document.getElementById('hs-save-btn')?.addEventListener('click',saveHS);
-document.getElementById('hs-close-btn')?.addEventListener('click',closeHS);
-document.getElementById('hs-name')?.addEventListener('keypress',(e)=>{if(e.key==='Enter')saveHS();});
-
 draw();
 gameLoop();
 </script>
@@ -1633,6 +1762,11 @@ gameLoop();
     </div>
   </div>
 </div>
+<script>
+document.getElementById('hs-save-btn').addEventListener('click',saveHS);
+document.getElementById('hs-close-btn').addEventListener('click',closeHS);
+document.getElementById('hs-name').addEventListener('keypress',(e)=>{if(e.key==='Enter')saveHS();});
+</script>
 <div style="position:fixed;bottom:6px;left:8px;font-family:monospace;font-size:10px;color:rgba(255,255,255,0.35);pointer-events:none;z-index:9999;">Updated: Mar 20, 2026</div>
 </body>
 </html>
