@@ -283,6 +283,10 @@ header {
 .cabinet[data-game="checkers"] .game-title { color: #CD3333; text-shadow: 0 0 10px rgba(205,51,51,0.5); }
 .cabinet[data-game="checkers"] .play-btn { background: #CD3333; box-shadow: 0 0 20px rgba(205,51,51,0.4); }
 
+.cabinet[data-game="bracket"] .screen-art { color: #DAA520; }
+.cabinet[data-game="bracket"] .game-title { color: #DAA520; text-shadow: 0 0 10px rgba(218,165,32,0.5); }
+.cabinet[data-game="bracket"] .play-btn { background: #DAA520; color: #000; box-shadow: 0 0 20px rgba(218,165,32,0.4); }
+
 .cabinet-info {
   padding: 20px;
   text-align: center;
@@ -740,6 +744,26 @@ footer a:hover { color: var(--neon-pink); }
         <div class="game-stats">
           <button class="like-btn" data-like="checkers" onclick="event.stopPropagation(); toggleLike('checkers')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
           <span class="hs-badge" data-hs="checkers"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cabinet" data-game="bracket" onclick="launchGame('games/evan-bracket-2026.html', 'EVAN\'S 2026 MARCH MADNESS BRACKET')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3C0;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">March Madness 2026</div>
+        <div class="game-desc">Evan's interactive NCAA bracket tracker. Live ESPN scores auto-update on refresh. Track picks vs. actual results with point scoring.</div>
+        <div class="game-tags">
+          <span class="tag">Bracket</span>
+          <span class="tag">NCAA</span>
+          <span class="tag">Live Scores</span>
+        </div>
+        <button class="play-btn">VIEW</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="bracket" onclick="event.stopPropagation(); toggleLike('bracket')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="bracket"></span>
         </div>
       </div>
     </div>
