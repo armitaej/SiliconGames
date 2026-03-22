@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Evan's 2026 March Madness Bracket</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            color: #eee;
+            font-family: 'Segoe UI', Tahoma, Geneva, sans-serif;
+            overflow-x: auto;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            padding: 12px 20px;
+            border-bottom: 2px solid #DAA520;
+            background: #1a1a2e;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 {
+            color: #DAA520;
+            font-size: 1.5em;
+            margin-bottom: 4px;
+            letter-spacing: 2px;
+        }
+        .score-line {
+            color: #DAA520;
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+        .score-detail {
+            color: #999;
+            font-size: 0.82em;
+            margin-top: 2px;
+        }
+        .controls {
+            margin-top: 6px;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .fetch-status {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 4px;
+        }
+        .fetch-status.fetching { color: #DAA520; }
+        .fetch-status.success { color: #4CAF50; }
+        .fetch-status.error { color: #e74c3c; }
+        .btn {
+            background: #DAA520;
+            color: #1a1a2e;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.78em;
+        }
+        .btn:hover { background: #ffd700; }
+        .btn-secondary {
+            background: #333;
+            color: #DAA520;
+            border: 1px solid #555;
+        }
+        .btn-secondary:hover { background: #444; }
+
+        .bracket-wrapper {
+            overflow-x: auto;
+            padding: 8px 15px 20px;
+        }
+        .col-headers {
+            display: flex;
+            margin: 0 auto;
+        }
+        .col-header {
+            text-align: center;
+            font-size: 8px;
+            color: #777;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 4px 0;
+            flex-shrink: 0;
+        }
+        .bracket-container {
+            position: relative;
+            margin: 0 auto;
+        }
+        .bracket-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .game-box {
+            position: absolute;
+            background: #252540;
+            border: 1px solid #444;
+            border-radius: 3px;
+            z-index: 2;
+            overflow: hidden;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .game-box:hover {
+            border-color: #DAA520;
+            box-shadow: 0 0 8px rgba(218,165,32,0.3);
+        }
+        .game-box.correct { border-left: 3px solid #4CAF50; }
+        .game-box.wrong { border-left: 3px solid #e74c3c; }
+        .game-box.pending { border-left: 3px solid #555; }
+
+        .team-row {
+            display: flex;
+            align-items: center;
+            padding: 1px 4px;
+            font-size: 9px;
+            line-height: 16px;
+            height: 17px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .team-row:first-child { border-bottom: 1px solid #333; }
+        .team-row:hover { background: rgba(218,165,32,0.12); }
+        .team-seed {
+            color: #888;
+            font-size: 8px;
+            min-width: 13px;
+            text-align: right;
+            margin-right: 3px;
+            flex-shrink: 0;
+        }
+        .team-name {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .pick-ind {
+            font-size: 7px;
+            margin-left: 2px;
+            flex-shrink: 0;
+        }
+
+        .team-row.winner { font-weight: bold; background: rgba(76,175,80,0.12); }
+        .team-row.winner.upset { background: rgba(231,76,60,0.12); }
+        .team-row.loser { color: #555; }
+        .team-row.evan-pick .team-name { color: #DAA520; }
+        .team-row.winner.evan-pick .team-name { color: #5ddb5d; }
+        .team-row.winner.upset .team-name { color: #eee; }
+
+        .region-label {
+            position: absolute;
+            font-size: 13px;
+            font-weight: bold;
+            color: rgba(218,165,32,0.2);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            z-index: 0;
+            pointer-events: none;
+            transform: rotate(-90deg);
+            white-space: nowrap;
+        }
+        .champ-container {
+            position: absolute;
+            z-index: 3;
+            text-align: center;
+        }
+        .champ-label {
+            font-size: 9px;
+            color: #DAA520;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 3px;
+        }
+        .champ-name {
+            font-size: 13px;
+            font-weight: bold;
+            color: #DAA520;
+            padding: 5px 8px;
+            border: 2px solid #DAA520;
+            border-radius: 5px;
+            background: #252540;
+            cursor: pointer;
+            display: inline-block;
+        }
+        .champ-name:hover { background: #353560; }
+
+        .legend {
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+            padding: 6px;
+            font-size: 9px;
+            color: #888;
+        }
+        .legend-item { display: flex; align-items: center; gap: 4px; }
+        .legend-swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            border: 1px solid #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>EVAN'S 2026 MARCH MADNESS BRACKET</h1>
+        <div class="score-line">Score: <span id="totalScore">0</span> pts</div>
+        <div class="score-detail" id="scoreBreakdown"></div>
+        <div class="controls">
+            <button class="btn" onclick="fetchLiveScores()">🔄 Refresh Scores</button>
+            <button class="btn btn-secondary" onclick="resetAllResults()">Reset Results</button>
+            <button class="btn btn-secondary" onclick="exportBracket()">Export JSON</button>
+            <span style="color:#666;font-size:11px;line-height:28px;">Click a team to set winner</span>
+        </div>
+        <div class="fetch-status" id="fetchStatus">Auto-updating on load...</div>
+    </div>
+    <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:#4CAF50;"></div> Correct pick</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#e74c3c;"></div> Wrong pick</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#555;"></div> Pending</div>
+        <div class="legend-item"><span style="color:#DAA520;">★</span> Evan's pick</div>
+    </div>
+    <div class="bracket-wrapper">
+        <div class="col-headers" id="colHeaders"></div>
+        <div class="bracket-container" id="bracket"></div>
+    </div>
+
+<script>
+    // === LAYOUT CONSTANTS ===
+    const BRACKET_H = 860;
+    const COL_W = 105;
+    const GAP = 16;
+    const BOX_W = 100;
+    const BOX_H = 36;
+    const NUM_COLS = 11;
+
+    // Column X positions (0=left R64, 10=right R64)
+    const colX = [];
+    for (let i = 0; i < NUM_COLS; i++) {
+        colX.push(i * (COL_W + GAP));
+    }
+    const TOTAL_W = colX[10] + COL_W;
+
+    // Game center Y for a given round size and index
+    function getY(numGames, index) {
+        return (index + 0.5) / numGames * BRACKET_H;
+    }
+
+    // Column header labels
+    const COL_LABELS = [
+        'Round of 64', 'Round of 32', 'Round of 16', 'Round of 8',
+        'Nat. Semis', 'Championship', 'Nat. Semis',
+        'Round of 8', 'Round of 16', 'Round of 32', 'Round of 64'
+    ];
+
+    // Point values per round (1 point per correct pick)
+    const PTS = { r64: 1, r32: 1, s16: 1, e8: 1, f4: 1, champ: 1 };
+
+    // === BRACKET DATA ===
+    const bracketData = {
+        east: {
+            r64: [
+                { seed1: 1, team1: 'Duke', seed2: 16, team2: 'Siena', evanPick: 'Duke', actual: 'Duke' },
+                { seed1: 8, team1: 'Ohio State', seed2: 9, team2: 'TCU', evanPick: 'Ohio State', actual: 'TCU' },
+                { seed1: 5, team1: 'St. John\'s', seed2: 12, team2: 'Northern Iowa', evanPick: 'St. John\'s', actual: 'St. John\'s' },
+                { seed1: 4, team1: 'Kansas', seed2: 13, team2: 'Cal Baptist', evanPick: 'Kansas', actual: 'Kansas' },
+                { seed1: 6, team1: 'Louisville', seed2: 11, team2: 'South Florida', evanPick: 'Louisville', actual: 'Louisville' },
+                { seed1: 3, team1: 'Michigan State', seed2: 14, team2: 'North Dakota St', evanPick: 'Michigan State', actual: 'Michigan State' },
+                { seed1: 7, team1: 'UCLA', seed2: 10, team2: 'UCF', evanPick: 'UCF', actual: 'UCLA' },
+                { seed1: 2, team1: 'UConn', seed2: 15, team2: 'Furman', evanPick: 'UConn', actual: 'UConn' }
+            ],
+            r32: [
+                { team1: 'Duke', team2: 'TCU', evanPick: 'Duke', actual: 'Duke' },
+                { team1: 'St. John\'s', team2: 'Kansas', evanPick: 'Kansas', actual: '' },
+                { team1: 'Louisville', team2: 'Michigan State', evanPick: 'Michigan State', actual: 'Michigan State' },
+                { team1: 'UCLA', team2: 'UConn', evanPick: 'UConn', actual: '' }
+            ],
+            s16: [
+                { team1: 'Duke', team2: 'TBD', evanPick: 'Duke', actual: '' },
+                { team1: 'Michigan State', team2: 'TBD', evanPick: 'UConn', actual: '' }
+            ],
+            e8: [
+                { team1: 'TBD', team2: 'TBD', evanPick: 'Duke', actual: '' }
+            ]
+        },
+        south: {
+            r64: [
+                { seed1: 1, team1: 'Florida', seed2: 16, team2: 'Prairie View A&M', evanPick: 'Florida', actual: 'Florida' },
+                { seed1: 8, team1: 'Clemson', seed2: 9, team2: 'Iowa', evanPick: 'Iowa', actual: 'Iowa' },
+                { seed1: 5, team1: 'Vanderbilt', seed2: 12, team2: 'McNeese', evanPick: 'Vanderbilt', actual: 'Vanderbilt' },
+                { seed1: 4, team1: 'Nebraska', seed2: 13, team2: 'Troy', evanPick: 'Nebraska', actual: 'Nebraska' },
+                { seed1: 6, team1: 'N. Carolina', seed2: 11, team2: 'VCU', evanPick: 'N. Carolina', actual: 'VCU' },
+                { seed1: 3, team1: 'Illinois', seed2: 14, team2: 'Penn', evanPick: 'Illinois', actual: 'Illinois' },
+                { seed1: 7, team1: 'St. Mary\'s', seed2: 10, team2: 'Texas A&M', evanPick: 'St. Mary\'s', actual: 'Texas A&M' },
+                { seed1: 2, team1: 'Houston', seed2: 15, team2: 'Idaho', evanPick: 'Houston', actual: 'Houston' }
+            ],
+            r32: [
+                { team1: 'Florida', team2: 'Iowa', evanPick: 'Florida', actual: '' },
+                { team1: 'Vanderbilt', team2: 'Nebraska', evanPick: 'Vanderbilt', actual: 'Nebraska' },
+                { team1: 'VCU', team2: 'Illinois', evanPick: 'Illinois', actual: 'Illinois' },
+                { team1: 'Texas A&M', team2: 'Houston', evanPick: 'Houston', actual: 'Houston' }
+            ],
+            s16: [
+                { team1: 'TBD', team2: 'Nebraska', evanPick: 'Florida', actual: '' },
+                { team1: 'Illinois', team2: 'Houston', evanPick: 'Houston', actual: '' }
+            ],
+            e8: [
+                { team1: 'TBD', team2: 'TBD', evanPick: 'Florida', actual: '' }
+            ]
+        },
+        west: {
+            r64: [
+                { seed1: 1, team1: 'Arizona', seed2: 16, team2: 'LIU', evanPick: 'Arizona', actual: 'Arizona' },
+                { seed1: 8, team1: 'Villanova', seed2: 9, team2: 'Utah State', evanPick: 'Utah State', actual: 'Utah State' },
+                { seed1: 5, team1: 'Wisconsin', seed2: 12, team2: 'High Point', evanPick: 'Wisconsin', actual: 'High Point' },
+                { seed1: 4, team1: 'Arkansas', seed2: 13, team2: 'Hawaii', evanPick: 'Arkansas', actual: 'Arkansas' },
+                { seed1: 6, team1: 'BYU', seed2: 11, team2: 'Texas', evanPick: 'BYU', actual: 'Texas' },
+                { seed1: 3, team1: 'Gonzaga', seed2: 14, team2: 'Kennesaw State', evanPick: 'Gonzaga', actual: 'Gonzaga' },
+                { seed1: 7, team1: 'Miami FL', seed2: 10, team2: 'Missouri', evanPick: 'Miami FL', actual: 'Miami FL' },
+                { seed1: 2, team1: 'Purdue', seed2: 15, team2: 'Queens', evanPick: 'Purdue', actual: 'Purdue' }
+            ],
+            r32: [
+                { team1: 'Arizona', team2: 'Utah State', evanPick: 'Arizona', actual: '' },
+                { team1: 'High Point', team2: 'Arkansas', evanPick: 'Wisconsin', actual: 'Arkansas' },
+                { team1: 'Texas', team2: 'Gonzaga', evanPick: 'Gonzaga', actual: 'Texas' },
+                { team1: 'Miami FL', team2: 'Purdue', evanPick: 'Purdue', actual: '' }
+            ],
+            s16: [
+                { team1: 'TBD', team2: 'Arkansas', evanPick: 'Arizona', actual: '' },
+                { team1: 'Texas', team2: 'TBD', evanPick: 'Purdue', actual: '' }
+            ],
+            e8: [
+                { team1: 'TBD', team2: 'TBD', evanPick: 'Arizona', actual: '' }
+            ]
+        },
+        midwest: {
+            r64: [
+                { seed1: 1, team1: 'Michigan', seed2: 16, team2: 'Howard', evanPick: 'Michigan', actual: 'Michigan' },
+                { seed1: 8, team1: 'Georgia', seed2: 9, team2: 'St. Louis', evanPick: 'Georgia', actual: 'St. Louis' },
+                { seed1: 5, team1: 'Texas Tech', seed2: 12, team2: 'Akron', evanPick: 'Texas Tech', actual: 'Texas Tech' },
+                { seed1: 4, team1: 'Alabama', seed2: 13, team2: 'Hofstra', evanPick: 'Alabama', actual: 'Alabama' },
+                { seed1: 6, team1: 'Tennessee', seed2: 11, team2: 'Miami Ohio', evanPick: 'Miami Ohio', actual: 'Tennessee' },
+                { seed1: 3, team1: 'Virginia', seed2: 14, team2: 'Wright State', evanPick: 'Virginia', actual: 'Virginia' },
+                { seed1: 7, team1: 'Kentucky', seed2: 10, team2: 'Santa Clara', evanPick: 'Kentucky', actual: 'Kentucky' },
+                { seed1: 2, team1: 'Iowa State', seed2: 15, team2: 'TBD', evanPick: 'Iowa State', actual: 'Iowa State' }
+            ],
+            r32: [
+                { team1: 'Michigan', team2: 'St. Louis', evanPick: 'Michigan', actual: 'Michigan' },
+                { team1: 'Texas Tech', team2: 'Alabama', evanPick: 'Texas Tech', actual: '' },
+                { team1: 'Tennessee', team2: 'Virginia', evanPick: 'Miami Ohio', actual: '' },
+                { team1: 'Kentucky', team2: 'Iowa State', evanPick: 'Kentucky', actual: '' }
+            ],
+            s16: [
+                { team1: 'Michigan', team2: 'TBD', evanPick: 'Michigan', actual: '' },
+                { team1: 'TBD', team2: 'TBD', evanPick: 'Miami Ohio', actual: '' }
+            ],
+            e8: [
+                { team1: 'TBD', team2: 'TBD', evanPick: 'Miami Ohio', actual: '' }
+            ]
+        },
+        finalFour: {
+            evanFF: { east: 'Duke', south: 'Florida', west: 'Arizona', midwest: 'Miami Ohio' },
+            actualFF: { east: '', south: '', west: '', midwest: '' },
+            evanFinal: { team1: 'Duke', team2: 'Miami Ohio' },
+            actualFinal: { team1: '', team2: '' },
+            evanChamp: 'Miami Ohio',
+            actualChamp: ''
+        }
+    };
+
+    // === PERSISTENCE ===
+    function loadBracket() {
+        const saved = localStorage.getItem('evanBracket2026_v2');
+        if (saved) {
+            try { Object.assign(bracketData, JSON.parse(saved)); } catch(e) {}
+        }
+    }
+    function saveBracket() {
+        localStorage.setItem('evanBracket2026_v2', JSON.stringify(bracketData));
+    }
+
+    // === WINNER LOGIC ===
+    function setWinner(region, round, index, winner) {
+        if (region === 'leftSemi') {
+            bracketData.finalFour.actualFinal.team1 = winner;
+        } else if (region === 'rightSemi') {
+            bracketData.finalFour.actualFinal.team2 = winner;
+        } else if (region === 'championship') {
+            bracketData.finalFour.actualChamp = winner;
+        } else {
+            bracketData[region][round][index].actual = winner;
+            propagate(region, round, index, winner);
+        }
+        saveBracket();
+        renderBracket();
+        updateScore();
+    }
+
+    function propagate(region, round, index, winner) {
+        const rounds = ['r64', 'r32', 's16', 'e8'];
+        const ri = rounds.indexOf(round);
+        if (ri < rounds.length - 1) {
+            const next = rounds[ri + 1];
+            const ni = Math.floor(index / 2);
+            if (bracketData[region][next] && bracketData[region][next][ni]) {
+                if (index % 2 === 0) {
+                    bracketData[region][next][ni].team1 = winner;
+                } else {
+                    bracketData[region][next][ni].team2 = winner;
+                }
+            }
+        }
+        // E8 winner → Final Four
+        if (round === 'e8') {
+            bracketData.finalFour.actualFF[region] = winner;
+        }
+    }
+
+    // === SCORING ===
+    function updateScore() {
+        let sc = { r64: 0, r32: 0, s16: 0, e8: 0, f4: 0, champ: 0 };
+        ['east','south','west','midwest'].forEach(reg => {
+            ['r64','r32','s16','e8'].forEach(rd => {
+                bracketData[reg][rd].forEach(m => {
+                    if (m.actual && m.actual !== 'TBD' && m.evanPick === m.actual) sc[rd]++;
+                });
+            });
+        });
+        const ff = bracketData.finalFour;
+        if (ff.actualFinal.team1 && ff.actualFinal.team1 === ff.evanFinal.team1) sc.f4++;
+        if (ff.actualFinal.team2 && ff.actualFinal.team2 === ff.evanFinal.team2) sc.f4++;
+        if (ff.actualChamp && ff.actualChamp === ff.evanChamp) sc.champ = 1;
+
+        const total = sc.r64*PTS.r64 + sc.r32*PTS.r32 + sc.s16*PTS.s16 +
+                      sc.e8*PTS.e8 + sc.f4*PTS.f4 + sc.champ*PTS.champ;
+
+        document.getElementById('totalScore').textContent = total;
+        document.getElementById('scoreBreakdown').textContent =
+            `R64: ${sc.r64} | R32: ${sc.r32} | S16: ${sc.s16} | E8: ${sc.e8} | F4: ${sc.f4} | Champ: ${sc.champ} — Total: ${total} correct`;
+    }
+
+    // === RENDERING ===
+    function renderBracket() {
+        const container = document.getElementById('bracket');
+        container.innerHTML = '';
+        container.style.width = TOTAL_W + 'px';
+        container.style.height = BRACKET_H + 'px';
+
+        // Render column headers
+        const hdr = document.getElementById('colHeaders');
+        hdr.innerHTML = '';
+        hdr.style.width = TOTAL_W + 'px';
+        COL_LABELS.forEach((label, i) => {
+            const d = document.createElement('div');
+            d.className = 'col-header';
+            d.style.width = COL_W + 'px';
+            if (i > 0) d.style.marginLeft = GAP + 'px';
+            d.textContent = label;
+            hdr.appendChild(d);
+        });
+
+        // Create SVG for lines
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.classList.add('bracket-svg');
+        svg.setAttribute('width', TOTAL_W);
+        svg.setAttribute('height', BRACKET_H);
+        container.appendChild(svg);
+
+        function addLine(x1, y1, x2, y2) {
+            const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+            l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+            l.setAttribute('stroke', '#DAA520');
+            l.setAttribute('stroke-width', '1');
+            l.setAttribute('stroke-opacity', '0.35');
+            svg.appendChild(l);
+        }
+
+        // Create a game box and return its center position
+        function makeBox(x, y, matchup, region, round, index) {
+            const box = document.createElement('div');
+            box.className = 'game-box';
+            box.style.left = x + 'px';
+            box.style.top = (y - BOX_H / 2) + 'px';
+            box.style.width = BOX_W + 'px';
+            box.style.height = BOX_H + 'px';
+
+            const hasResult = matchup.actual && matchup.actual !== 'TBD' && matchup.actual !== '';
+            const isCorrect = hasResult && matchup.evanPick === matchup.actual;
+
+            if (hasResult) box.classList.add(isCorrect ? 'correct' : 'wrong');
+            else box.classList.add('pending');
+
+            const teams = [
+                { name: matchup.team1, seed: matchup.seed1 },
+                { name: matchup.team2, seed: matchup.seed2 }
+            ];
+
+            teams.forEach(t => {
+                const row = document.createElement('div');
+                row.className = 'team-row';
+
+                const isWinner = hasResult && matchup.actual === t.name;
+                const isLoser = hasResult && matchup.actual !== t.name;
+                const isPick = matchup.evanPick === t.name;
+
+                if (isWinner) {
+                    row.classList.add('winner');
+                    if (!isCorrect) row.classList.add('upset');
+                }
+                if (isLoser) row.classList.add('loser');
+                if (isPick) row.classList.add('evan-pick');
+
+                if (t.seed) {
+                    const s = document.createElement('span');
+                    s.className = 'team-seed';
+                    s.textContent = t.seed;
+                    row.appendChild(s);
+                }
+
+                const n = document.createElement('span');
+                n.className = 'team-name';
+                n.textContent = t.name || 'TBD';
+                row.appendChild(n);
+
+                if (isPick && !hasResult) {
+                    const ind = document.createElement('span');
+                    ind.className = 'pick-ind';
+                    ind.textContent = '★';
+                    ind.style.color = '#DAA520';
+                    row.appendChild(ind);
+                }
+                if (isWinner && isCorrect) {
+                    const ind = document.createElement('span');
+                    ind.className = 'pick-ind';
+                    ind.textContent = '✓';
+                    ind.style.color = '#4CAF50';
+                    row.appendChild(ind);
+                }
+                if (isWinner && !isCorrect) {
+                    const ind = document.createElement('span');
+                    ind.className = 'pick-ind';
+                    ind.textContent = '✗';
+                    ind.style.color = '#e74c3c';
+                    row.appendChild(ind);
+                }
+
+                row.addEventListener('click', () => {
+                    setWinner(region, round, index, t.name);
+                });
+                box.appendChild(row);
+            });
+
+            container.appendChild(box);
+            return { x, y };
+        }
+
+        // Draw bracket connectors for a pair of games feeding into next round
+        function drawConnLeft(a, b, c) {
+            const rx = a.x + BOX_W;
+            const lx = c.x;
+            const mx = (rx + lx) / 2;
+            addLine(rx, a.y, mx, a.y);
+            addLine(rx, b.y, mx, b.y);
+            addLine(mx, a.y, mx, b.y);
+            addLine(mx, c.y, lx, c.y);
+        }
+        function drawConnRight(a, b, c) {
+            const lx = a.x;
+            const rx = c.x + BOX_W;
+            const mx = (lx + rx) / 2;
+            addLine(lx, a.y, mx, a.y);
+            addLine(lx, b.y, mx, b.y);
+            addLine(mx, a.y, mx, b.y);
+            addLine(mx, c.y, rx, c.y);
+        }
+
+        // === RENDER LEFT SIDE: East (top 8) + South (bottom 8) ===
+        const leftRegions = ['east', 'south'];
+        const leftCols = [0, 1, 2, 3]; // R64, R32, S16, E8
+        const leftRounds = ['r64', 'r32', 's16', 'e8'];
+        const leftSizes = [16, 8, 4, 2]; // games per column
+        const leftPositions = [[], [], [], []]; // positions per round
+
+        leftRegions.forEach((reg, ri) => {
+            const regionData = bracketData[reg];
+            leftRounds.forEach((rd, rdi) => {
+                const gamesInRegion = regionData[rd].length;
+                regionData[rd].forEach((match, gi) => {
+                    const globalIdx = ri * gamesInRegion + gi;
+                    const y = getY(leftSizes[rdi], globalIdx);
+                    const pos = makeBox(colX[leftCols[rdi]], y, match, reg, rd, gi);
+                    leftPositions[rdi].push(pos);
+                });
+            });
+        });
+
+        // Draw left connectors
+        for (let rdi = 0; rdi < 3; rdi++) {
+            const prev = leftPositions[rdi];
+            const next = leftPositions[rdi + 1];
+            for (let i = 0; i < next.length; i++) {
+                drawConnLeft(prev[i * 2], prev[i * 2 + 1], next[i]);
+            }
+        }
+
+        // === RENDER RIGHT SIDE: West (top 8) + Midwest (bottom 8) ===
+        const rightRegions = ['west', 'midwest'];
+        const rightCols = [10, 9, 8, 7]; // R64, R32, S16, E8 (right to left)
+        const rightRounds = ['r64', 'r32', 's16', 'e8'];
+        const rightSizes = [16, 8, 4, 2];
+        const rightPositions = [[], [], [], []];
+
+        rightRegions.forEach((reg, ri) => {
+            const regionData = bracketData[reg];
+            rightRounds.forEach((rd, rdi) => {
+                const gamesInRegion = regionData[rd].length;
+                regionData[rd].forEach((match, gi) => {
+                    const globalIdx = ri * gamesInRegion + gi;
+                    const y = getY(rightSizes[rdi], globalIdx);
+                    const pos = makeBox(colX[rightCols[rdi]], y, match, reg, rd, gi);
+                    rightPositions[rdi].push(pos);
+                });
+            });
+        });
+
+        // Draw right connectors
+        for (let rdi = 0; rdi < 3; rdi++) {
+            const prev = rightPositions[rdi];
+            const next = rightPositions[rdi + 1];
+            for (let i = 0; i < next.length; i++) {
+                drawConnRight(prev[i * 2], prev[i * 2 + 1], next[i]);
+            }
+        }
+
+        // === FINAL FOUR ===
+        const ff = bracketData.finalFour;
+
+        // Left Semi (col 4) - East vs South
+        const leftSemiMatch = {
+            team1: ff.actualFF.east || bracketData.east.e8[0].actual || ff.evanFF.east,
+            team2: ff.actualFF.south || bracketData.south.e8[0].actual || ff.evanFF.south,
+            evanPick: ff.evanFinal.team1,
+            actual: ff.actualFinal.team1 || ''
+        };
+        const leftSemiY = getY(1, 0);
+        const leftSemiPos = makeBox(colX[4], leftSemiY, leftSemiMatch, 'leftSemi', 'semi', 0);
+
+        // Right Semi (col 6) - West vs Midwest
+        const rightSemiMatch = {
+            team1: ff.actualFF.west || bracketData.west.e8[0].actual || ff.evanFF.west,
+            team2: ff.actualFF.midwest || bracketData.midwest.e8[0].actual || ff.evanFF.midwest,
+            evanPick: ff.evanFinal.team2,
+            actual: ff.actualFinal.team2 || ''
+        };
+        const rightSemiY = getY(1, 0);
+        const rightSemiPos = makeBox(colX[6], rightSemiY, rightSemiMatch, 'rightSemi', 'semi', 0);
+
+        // Championship (col 5)
+        const champMatch = {
+            team1: ff.actualFinal.team1 || ff.evanFinal.team1,
+            team2: ff.actualFinal.team2 || ff.evanFinal.team2,
+            evanPick: ff.evanChamp,
+            actual: ff.actualChamp || ''
+        };
+        const champY = getY(1, 0);
+        const champPos = makeBox(colX[5], champY, champMatch, 'championship', 'final', 0);
+
+        // Draw E8 → Semi connectors
+        drawConnLeft(leftPositions[3][0], leftPositions[3][1], leftSemiPos);
+        drawConnRight(rightPositions[3][0], rightPositions[3][1], rightSemiPos);
+
+        // Draw Semi → Championship connectors
+        // Left semi → champ
+        const lsRx = leftSemiPos.x + BOX_W;
+        const cLx = champPos.x;
+        addLine(lsRx, leftSemiPos.y, cLx, champPos.y);
+        // Right semi → champ
+        const rsLx = rightSemiPos.x;
+        const cRx = champPos.x + BOX_W;
+        addLine(rsLx, rightSemiPos.y, cRx, champPos.y);
+
+        // Champion label above championship box
+        const champLabel = document.createElement('div');
+        champLabel.className = 'champ-container';
+        champLabel.style.left = (colX[5] + BOX_W / 2 - 40) + 'px';
+        champLabel.style.top = (champY - BOX_H / 2 - 30) + 'px';
+        champLabel.style.width = '80px';
+        champLabel.innerHTML = `<div class="champ-label">Champion</div>
+            <div style="font-size:11px;color:#DAA520;font-weight:bold;">${ff.actualChamp || 'TBD'}</div>`;
+        container.appendChild(champLabel);
+
+        // Evan's championship pick label
+        const evanChampLabel = document.createElement('div');
+        evanChampLabel.className = 'champ-container';
+        evanChampLabel.style.left = (colX[5] + BOX_W / 2 - 45) + 'px';
+        evanChampLabel.style.top = (champY + BOX_H / 2 + 6) + 'px';
+        evanChampLabel.style.width = '90px';
+        evanChampLabel.innerHTML = `<div style="font-size:8px;color:#888;">Evan's pick:</div>
+            <div style="font-size:10px;color:#DAA520;">${ff.evanChamp}</div>`;
+        container.appendChild(evanChampLabel);
+
+        // === REGION LABELS ===
+        function addRegionLabel(text, x, y) {
+            const lbl = document.createElement('div');
+            lbl.className = 'region-label';
+            lbl.textContent = text;
+            lbl.style.left = x + 'px';
+            lbl.style.top = y + 'px';
+            container.appendChild(lbl);
+        }
+        addRegionLabel('EAST', colX[2] - 10, BRACKET_H * 0.25 - 30);
+        addRegionLabel('SOUTH', colX[2] - 10, BRACKET_H * 0.75 - 30);
+        addRegionLabel('WEST', colX[8] + COL_W + 5, BRACKET_H * 0.25 - 30);
+        addRegionLabel('MIDWEST', colX[8] + COL_W + 5, BRACKET_H * 0.75 - 40);
+    }
+
+    // === CONTROLS ===
+    function resetAllResults() {
+        if (!confirm('Clear all actual results? This cannot be undone.')) return;
+        ['east','south','west','midwest'].forEach(reg => {
+            ['r64','r32','s16','e8'].forEach(rd => {
+                bracketData[reg][rd].forEach(m => { m.actual = ''; });
+            });
+        });
+        const ff = bracketData.finalFour;
+        ff.actualFF = { east: '', south: '', west: '', midwest: '' };
+        ff.actualFinal = { team1: '', team2: '' };
+        ff.actualChamp = '';
+        saveBracket();
+        renderBracket();
+        updateScore();
+    }
+
+    function exportBracket() {
+        const blob = new Blob([JSON.stringify(bracketData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `evan-bracket-2026-${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // === ESPN LIVE SCORES ===
+    const TOURNAMENT_DATES = [
+        '20260319', '20260320', // R64
+        '20260321', '20260322', // R32
+        '20260327', '20260328', // S16
+        '20260329', '20260330', // E8
+        '20260404',             // F4
+        '20260406'              // Championship
+    ];
+
+    // Normalize team name for matching
+    function normName(s) {
+        return s.toLowerCase()
+            .replace(/\./g, '')
+            .replace(/'/g, "'")
+            .replace(/st\b/g, 'state')
+            .replace(/n carolina/g, 'north carolina')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    // Map from ESPN team location/name to bracket team names
+    // ESPN's team.location is usually what we need ("Duke", "Michigan State", etc.)
+    // This covers edge cases where ESPN names differ from bracket names
+    const ESPN_NAME_OVERRIDES = {
+        'prairie view': 'Prairie View A&M',
+        'prairie view a&m': 'Prairie View A&M',
+        'north carolina': 'N. Carolina',
+        'unc': 'N. Carolina',
+        "saint john's": "St. John's",
+        "st. john's (ny)": "St. John's",
+        "saint mary's": "St. Mary's",
+        "saint mary's (ca)": "St. Mary's",
+        "saint louis": "St. Louis",
+        'north dakota state': 'North Dakota St',
+        'ndsu': 'North Dakota St',
+        'south florida': 'South Florida',
+        'usf': 'South Florida',
+        'california baptist': 'Cal Baptist',
+        'northern iowa': 'Northern Iowa',
+        'miami': 'Miami FL',
+        'miami (fl)': 'Miami FL',
+        'miami fl': 'Miami FL',
+        'miami (oh)': 'Miami Ohio',
+        'miami ohio': 'Miami Ohio',
+        'liu': 'LIU',
+        'liu brooklyn': 'LIU',
+        'long island university': 'LIU',
+        'brigham young': 'BYU',
+        'byu': 'BYU',
+        'connecticut': 'UConn',
+        'uconn': 'UConn',
+        'ucf': 'UCF',
+        'vcu': 'VCU',
+        'tcu': 'TCU',
+        'iowa state': 'Iowa State',
+        'texas a&m': 'Texas A&M',
+        'texas tech': 'Texas Tech',
+        'michigan state': 'Michigan State',
+        'ohio state': 'Ohio State',
+        'utah state': 'Utah State',
+        'kennesaw state': 'Kennesaw State',
+        'wright state': 'Wright State',
+        'santa clara': 'Santa Clara',
+        'high point': 'High Point'
+    };
+
+    // Get all team names currently in the bracket
+    function getAllBracketTeams() {
+        const teams = new Set();
+        ['east','south','west','midwest'].forEach(reg => {
+            ['r64','r32','s16','e8'].forEach(rd => {
+                bracketData[reg][rd].forEach(m => {
+                    if (m.team1 && m.team1 !== 'TBD') teams.add(m.team1);
+                    if (m.team2 && m.team2 !== 'TBD') teams.add(m.team2);
+                });
+            });
+        });
+        return teams;
+    }
+
+    // Match an ESPN team object to a bracket team name
+    function matchTeamName(espnTeam) {
+        const loc = (espnTeam.location || '').trim();
+        const dispName = (espnTeam.displayName || '').trim();
+        const abbr = (espnTeam.abbreviation || '').trim();
+        const shortName = (espnTeam.shortDisplayName || '').trim();
+
+        // 1. Check overrides first (lowercase)
+        const locLower = loc.toLowerCase();
+        const dispLower = dispName.toLowerCase();
+        const abbrLower = abbr.toLowerCase();
+        if (ESPN_NAME_OVERRIDES[locLower]) return ESPN_NAME_OVERRIDES[locLower];
+        if (ESPN_NAME_OVERRIDES[dispLower]) return ESPN_NAME_OVERRIDES[dispLower];
+        if (ESPN_NAME_OVERRIDES[abbrLower]) return ESPN_NAME_OVERRIDES[abbrLower];
+
+        // 2. Direct match against bracket teams
+        const bracketTeams = getAllBracketTeams();
+        if (bracketTeams.has(loc)) return loc;
+        if (bracketTeams.has(dispName)) return dispName;
+        if (bracketTeams.has(abbr)) return abbr;
+        if (bracketTeams.has(shortName)) return shortName;
+
+        // 3. Fuzzy: check if any bracket team is contained in the ESPN display name
+        for (const bt of bracketTeams) {
+            if (dispName.toLowerCase().includes(bt.toLowerCase()) && bt.length > 3) {
+                return bt;
+            }
+        }
+
+        // 4. Check if ESPN location matches after normalization
+        for (const bt of bracketTeams) {
+            if (normName(loc) === normName(bt) || normName(dispName) === normName(bt)) {
+                return bt;
+            }
+        }
+
+        // Fallback: return the location (best guess)
+        return loc || dispName;
+    }
+
+    // Find and update a matchup in the bracket where winner beat loser
+    function updateMatchup(winnerName, loserName) {
+        const regions = ['east','south','west','midwest'];
+        const rounds = ['r64','r32','s16','e8'];
+
+        for (const reg of regions) {
+            for (const rd of rounds) {
+                for (let i = 0; i < bracketData[reg][rd].length; i++) {
+                    const m = bracketData[reg][rd][i];
+                    const t1 = m.team1, t2 = m.team2;
+                    if (!t1 || !t2 || t1 === 'TBD' || t2 === 'TBD') continue;
+
+                    // Check if this matchup contains both teams
+                    const t1Match = (t1 === winnerName || t1 === loserName);
+                    const t2Match = (t2 === winnerName || t2 === loserName);
+
+                    if (t1Match && t2Match) {
+                        if (m.actual !== winnerName) {
+                            m.actual = winnerName;
+                            propagate(reg, rd, i, winnerName);
+                            return true;
+                        }
+                        return false; // already set
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    async function fetchLiveScores() {
+        const statusEl = document.getElementById('fetchStatus');
+        statusEl.textContent = '⏳ Fetching live scores...';
+        statusEl.className = 'fetch-status fetching';
+
+        try {
+            let totalUpdated = 0;
+            let totalGames = 0;
+
+            // Fetch all tournament dates in parallel (batch of 3 to be polite)
+            for (let batch = 0; batch < TOURNAMENT_DATES.length; batch += 3) {
+                const dateBatch = TOURNAMENT_DATES.slice(batch, batch + 3);
+                const promises = dateBatch.map(date =>
+                    fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${date}&groups=100&limit=200`)
+                        .then(r => r.json())
+                        .catch(() => ({ events: [] }))
+                );
+                const results = await Promise.all(promises);
+
+                for (const data of results) {
+                    if (!data.events) continue;
+                    for (const event of data.events) {
+                        const comp = event.competitions && event.competitions[0];
+                        if (!comp || !comp.status || !comp.status.type || !comp.status.type.completed) continue;
+
+                        totalGames++;
+                        const competitors = comp.competitors || [];
+                        const winner = competitors.find(c => c.winner);
+                        const loser = competitors.find(c => !c.winner);
+                        if (!winner || !loser) continue;
+
+                        const winnerName = matchTeamName(winner.team);
+                        const loserName = matchTeamName(loser.team);
+
+                        if (updateMatchup(winnerName, loserName)) totalUpdated++;
+                    }
+                }
+            }
+
+            if (totalUpdated > 0) {
+                saveBracket();
+                renderBracket();
+                updateScore();
+            }
+
+            const now = new Date().toLocaleTimeString();
+            statusEl.textContent = `✅ ${totalUpdated} new updates from ${totalGames} completed games • ${now}`;
+            statusEl.className = 'fetch-status success';
+
+            // Store last fetch time
+            localStorage.setItem('evanBracket2026_lastFetch', Date.now().toString());
+
+        } catch (e) {
+            statusEl.textContent = `❌ Could not fetch scores: ${e.message}`;
+            statusEl.className = 'fetch-status error';
+            console.error('Fetch error:', e);
+        }
+    }
+
+    // === INIT ===
+    document.addEventListener('DOMContentLoaded', () => {
+        loadBracket();
+        renderBracket();
+        updateScore();
+        // Auto-fetch scores on every page load
+        fetchLiveScores();
+    });
+</script>
+</body>
+</html>
