@@ -335,11 +335,9 @@
         }
 
         function newGame() {
-            if (gameState === 'playing' || gameState === 'gameOver') {
-                startGame();
-                document.getElementById('menu-screen').classList.add('hidden');
-                document.getElementById('game-over-screen').classList.add('hidden');
-            }
+            startGame();
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
         }
 
         function draw() {
@@ -940,6 +938,14 @@
                 draw();
             }
         });
+
+            // Menu screen click to start (overlay blocks canvas clicks)
+            document.getElementById('menu-screen').addEventListener('click', () => {
+                if (gameState === 'menu') {
+                    startGame();
+                    document.getElementById('menu-screen').classList.add('hidden');
+                }
+            });
 
             document.getElementById('new-game-btn').addEventListener('click', newGame);
             document.getElementById('undo-btn').addEventListener('click', undoMove);
