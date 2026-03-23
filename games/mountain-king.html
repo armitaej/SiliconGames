@@ -1078,6 +1078,7 @@
 
                 // Check enemy hits
                 for (let enemy of this.enemies) {
+                    if (enemy.dead) continue;
                     const dx = enemy.x - this.player.x;
                     const dy = enemy.y - this.player.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1136,6 +1137,7 @@
 
                 // Damage enemies
                 for (let enemy of this.enemies) {
+                    if (enemy.dead) continue;
                     const dx = enemy.x - this.player.x;
                     const dy = enemy.y - this.player.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1178,6 +1180,7 @@
                 let nearestDist = Infinity;
 
                 for (let enemy of this.enemies) {
+                    if (enemy.dead) continue;
                     const dx = enemy.x - this.player.x;
                     const dy = enemy.y - this.player.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1231,7 +1234,8 @@
                 this.player.addXp(enemy.xpReward);
                 this.player.score += enemy.xpReward;
                 this.sound.enemyDeath();
-                this.enemies = this.enemies.filter(e => e !== enemy);
+                // Mark for removal instead of filtering mid-loop
+                enemy.dead = true;
 
                 // Chance to drop item
                 if (Math.random() < 0.3) {
@@ -1239,8 +1243,14 @@
                     const type = itemTypes[Math.floor(Math.random() * itemTypes.length)];
                     this.items.push(new Item(enemy.x, enemy.y, type));
                 }
+            }
 
-                if (this.enemies.length === 0 && !this.boss) {
+            // Called once per frame after all combat is resolved
+            cleanupDead() {
+                const hadEnemies = this.enemies.length > 0;
+                this.enemies = this.enemies.filter(e => !e.dead);
+                this.items = this.items.filter(i => !i.collected);
+                if (hadEnemies && this.enemies.length === 0 && !this.boss) {
                     this.allEnemiesDefeated = true;
                     this.exitOpened = true;
                 }
@@ -1278,6 +1288,7 @@
 
                 // Enemy updates
                 for (let enemy of this.enemies) {
+                    if (enemy.dead) continue;
                     enemy.update(this.player.x, this.player.y, this.walls, this.enemies);
                 }
 
@@ -1288,6 +1299,7 @@
 
                 // Enemy collisions with player
                 for (let enemy of this.enemies) {
+                    if (enemy.dead) continue;
                     const dx = enemy.x - this.player.x;
                     const dy = enemy.y - this.player.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1370,6 +1382,9 @@
                         }
                     }
                 }
+
+                // Cleanup dead enemies and collected items
+                this.cleanupDead();
 
                 // Game over check
                 if (this.player.hp <= 0) {
@@ -1552,8 +1567,12 @@
             }
 
             gameLoop() {
-                this.update();
-                this.draw();
+                try {
+                    this.update();
+                    this.draw();
+                } catch (e) {
+                    console.error('Game loop error:', e);
+                }
                 requestAnimationFrame(() => this.gameLoop());
             }
         }
