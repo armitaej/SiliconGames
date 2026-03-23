@@ -342,9 +342,12 @@ class CheckersGame {
             }
 
             if (moveFound) {
-                this.selectedPiece = null;
-                this.validMoves = [];
-                this.validJumps = [];
+                // Don't clear state — movePiece/executeJump handle it.
+                // They either call endTurn() (clears + switches player),
+                // or set up a multi-jump continuation (selectedPiece + validJumps).
+            } else if (this.validJumps.length > 0 && this.selectedPiece) {
+                // In a forced multi-jump chain — player MUST continue jumping
+                // with the same piece. Don't allow reselection or deselection.
             } else if (this.isRedPiece(this.board[r][c])) {
                 // Select different piece
                 this.selectedPiece = {r, c};
