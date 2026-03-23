@@ -844,6 +844,71 @@
             }
         }
 
+        // Piece-square tables (from black's perspective, row 0 = black's back rank)
+        // These encourage pieces to move to good squares
+        const PST_PAWN = [
+            [ 0,  0,  0,  0,  0,  0,  0,  0],
+            [50, 50, 50, 50, 50, 50, 50, 50],
+            [10, 10, 20, 30, 30, 20, 10, 10],
+            [ 5,  5, 10, 25, 25, 10,  5,  5],
+            [ 0,  0,  0, 20, 20,  0,  0,  0],
+            [ 5, -5,-10,  0,  0,-10, -5,  5],
+            [ 5, 10, 10,-20,-20, 10, 10,  5],
+            [ 0,  0,  0,  0,  0,  0,  0,  0]
+        ];
+        const PST_KNIGHT = [
+            [-50,-40,-30,-30,-30,-30,-40,-50],
+            [-40,-20,  0,  0,  0,  0,-20,-40],
+            [-30,  0, 10, 15, 15, 10,  0,-30],
+            [-30,  5, 15, 20, 20, 15,  5,-30],
+            [-30,  0, 15, 20, 20, 15,  0,-30],
+            [-30,  5, 10, 15, 15, 10,  5,-30],
+            [-40,-20,  0,  5,  5,  0,-20,-40],
+            [-50,-40,-30,-30,-30,-30,-40,-50]
+        ];
+        const PST_BISHOP = [
+            [-20,-10,-10,-10,-10,-10,-10,-20],
+            [-10,  0,  0,  0,  0,  0,  0,-10],
+            [-10,  0, 10, 10, 10, 10,  0,-10],
+            [-10,  5,  5, 10, 10,  5,  5,-10],
+            [-10,  0,  5, 10, 10,  5,  0,-10],
+            [-10, 10, 10, 10, 10, 10, 10,-10],
+            [-10,  5,  0,  0,  0,  0,  5,-10],
+            [-20,-10,-10,-10,-10,-10,-10,-20]
+        ];
+        const PST_ROOK = [
+            [ 0,  0,  0,  0,  0,  0,  0,  0],
+            [ 5, 10, 10, 10, 10, 10, 10,  5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [ 0,  0,  0,  5,  5,  0,  0,  0]
+        ];
+        const PST_QUEEN = [
+            [-20,-10,-10, -5, -5,-10,-10,-20],
+            [-10,  0,  0,  0,  0,  0,  0,-10],
+            [-10,  0,  5,  5,  5,  5,  0,-10],
+            [ -5,  0,  5,  5,  5,  5,  0, -5],
+            [  0,  0,  5,  5,  5,  5,  0, -5],
+            [-10,  5,  5,  5,  5,  5,  0,-10],
+            [-10,  0,  5,  0,  0,  0,  0,-10],
+            [-20,-10,-10, -5, -5,-10,-10,-20]
+        ];
+        const PST_KING = [
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-20,-30,-30,-40,-40,-30,-30,-20],
+            [-10,-20,-20,-20,-20,-20,-20,-10],
+            [ 20, 20,  0,  0,  0,  0, 20, 20],
+            [ 20, 30, 10,  0,  0, 10, 30, 20]
+        ];
+
+        const PST_MAP = { 'p': PST_PAWN, 'n': PST_KNIGHT, 'b': PST_BISHOP, 'r': PST_ROOK, 'q': PST_QUEEN, 'k': PST_KING };
+
         function evaluateBoard() {
             let score = 0;
             for (let row = 0; row < BOARD_SIZE; row++) {
@@ -851,7 +916,14 @@
                     const piece = board[row][col];
                     if (piece) {
                         const value = PIECE_VALUES[piece];
-                        score += piece === piece.toUpperCase() ? value : -value;
+                        const pst = PST_MAP[piece.toLowerCase()];
+                        if (piece === piece.toUpperCase()) {
+                            // White: tables are from white's view (flip row)
+                            score += value + (pst ? pst[7 - row][col] : 0);
+                        } else {
+                            // Black: tables are from black's view (row as-is)
+                            score -= value + (pst ? pst[row][col] : 0);
+                        }
                     }
                 }
             }
@@ -860,7 +932,7 @@
 
         function getAIMove() {
             let bestMove = null;
-            let bestEval = -Infinity;
+            let bestEval = Infinity; // AI is black, wants to MINIMIZE
 
             for (let row = 0; row < BOARD_SIZE; row++) {
                 for (let col = 0; col < BOARD_SIZE; col++) {
@@ -876,7 +948,7 @@
                             board[row][col] = piece;
                             board[move.row][move.col] = captured;
 
-                            if (eval_ > bestEval) {
+                            if (eval_ < bestEval) { // MINIMIZE for black
                                 bestEval = eval_;
                                 bestMove = { from: { row, col }, to: move };
                             }
