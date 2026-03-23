@@ -299,6 +299,7 @@
         let audioContext = null;
         let canUndoMove = false;
         let inProgress = false;
+        let positionHistory = []; // track board positions for repetition avoidance
 
         let canvas, ctx;
 
@@ -325,6 +326,7 @@
             validMoves = [];
             canUndoMove = false;
             inProgress = false;
+            positionHistory = [];
         }
 
         function startGame() {
@@ -641,6 +643,7 @@
             });
 
             gameHistory.push(JSON.stringify(board.map(r => [...r])));
+            positionHistory.push(boardToKey());
             canUndoMove = true;
             playMoveSound();
             turn = turn === 'white' ? 'black' : 'white';
@@ -652,6 +655,7 @@
 
             const lastMove = moveHistory.pop();
             gameHistory.pop();
+            positionHistory.pop();
 
             board[lastMove.from.row][lastMove.from.col] = lastMove.piece;
             board[lastMove.to.row][lastMove.to.col] = lastMove.captured;
@@ -844,8 +848,8 @@
             }
         }
 
-        // Piece-square tables (from black's perspective, row 0 = black's back rank)
-        // These encourage pieces to move to good squares
+        // Piece-square tables (standard white perspective: array row 0 = rank 8, row 7 = rank 1)
+        // White uses pst[row][col] directly; Black mirrors with pst[7-row][col]
         const PST_PAWN = [
             [ 0,  0,  0,  0,  0,  0,  0,  0],
             [50, 50, 50, 50, 50, 50, 50, 50],
@@ -909,8 +913,15 @@
 
         const PST_MAP = { 'p': PST_PAWN, 'n': PST_KNIGHT, 'b': PST_BISHOP, 'r': PST_ROOK, 'q': PST_QUEEN, 'k': PST_KING };
 
+        function boardToKey() {
+            return board.map(r => r.map(c => c || '.').join('')).join('/');
+        }
+
         function evaluateBoard() {
             let score = 0;
+            let whiteMobility = 0;
+            let blackMobility = 0;
+
             for (let row = 0; row < BOARD_SIZE; row++) {
                 for (let col = 0; col < BOARD_SIZE; col++) {
                     const piece = board[row][col];
@@ -918,15 +929,22 @@
                         const value = PIECE_VALUES[piece];
                         const pst = PST_MAP[piece.toLowerCase()];
                         if (piece === piece.toUpperCase()) {
-                            // White: tables are from white's view (flip row)
-                            score += value + (pst ? pst[7 - row][col] : 0);
+                            // White: direct table lookup (row 0 = rank 8)
+                            score += value + (pst ? pst[row][col] : 0);
+                            whiteMobility += getValidMoves(row, col).length;
                         } else {
-                            // Black: tables are from black's view (row as-is)
-                            score -= value + (pst ? pst[row][col] : 0);
+                            // Black: mirror vertically (row 0 → row 7)
+                            score -= value + (pst ? pst[7 - row][col] : 0);
+                            blackMobility += getValidMoves(row, col).length;
                         }
                     }
                 }
             }
+
+            // Mobility bonus: 2 points per legal move
+            score += whiteMobility * 2;
+            score -= blackMobility * 2;
+
             return score;
         }
 
@@ -944,7 +962,15 @@
                             board[move.row][move.col] = piece;
                             board[row][col] = null;
 
-                            const eval_ = minimax(3, true, -Infinity, Infinity);
+                            let eval_ = minimax(3, true, -Infinity, Infinity);
+
+                            // Penalize positions we've already seen (anti-repetition)
+                            const key = boardToKey();
+                            const repeats = positionHistory.filter(k => k === key).length;
+                            if (repeats > 0) {
+                                eval_ += 150 * repeats; // push eval toward white = bad for black
+                            }
+
                             board[row][col] = piece;
                             board[move.row][move.col] = captured;
 
