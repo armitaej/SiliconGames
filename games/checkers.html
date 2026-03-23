@@ -509,7 +509,7 @@ class CheckersGame {
             const {fromR, fromC, toR, toC, capturedR, capturedC} = bestMove.move;
 
             if (capturedR !== null) {
-                // Jump move
+                // Jump move - chain all jumps then end turn
                 this.executeAIJump(fromR, fromC, toR, toC, capturedR, capturedC);
             } else {
                 // Regular move
@@ -519,19 +519,28 @@ class CheckersGame {
                 this.playMoveSound();
                 this.checkPromotion(toR, toC);
                 this.moveCount++;
-                this.updateUI();
+                this.aiFinishTurn();
             }
-        }
-
-        this.aiThinking = false;
-
-        if (!this.isGameOver()) {
-            this.currentPlayer = COLORS.RED;
-            this.updateUI();
-            this.draw();
         } else {
-            this.showGameOver();
+            // No valid move - AI loses
+            this.aiFinishTurn();
         }
+    }
+
+    aiFinishTurn() {
+        this.aiThinking = false;
+        this.selectedPiece = null;
+        this.validMoves = [];
+        this.validJumps = [];
+
+        if (this.isGameOver()) {
+            this.showGameOver();
+            return;
+        }
+
+        this.currentPlayer = COLORS.RED;
+        this.updateUI();
+        this.draw();
     }
 
     executeAIJump(fromR, fromC, toR, toC, capturedR, capturedC) {
@@ -547,11 +556,10 @@ class CheckersGame {
         // Check for additional jumps and chain them
         const additionalJumps = this.getMovesForPiece(this.board, toR, toC).jumps;
         if (additionalJumps.length > 0) {
-            // Continue jumping with the same piece
             const nextJump = additionalJumps[0];
             this.executeAIJump(toR, toC, nextJump[0], nextJump[1], nextJump[2], nextJump[3]);
         } else {
-            this.updateUI();
+            this.aiFinishTurn();
         }
     }
 

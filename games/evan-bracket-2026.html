@@ -384,13 +384,13 @@
 
     // === PERSISTENCE ===
     function loadBracket() {
-        const saved = localStorage.getItem('evanBracket2026_v3');
+        const saved = localStorage.getItem('evanBracket2026_v4');
         if (saved) {
             try { Object.assign(bracketData, JSON.parse(saved)); } catch(e) {}
         }
     }
     function saveBracket() {
-        localStorage.setItem('evanBracket2026_v3', JSON.stringify(bracketData));
+        localStorage.setItem('evanBracket2026_v4', JSON.stringify(bracketData));
     }
 
     // === WINNER LOGIC ===
@@ -456,36 +456,35 @@
         return { r64: r64winners, r32: r32winners, s16: s16winners, e8: e8winners };
     }
 
-    // Check if Evan correctly predicted BOTH teams in this matchup.
-    // A pick only counts if Evan got BOTH feeder games right in the prior round,
-    // meaning the actual matchup is exactly what he predicted.
+    // Check if Evan's picked team has a valid path through the bracket.
+    // Credit is given if Evan picked the winning team AND that team was
+    // correctly predicted to reach this round (i.e., Evan picked them in the prior round too).
+    // The opponent's path doesn't matter — only the picked team's path.
     function isPathCorrect(reg, round, index) {
         const d = bracketData[reg];
         const rounds = ['r64', 'r32', 's16', 'e8'];
         const ri = rounds.indexOf(round);
         if (ri === 0) return true; // R64 has no prior path to check
 
-        // Check that both feeder games from the prior round were picked correctly
+        const pick = d[round][index].evanPick;
         const priorRound = rounds[ri - 1];
         const feeder1Idx = index * 2;
         const feeder2Idx = index * 2 + 1;
         const feeder1 = d[priorRound][feeder1Idx];
         const feeder2 = d[priorRound][feeder2Idx];
 
-        if (!feeder1 || !feeder2) return false;
+        // Find which feeder game Evan's picked team came from
+        let feederIdx = -1;
+        if (feeder1 && feeder1.evanPick === pick) feederIdx = feeder1Idx;
+        else if (feeder2 && feeder2.evanPick === pick) feederIdx = feeder2Idx;
+        else return false; // Evan's pick doesn't trace back to any feeder — no credit
 
-        // Both feeders must have actual results matching Evan's picks
-        const feeder1Ok = feeder1.actual && feeder1.evanPick === feeder1.actual;
-        const feeder2Ok = feeder2.actual && feeder2.evanPick === feeder2.actual;
+        // The picked team must have actually won their feeder game
+        const feeder = d[priorRound][feederIdx];
+        if (!feeder.actual || feeder.evanPick !== feeder.actual) return false;
 
-        if (!feeder1Ok || !feeder2Ok) return false;
-
-        // Recursively check that feeders' paths are also correct
-        if (ri >= 2) {
-            if (!isPathCorrect(reg, priorRound, feeder1Idx)) return false;
-            if (!isPathCorrect(reg, priorRound, feeder2Idx)) return false;
-        }
-        return true;
+        // Recursively check the feeder's path
+        return isPathCorrect(reg, priorRound, feederIdx);
     }
 
     function updateScore() {

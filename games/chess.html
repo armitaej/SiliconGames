@@ -300,8 +300,12 @@
         let canUndoMove = false;
         let inProgress = false;
 
-        const canvas = document.getElementById('chess-canvas');
-        const ctx = canvas.getContext('2d');
+        let canvas, ctx;
+
+        function initDOM() {
+            canvas = document.getElementById('chess-canvas');
+            ctx = canvas.getContext('2d');
+        }
 
         function initBoard() {
             board = [
@@ -886,7 +890,10 @@
             return bestMove;
         }
 
-        canvas.addEventListener('click', (e) => {
+        document.addEventListener('DOMContentLoaded', () => {
+            initDOM();
+
+            canvas.addEventListener('click', (e) => {
             if (gameState === 'menu') {
                 startGame();
                 document.getElementById('menu-screen').classList.add('hidden');
@@ -934,14 +941,15 @@
             }
         });
 
-        document.getElementById('new-game-btn').addEventListener('click', newGame);
-        document.getElementById('undo-btn').addEventListener('click', undoMove);
-        document.getElementById('high-score-btn').addEventListener('click', showHighScores);
-        document.getElementById('close-high-scores-btn').addEventListener('click', closeHighScores);
-        document.getElementById('play-again-btn').addEventListener('click', newGame);
+            document.getElementById('new-game-btn').addEventListener('click', newGame);
+            document.getElementById('undo-btn').addEventListener('click', undoMove);
+            document.getElementById('high-score-btn').addEventListener('click', showHighScores);
+            document.getElementById('close-high-scores-btn').addEventListener('click', closeHighScores);
+            document.getElementById('play-again-btn').addEventListener('click', newGame);
 
-        initBoard();
-        draw();
+            initBoard();
+            draw();
+        });
     </script>
 </body>
 </html>
