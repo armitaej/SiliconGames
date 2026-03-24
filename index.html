@@ -287,6 +287,10 @@ header {
 .cabinet[data-game="bracket"] .game-title { color: #DAA520; text-shadow: 0 0 10px rgba(218,165,32,0.5); }
 .cabinet[data-game="bracket"] .play-btn { background: #DAA520; color: #000; box-shadow: 0 0 20px rgba(218,165,32,0.4); }
 
+.cabinet[data-game="sports"] .screen-art { color: #ff6b35; }
+.cabinet[data-game="sports"] .game-title { color: #ff6b35; text-shadow: 0 0 10px rgba(255,107,53,0.5); }
+.cabinet[data-game="sports"] .play-btn { background: #ff6b35; color: #000; box-shadow: 0 0 20px rgba(255,107,53,0.4); }
+
 .cabinet-info {
   padding: 20px;
   text-align: center;
@@ -744,6 +748,27 @@ footer a:hover { color: var(--neon-pink); }
         <div class="game-stats">
           <button class="like-btn" data-like="checkers" onclick="event.stopPropagation(); toggleLike('checkers')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
           <span class="hs-badge" data-hs="checkers"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cabinet" data-game="sports" onclick="launchGame('games/sports-arcade.html', 'SPORTS ARCADE')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3C6;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Sports Arcade</div>
+        <div class="game-desc">Four arcade sports in one! Basketball free throws, football field goals, baseball home run derby, and hockey penalty shots.</div>
+        <div class="game-tags">
+          <span class="tag">Basketball</span>
+          <span class="tag">Football</span>
+          <span class="tag">Baseball</span>
+          <span class="tag">Hockey</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="sports" onclick="event.stopPropagation(); toggleLike('sports')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="sports"></span>
         </div>
       </div>
     </div>
