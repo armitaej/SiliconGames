@@ -444,7 +444,8 @@
                 const statMult = 1 + 0.3 * stageNum;
                 this.hp = this.baseStats.hp * statMult;
                 this.maxHp = this.hp;
-                this.speed = this.baseStats.speed * statMult;
+                // Speed caps at 2x base to prevent enemies from being invisible-fast
+                this.speed = this.baseStats.speed * Math.min(statMult, 2.0);
                 this.damage = this.baseStats.damage * statMult;
                 this.detectionRange = 200;
                 this.attackRange = 40;
@@ -1076,11 +1077,13 @@
                 this.player.attackCooldown = 20;
                 this.sound.meleeHit();
 
-                // Check enemy hits
+                // Check enemy hits (center-to-center)
+                const atkCX = this.player.x + this.player.width / 2;
+                const atkCY = this.player.y + this.player.height / 2;
                 for (let enemy of this.enemies) {
                     if (enemy.dead) continue;
-                    const dx = enemy.x - this.player.x;
-                    const dy = enemy.y - this.player.y;
+                    const dx = (enemy.x + enemy.width / 2) - atkCX;
+                    const dy = (enemy.y + enemy.height / 2) - atkCY;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
                     if (dist < this.player.attackPower * 2 + 40 && Math.abs(dx) < 60) {
@@ -1297,11 +1300,14 @@
                     this.boss.update(this.player.x, this.player.y, this.walls);
                 }
 
-                // Enemy collisions with player
+                // Enemy collisions with player (center-to-center distance)
+                const pcx = this.player.x + this.player.width / 2;
+                const pcy = this.player.y + this.player.height / 2;
+
                 for (let enemy of this.enemies) {
                     if (enemy.dead) continue;
-                    const dx = enemy.x - this.player.x;
-                    const dy = enemy.y - this.player.y;
+                    const dx = (enemy.x + enemy.width / 2) - pcx;
+                    const dy = (enemy.y + enemy.height / 2) - pcy;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
                     if (dist < this.player.width / 2 + enemy.width / 2 && enemy.attackTimer === 0) {
@@ -1310,10 +1316,10 @@
                     }
                 }
 
-                // Boss collision with player
+                // Boss collision with player (center-to-center distance)
                 if (this.boss) {
-                    const dx = this.boss.x - this.player.x;
-                    const dy = this.boss.y - this.player.y;
+                    const dx = (this.boss.x + this.boss.width / 2) - pcx;
+                    const dy = (this.boss.y + this.boss.height / 2) - pcy;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
                     if (dist < this.player.width / 2 + this.boss.width / 2 && this.boss.attackTimer === 0) {
