@@ -267,9 +267,54 @@ header {
 .cabinet[data-game="kingdom"] .game-title { color: var(--neon-green); text-shadow: 0 0 10px rgba(57,255,20,0.5); }
 .cabinet[data-game="kingdom"] .play-btn { background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57,255,20,0.4); }
 
+.cabinet[data-game="mking"] .screen-art { color: #DAA520; }
+.cabinet[data-game="mking"] .game-title { color: #DAA520; text-shadow: 0 0 10px rgba(218,165,32,0.5); }
+.cabinet[data-game="mking"] .play-btn { background: #DAA520; color: #000; box-shadow: 0 0 20px rgba(218,165,32,0.4); }
+
 .cabinet[data-game="towerdef"] .screen-art { color: var(--neon-yellow); }
 .cabinet[data-game="towerdef"] .game-title { color: var(--neon-yellow); text-shadow: 0 0 10px rgba(255,230,0,0.5); }
 .cabinet[data-game="towerdef"] .play-btn { background: var(--neon-yellow); color: #000; box-shadow: 0 0 20px rgba(255,230,0,0.4); }
+
+.cabinet[data-game="chess"] .screen-art { color: #8B4513; }
+.cabinet[data-game="chess"] .game-title { color: #8B4513; text-shadow: 0 0 10px rgba(139,69,19,0.5); }
+.cabinet[data-game="chess"] .play-btn { background: #8B4513; box-shadow: 0 0 20px rgba(139,69,19,0.4); }
+
+.cabinet[data-game="checkers"] .screen-art { color: #CD3333; }
+.cabinet[data-game="checkers"] .game-title { color: #CD3333; text-shadow: 0 0 10px rgba(205,51,51,0.5); }
+.cabinet[data-game="checkers"] .play-btn { background: #CD3333; box-shadow: 0 0 20px rgba(205,51,51,0.4); }
+
+.cabinet[data-game="bracket"] .screen-art { color: #DAA520; }
+.cabinet[data-game="bracket"] .game-title { color: #DAA520; text-shadow: 0 0 10px rgba(218,165,32,0.5); }
+.cabinet[data-game="bracket"] .play-btn { background: #DAA520; color: #000; box-shadow: 0 0 20px rgba(218,165,32,0.4); }
+
+.cabinet[data-game="sports"] .screen-art { color: #ff6b35; }
+.cabinet[data-game="sports"] .game-title { color: #ff6b35; text-shadow: 0 0 10px rgba(255,107,53,0.5); }
+.cabinet[data-game="sports"] .play-btn { background: #ff6b35; color: #000; box-shadow: 0 0 20px rgba(255,107,53,0.4); }
+
+.cabinet[data-game="slingshot"] .screen-art { color: #4af; }
+.cabinet[data-game="slingshot"] .game-title { color: #4af; text-shadow: 0 0 10px rgba(68,170,255,0.5); }
+.cabinet[data-game="slingshot"] .play-btn { background: #4af; color: #000; box-shadow: 0 0 20px rgba(68,170,255,0.4); }
+
+/* Slingshot level picker on card */
+.slingshot-level-picker { margin-bottom: 14px; }
+.slingshot-level-picker-label {
+  font-size: 9px; letter-spacing: 2px; color: #8af; text-transform: uppercase;
+  margin-bottom: 8px; font-family: 'Orbitron', sans-serif; opacity: 0.7;
+}
+.slingshot-level-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.sl-lvl-btn {
+  background: rgba(68,170,255,0.06); border: 1px solid rgba(68,170,255,0.2);
+  border-radius: 5px; color: #8af; font-size: 10px; font-weight: 600;
+  cursor: pointer; padding: 5px 2px; transition: all 0.15s;
+  font-family: 'Orbitron', sans-serif;
+}
+.sl-lvl-btn:hover { background: rgba(68,170,255,0.2); border-color: #4af; color: #fff; }
+.sl-lvl-btn.sl-active {
+  background: rgba(68,170,255,0.3); border-color: #4af; color: #fff;
+  box-shadow: 0 0 8px rgba(68,170,255,0.4);
+}
 
 .cabinet-info {
   padding: 20px;
@@ -627,6 +672,27 @@ footer a:hover { color: var(--neon-pink); }
       </div>
     </div>
 
+    <!-- Mountain King -->
+    <div class="cabinet" data-game="mking" onclick="launchGame('games/mountain-king.html', 'MOUNTAIN KING')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x2694;&#xFE0F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Mountain King</div>
+        <div class="game-desc">Play as the legendary Mountain King! Stomp, stun, and smash through 11 stages of dark fantasy. Unlock Avatar form at level 6!</div>
+        <div class="game-tags">
+          <span class="tag">Action RPG</span>
+          <span class="tag">Dark Fantasy</span>
+          <span class="tag">11 Stages</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="mking" onclick="event.stopPropagation(); toggleLike('mking')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="mking"></span>
+        </div>
+      </div>
+    </div>
+
     <!-- Legend of the Lost Kingdom -->
     <div class="cabinet" data-game="kingdom" onclick="launchGame('games/legend-kingdom.html', 'LEGEND OF THE LOST KINGDOM')">
       <div class="cabinet-screen">
@@ -665,6 +731,116 @@ footer a:hover { color: var(--neon-pink); }
         <div class="game-stats">
           <button class="like-btn" data-like="towerdef" onclick="event.stopPropagation(); toggleLike('towerdef')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
           <span class="hs-badge" data-hs="towerdefense"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chess Master -->
+    <div class="cabinet" data-game="chess" onclick="launchGame('games/chess.html', 'CHESS MASTER')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x265A;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Chess Master</div>
+        <div class="game-desc">Challenge the AI in the ultimate game of strategy. Classic wood board with full rules including castling, en passant, and promotion.</div>
+        <div class="game-tags">
+          <span class="tag">Strategy</span>
+          <span class="tag">Board Game</span>
+          <span class="tag">AI</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="chess" onclick="event.stopPropagation(); toggleLike('chess')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="chess"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Checkers Classic -->
+    <div class="cabinet" data-game="checkers" onclick="launchGame('games/checkers.html', 'CHECKERS CLASSIC')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x26C0;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Checkers Classic</div>
+        <div class="game-desc">Jump, capture, and crown your way to victory against a crafty AI opponent. Mandatory jumps, multi-captures, and king promotions.</div>
+        <div class="game-tags">
+          <span class="tag">Strategy</span>
+          <span class="tag">Board Game</span>
+          <span class="tag">AI</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="checkers" onclick="event.stopPropagation(); toggleLike('checkers')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="checkers"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cabinet" data-game="sports" onclick="launchGame('games/sports-arcade.html', 'SPORTS ARCADE')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3C6;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Sports Arcade</div>
+        <div class="game-desc">Six arcade sports in one! Basketball, football, baseball, hockey, soccer, and gaga ball — all phone friendly!</div>
+        <div class="game-tags">
+          <span class="tag">Basketball</span>
+          <span class="tag">Football</span>
+          <span class="tag">Baseball</span>
+          <span class="tag">Hockey</span>
+          <span class="tag">Soccer</span>
+          <span class="tag">Gaga Ball</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="sports" onclick="event.stopPropagation(); toggleLike('sports')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="sports"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slingshot -->
+    <div class="cabinet" data-game="slingshot" onclick="launchSlingshot()">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1FA90;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Slingshot</div>
+        <div class="game-desc">Navigate gravitational fields with limited thrust. Slingshot around planets to reach the portal across 14 punishing levels.</div>
+        <div class="game-tags">
+          <span class="tag">Physics</span>
+          <span class="tag">Space</span>
+          <span class="tag">14 Levels</span>
+        </div>
+        <div class="slingshot-level-picker" onclick="event.stopPropagation()">
+          <div class="slingshot-level-picker-label">Start at level</div>
+          <div class="slingshot-level-grid" id="slingshot-level-grid"></div>
+        </div>
+        <button class="play-btn" onclick="event.stopPropagation(); launchSlingshot()">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="slingshot" onclick="event.stopPropagation(); toggleLike('slingshot')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="slingshot"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cabinet" data-game="bracket" onclick="launchGame('games/evan-bracket-2026.html', 'EVAN\'S 2026 MARCH MADNESS BRACKET')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3C0;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">March Madness 2026</div>
+        <div class="game-desc">Evan's interactive NCAA bracket tracker. Live ESPN scores auto-update on refresh. Track picks vs. actual results with point scoring.</div>
+        <div class="game-tags">
+          <span class="tag">Bracket</span>
+          <span class="tag">NCAA</span>
+          <span class="tag">Live Scores</span>
+        </div>
+        <button class="play-btn">VIEW</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="bracket" onclick="event.stopPropagation(); toggleLike('bracket')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="bracket"></span>
         </div>
       </div>
     </div>
@@ -780,6 +956,34 @@ function closeGame() {
   document.body.style.overflow = '';
   refreshLikes();
   refreshHighScoreBadges();
+}
+
+// Slingshot level picker
+let slingshotStartLevel = 1;
+(function() {
+  const levelNames = [
+    'First Flight','Binary Stars','Gauntlet','Slingshot Alley','The Squeeze',
+    'Gravity Well','Orbital Dance','Event Horizon','The Maze','Dead Drift',
+    'Pulsar Corridor','Twin Titans','No Margin','Singularity'
+  ];
+  const grid = document.getElementById('slingshot-level-grid');
+  levelNames.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'sl-lvl-btn' + (i === 0 ? ' sl-active' : '');
+    btn.textContent = i + 1;
+    btn.title = name;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      slingshotStartLevel = i + 1;
+      grid.querySelectorAll('.sl-lvl-btn').forEach(b => b.classList.remove('sl-active'));
+      btn.classList.add('sl-active');
+    });
+    grid.appendChild(btn);
+  });
+})();
+
+function launchSlingshot() {
+  launchGame('games/Slingshot.html#' + slingshotStartLevel, 'SLINGSHOT');
 }
 
 // Coin counter text cycle

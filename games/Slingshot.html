@@ -46,7 +46,36 @@
   }
   #msg-body {
     font-size: 15px; color: #adf; text-align: center; line-height: 1.8;
-    max-width: 400px; margin-bottom: 36px; opacity: 0.7;
+    max-width: 400px; margin-bottom: 20px; opacity: 0.7;
+  }
+  #level-select {
+    margin-bottom: 28px; text-align: center;
+  }
+  #level-select-label {
+    font-size: 11px; letter-spacing: 3px; color: #8af; opacity: 0.7;
+    text-transform: uppercase; margin-bottom: 12px;
+  }
+  #level-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;
+    max-width: 380px;
+  }
+  .lvl-btn {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(100,180,255,0.2);
+    border-radius: 8px; color: #8af; font-size: 11px; cursor: pointer;
+    padding: 8px 4px; transition: all 0.2s; font-family: 'Segoe UI', Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    pointer-events: auto;
+  }
+  .lvl-btn:hover {
+    background: rgba(60,140,255,0.15); border-color: #4af; color: #fff;
+  }
+  .lvl-btn.active {
+    background: rgba(60,140,255,0.25); border-color: #4af;
+    color: #fff; box-shadow: 0 0 10px rgba(60,140,255,0.3);
+  }
+  .lvl-btn .lvl-num { font-size: 14px; font-weight: 600; }
+  .lvl-btn .lvl-dot {
+    width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.5;
   }
   .btn {
     pointer-events: auto; padding: 14px 44px; font-size: 16px;
@@ -91,6 +120,10 @@
   <div id="msg-title">SLINGSHOT</div>
   <div id="msg-subtitle">Navigate the gravity fields</div>
   <div id="msg-body">Use thrust to steer your ship through gravitational wells.<br>Reach the glowing portal to advance.</div>
+  <div id="level-select">
+    <div id="level-select-label">Select Starting Level</div>
+    <div id="level-grid"></div>
+  </div>
   <button class="btn" id="msg-btn" onclick="startGame()">Launch</button>
 </div>
 
@@ -136,6 +169,7 @@ const TRAIL_MAX = 120;
 // ========== STATE ==========
 let ship, particles, trail, stars, levelTime, gameState, currentLevel;
 let keys = {};
+let selectedStartLevel = 0; // 0-indexed level to start at
 
 // ========== LEVELS ==========
 const levels = [
@@ -738,6 +772,8 @@ function showMessage(title, subtitle, body, btnText, action) {
   const btn = document.getElementById('msg-btn');
   btn.textContent = btnText;
   btn.onclick = action;
+  // Hide level picker on win/fail screens
+  document.getElementById('level-select').style.display = 'none';
   overlay.classList.remove('hidden');
 }
 
@@ -745,11 +781,32 @@ function hideMessage() {
   document.getElementById('message-overlay').classList.add('hidden');
 }
 
+// ========== LEVEL SELECT GRID ==========
+function buildLevelGrid() {
+  const grid = document.getElementById('level-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  levels.forEach((lev, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'lvl-btn' + (i === selectedStartLevel ? ' active' : '');
+    btn.title = lev.name;
+    btn.innerHTML = `<span class="lvl-num">${i + 1}</span><span class="lvl-dot"></span>`;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectedStartLevel = i;
+      grid.querySelectorAll('.lvl-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('msg-subtitle').textContent = `Level ${i + 1}: ${lev.name}`;
+    });
+    grid.appendChild(btn);
+  });
+}
+
 // ========== START ==========
 function startGame() {
   hideMessage();
   gameState = 'playing';
-  loadLevel(0);
+  loadLevel(selectedStartLevel);
 }
 
 function gameLoop(timestamp) {
@@ -766,6 +823,24 @@ gameState = 'menu';
 ship = null;
 particles = [];
 trail = [];
+
+// Read URL hash for starting level: #3 or #level=3 (1-indexed)
+(function() {
+  const hash = window.location.hash.replace('#', '');
+  const n = parseInt(hash.replace(/[^0-9]/g, '')) - 1;
+  if (!isNaN(n) && n >= 0 && n < levels.length) {
+    selectedStartLevel = n;
+  }
+})();
+
+buildLevelGrid();
+
+// Show level name for pre-selected level on start screen
+if (selectedStartLevel > 0) {
+  document.getElementById('msg-subtitle').textContent =
+    `Level ${selectedStartLevel + 1}: ${levels[selectedStartLevel].name}`;
+}
+
 lastTime = performance.now();
 requestAnimationFrame(gameLoop);
 </script>
