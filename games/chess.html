@@ -151,7 +151,7 @@
         }
 
         .game-over-screen {
-            display: none;
+            /* visibility managed by .hidden class */
         }
 
         .game-over-screen h2 {
@@ -249,7 +249,7 @@
                 <p>Click to Start</p>
                 <p style="font-size: 12px; margin-top: 20px;">White vs Computer (AI)</p>
             </div>
-            <div class="game-over-screen" id="game-over-screen">
+            <div class="game-over-screen hidden" id="game-over-screen">
                 <h2 id="game-over-title">Game Over</h2>
                 <p id="game-over-message"></p>
                 <button class="button" id="play-again-btn" style="margin-top: 20px;">Play Again</button>
