@@ -285,13 +285,13 @@
             ],
             r32: [
                 { team1: 'Duke', team2: 'TCU', evanPick: 'Duke', actual: 'Duke' },
-                { team1: 'St. John\'s', team2: 'Kansas', evanPick: 'Kansas', actual: '' },
+                { team1: 'St. John\'s', team2: 'Kansas', evanPick: 'Kansas', actual: 'St. John\'s' },
                 { team1: 'Louisville', team2: 'Michigan State', evanPick: 'Michigan State', actual: 'Michigan State' },
-                { team1: 'UCLA', team2: 'UConn', evanPick: 'UConn', actual: '' }
+                { team1: 'UCLA', team2: 'UConn', evanPick: 'UConn', actual: 'UConn' }
             ],
             s16: [
-                { team1: 'Duke', team2: 'TBD', evanPick: 'Duke', actual: '' },
-                { team1: 'Michigan State', team2: 'TBD', evanPick: 'UConn', actual: '' }
+                { team1: 'Duke', team2: 'St. John\'s', evanPick: 'Duke', actual: '' },
+                { team1: 'Michigan State', team2: 'UConn', evanPick: 'UConn', actual: '' }
             ],
             e8: [
                 { team1: 'TBD', team2: 'TBD', evanPick: 'Duke', actual: '' }
@@ -309,13 +309,13 @@
                 { seed1: 2, team1: 'Houston', seed2: 15, team2: 'Idaho', evanPick: 'Houston', actual: 'Houston' }
             ],
             r32: [
-                { team1: 'Florida', team2: 'Iowa', evanPick: 'Florida', actual: '' },
+                { team1: 'Florida', team2: 'Iowa', evanPick: 'Florida', actual: 'Iowa' },
                 { team1: 'Vanderbilt', team2: 'Nebraska', evanPick: 'Vanderbilt', actual: 'Nebraska' },
                 { team1: 'VCU', team2: 'Illinois', evanPick: 'Illinois', actual: 'Illinois' },
                 { team1: 'Texas A&M', team2: 'Houston', evanPick: 'Houston', actual: 'Houston' }
             ],
             s16: [
-                { team1: 'TBD', team2: 'Nebraska', evanPick: 'Florida', actual: '' },
+                { team1: 'Iowa', team2: 'Nebraska', evanPick: 'Florida', actual: '' },
                 { team1: 'Illinois', team2: 'Houston', evanPick: 'Houston', actual: '' }
             ],
             e8: [
@@ -334,14 +334,14 @@
                 { seed1: 2, team1: 'Purdue', seed2: 15, team2: 'Queens', evanPick: 'Purdue', actual: 'Purdue' }
             ],
             r32: [
-                { team1: 'Arizona', team2: 'Utah State', evanPick: 'Arizona', actual: '' },
+                { team1: 'Arizona', team2: 'Utah State', evanPick: 'Arizona', actual: 'Arizona' },
                 { team1: 'High Point', team2: 'Arkansas', evanPick: 'Wisconsin', actual: 'Arkansas' },
                 { team1: 'Texas', team2: 'Gonzaga', evanPick: 'Gonzaga', actual: 'Texas' },
-                { team1: 'Miami FL', team2: 'Purdue', evanPick: 'Purdue', actual: '' }
+                { team1: 'Miami FL', team2: 'Purdue', evanPick: 'Purdue', actual: 'Purdue' }
             ],
             s16: [
-                { team1: 'TBD', team2: 'Arkansas', evanPick: 'Arizona', actual: '' },
-                { team1: 'Texas', team2: 'TBD', evanPick: 'Purdue', actual: '' }
+                { team1: 'Arizona', team2: 'Arkansas', evanPick: 'Arizona', actual: '' },
+                { team1: 'Texas', team2: 'Purdue', evanPick: 'Purdue', actual: '' }
             ],
             e8: [
                 { team1: 'TBD', team2: 'TBD', evanPick: 'Arizona', actual: '' }
@@ -356,17 +356,17 @@
                 { seed1: 6, team1: 'Tennessee', seed2: 11, team2: 'Miami Ohio', evanPick: 'Miami Ohio', actual: 'Tennessee' },
                 { seed1: 3, team1: 'Virginia', seed2: 14, team2: 'Wright State', evanPick: 'Virginia', actual: 'Virginia' },
                 { seed1: 7, team1: 'Kentucky', seed2: 10, team2: 'Santa Clara', evanPick: 'Kentucky', actual: 'Kentucky' },
-                { seed1: 2, team1: 'Iowa State', seed2: 15, team2: 'TBD', evanPick: 'Iowa State', actual: 'Iowa State' }
+                { seed1: 2, team1: 'Iowa State', seed2: 15, team2: 'Tennessee State', evanPick: 'Iowa State', actual: 'Iowa State' }
             ],
             r32: [
                 { team1: 'Michigan', team2: 'St. Louis', evanPick: 'Michigan', actual: 'Michigan' },
-                { team1: 'Texas Tech', team2: 'Alabama', evanPick: 'Texas Tech', actual: '' },
-                { team1: 'Tennessee', team2: 'Virginia', evanPick: 'Miami Ohio', actual: '' },
-                { team1: 'Kentucky', team2: 'Iowa State', evanPick: 'Kentucky', actual: '' }
+                { team1: 'Texas Tech', team2: 'Alabama', evanPick: 'Texas Tech', actual: 'Alabama' },
+                { team1: 'Tennessee', team2: 'Virginia', evanPick: 'Miami Ohio', actual: 'Tennessee' },
+                { team1: 'Kentucky', team2: 'Iowa State', evanPick: 'Kentucky', actual: 'Iowa State' }
             ],
             s16: [
-                { team1: 'Michigan', team2: 'TBD', evanPick: 'Michigan', actual: '' },
-                { team1: 'TBD', team2: 'TBD', evanPick: 'Miami Ohio', actual: '' }
+                { team1: 'Michigan', team2: 'Alabama', evanPick: 'Michigan', actual: '' },
+                { team1: 'Tennessee', team2: 'Iowa State', evanPick: 'Miami Ohio', actual: '' }
             ],
             e8: [
                 { team1: 'TBD', team2: 'TBD', evanPick: 'Miami Ohio', actual: '' }
@@ -384,13 +384,13 @@
 
     // === PERSISTENCE ===
     function loadBracket() {
-        const saved = localStorage.getItem('evanBracket2026_v4');
+        const saved = localStorage.getItem('evanBracket2026_v5');
         if (saved) {
             try { Object.assign(bracketData, JSON.parse(saved)); } catch(e) {}
         }
     }
     function saveBracket() {
-        localStorage.setItem('evanBracket2026_v4', JSON.stringify(bracketData));
+        localStorage.setItem('evanBracket2026_v5', JSON.stringify(bracketData));
     }
 
     // === WINNER LOGIC ===
@@ -626,6 +626,8 @@
                 }
 
                 row.addEventListener('click', () => {
+                    // Don't allow setting winner if either team is TBD/missing
+                    if (!matchup.team1 || !matchup.team2 || matchup.team1 === 'TBD' || matchup.team2 === 'TBD') return;
                     setWinner(region, round, index, t.name);
                 });
                 box.appendChild(row);
