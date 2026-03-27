@@ -177,6 +177,7 @@ const GOAL_RADIUS = 28;
 const DEATH_RADIUS_FACTOR = 1.0; // die if you hit the planet surface
 const FUEL_BURN_RATE = 8;   // per second while thrusting
 const TRAIL_MAX = 120;
+const FUEL_STATION_RADIUS = 18; // pickup radius for fuel stations
 
 // ========== STATE ==========
 let ship, particles, trail, stars, levelTime, gameState, currentLevel;
@@ -205,6 +206,9 @@ const levels = [
     goal: { x: -120, y: 0 },    // relative to right/center
     planets: [
       { x: 0.5, y: 0.5, mass: 3000, radius: 30, color: '#4af' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.25 }
     ]
   },
   {
@@ -215,6 +219,9 @@ const levels = [
     planets: [
       { x: 0.4, y: 0.35, mass: 2500, radius: 25, color: '#f84' },
       { x: 0.6, y: 0.65, mass: 2500, radius: 25, color: '#84f' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.5 }
     ]
   },
   {
@@ -226,6 +233,9 @@ const levels = [
       { x: 0.3, y: 0.5, mass: 2000, radius: 22, color: '#f4a' },
       { x: 0.5, y: 0.3, mass: 1800, radius: 20, color: '#4fa' },
       { x: 0.7, y: 0.6, mass: 2200, radius: 24, color: '#fa4' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.75 }
     ]
   },
   {
@@ -237,6 +247,9 @@ const levels = [
       { x: 0.25, y: 0.5, mass: 4000, radius: 35, color: '#f44' },
       { x: 0.55, y: 0.4, mass: 1500, radius: 18, color: '#8f4' },
       { x: 0.75, y: 0.6, mass: 3000, radius: 28, color: '#48f' }
+    ],
+    fuelStations: [
+      { x: 0.4, y: 0.2 }
     ]
   },
   {
@@ -249,6 +262,9 @@ const levels = [
       { x: 0.5, y: 0.72, mass: 4000, radius: 34, color: '#8af' },
       { x: 0.25, y: 0.5, mass: 1800, radius: 18, color: '#af8' },
       { x: 0.75, y: 0.5, mass: 1800, radius: 18, color: '#fa8' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.5 }
     ]
   },
   {
@@ -260,6 +276,9 @@ const levels = [
       { x: 0.5, y: 0.5, mass: 9000, radius: 48, color: '#f44' },
       { x: 0.2, y: 0.2, mass: 1500, radius: 16, color: '#4ff' },
       { x: 0.8, y: 0.8, mass: 1500, radius: 16, color: '#ff4' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.2 }
     ]
   },
   {
@@ -273,6 +292,9 @@ const levels = [
       { x: 0.35, y: 0.65, mass: 3200, radius: 28, color: '#fe4' },
       { x: 0.65, y: 0.65, mass: 3200, radius: 28, color: '#4fe' },
       { x: 0.5, y: 0.5, mass: 2000, radius: 18, color: '#fff' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.15 }
     ]
   },
   {
@@ -286,6 +308,10 @@ const levels = [
       { x: 0.8, y: 0.3, mass: 2000, radius: 18, color: '#f2f' },
       { x: 0.2, y: 0.7, mass: 2000, radius: 18, color: '#ff2' },
       { x: 0.8, y: 0.7, mass: 2000, radius: 18, color: '#2f2' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.15 },
+      { x: 0.5, y: 0.85 }
     ]
   },
   // ===== NEW HARDER LEVELS =====
@@ -301,6 +327,9 @@ const levels = [
       { x: 0.8, y: 0.65, mass: 2500, radius: 22, color: '#ff6' },
       { x: 0.3, y: 0.5, mass: 1800, radius: 16, color: '#f6f' },
       { x: 0.7, y: 0.5, mass: 1800, radius: 16, color: '#6ff' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.15 }
     ]
   },
   {
@@ -313,6 +342,9 @@ const levels = [
       { x: 0.65, y: 0.5, mass: 5000, radius: 38, color: '#49f' },
       { x: 0.5, y: 0.2, mass: 1500, radius: 14, color: '#f4f' },
       { x: 0.5, y: 0.8, mass: 1500, radius: 14, color: '#4ff' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.5 }
     ]
   },
   {
@@ -326,6 +358,9 @@ const levels = [
       { x: 0.5, y: 0.6, mass: 4000, radius: 30, color: '#44f' },
       { x: 0.65, y: 0.35, mass: 3000, radius: 24, color: '#ff4' },
       { x: 0.85, y: 0.55, mass: 3500, radius: 28, color: '#f4f' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.15 }
     ]
   },
   {
@@ -340,6 +375,9 @@ const levels = [
       { x: 0.5, y: 0.85, mass: 1200, radius: 12, color: '#0ff' },
       { x: 0.15, y: 0.7, mass: 1800, radius: 15, color: '#f0f' },
       { x: 0.85, y: 0.3, mass: 1800, radius: 15, color: '#0f0' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.5 }
     ]
   },
   {
@@ -355,6 +393,10 @@ const levels = [
       { x: 0.8, y: 0.7, mass: 3000, radius: 26, color: '#f48' },
       { x: 0.5, y: 0.15, mass: 2000, radius: 18, color: '#8ff' },
       { x: 0.5, y: 0.85, mass: 2000, radius: 18, color: '#ff8' }
+    ],
+    fuelStations: [
+      { x: 0.35, y: 0.5 },
+      { x: 0.65, y: 0.5 }
     ]
   },
   {
@@ -370,6 +412,10 @@ const levels = [
       { x: 0.8, y: 0.8, mass: 3500, radius: 28, color: '#a0f' },
       { x: 0.35, y: 0.5, mass: 2000, radius: 16, color: '#ff0' },
       { x: 0.65, y: 0.5, mass: 2000, radius: 16, color: '#0ff' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.15 },
+      { x: 0.5, y: 0.85 }
     ]
   }
 ];
@@ -423,6 +469,18 @@ function spawnExplosion(x, y) {
   }
 }
 
+function spawnFuelPickupParticles(x, y) {
+  for (let i = 0; i < 35; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 40 + Math.random() * 100;
+    spawnParticle(x, y,
+      Math.cos(angle) * speed, Math.sin(angle) * speed,
+      `hsl(${30 + Math.random() * 30}, 100%, ${55 + Math.random() * 35}%)`,
+      0.5 + Math.random() * 0.7
+    );
+  }
+}
+
 function spawnGoalParticles(x, y) {
   for (let i = 0; i < 40; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -469,6 +527,12 @@ function loadLevel(idx) {
   }));
 
   ship.goal = { x: goalPos.x, y: goalPos.y, radius: GOAL_RADIUS };
+
+  // Resolve fuel station positions
+  ship.fuelStations = (lev.fuelStations || []).map(fs => ({
+    x: fs.x * W, y: fs.y * H,
+    collected: false
+  }));
 
   particles = [];
   trail = [];
@@ -644,6 +708,17 @@ function update(dt) {
   if (ship.y < -margin) { ship.y = -margin; ship.vy = Math.abs(ship.vy) * 0.5; }
   if (ship.y > H + margin) { ship.y = H + margin; ship.vy = -Math.abs(ship.vy) * 0.5; }
 
+  // Fuel station pickup check
+  for (const fs of ship.fuelStations) {
+    if (fs.collected) continue;
+    const fsDist = Math.sqrt((ship.x - fs.x) ** 2 + (ship.y - fs.y) ** 2);
+    if (fsDist < FUEL_STATION_RADIUS + SHIP_SIZE) {
+      fs.collected = true;
+      ship.fuel = ship.maxFuel;
+      spawnFuelPickupParticles(fs.x, fs.y);
+    }
+  }
+
   // Goal check
   const gDist = Math.sqrt((ship.x - ship.goal.x) ** 2 + (ship.y - ship.goal.y) ** 2);
   if (gDist < ship.goal.radius + SHIP_SIZE) {
@@ -769,6 +844,67 @@ function draw() {
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
+
+  // Fuel stations
+  for (const fs of ship.fuelStations) {
+    if (fs.collected) {
+      // Draw dimmed empty shell
+      ctx.globalAlpha = 0.15;
+      ctx.strokeStyle = '#f80';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(fs.x, fs.y, FUEL_STATION_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    const fsPulse = FUEL_STATION_RADIUS + 2 * Math.sin(time * 4);
+
+    // Outer glow
+    const fsGrad = ctx.createRadialGradient(fs.x, fs.y, fsPulse * 0.3, fs.x, fs.y, fsPulse * 2.5);
+    fsGrad.addColorStop(0, 'rgba(255,170,0,0.3)');
+    fsGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = fsGrad;
+    ctx.beginPath();
+    ctx.arc(fs.x, fs.y, fsPulse * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Core body
+    const fsBody = ctx.createRadialGradient(fs.x, fs.y, fsPulse * 0.15, fs.x, fs.y, fsPulse);
+    fsBody.addColorStop(0, '#fff');
+    fsBody.addColorStop(0.35, '#fa0');
+    fsBody.addColorStop(1, 'rgba(255,120,0,0.4)');
+    ctx.fillStyle = fsBody;
+    ctx.beginPath();
+    ctx.arc(fs.x, fs.y, fsPulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Fuel drop icon (diamond shape in center)
+    ctx.save();
+    ctx.translate(fs.x, fs.y);
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.moveTo(0, -7);
+    ctx.quadraticCurveTo(6, 0, 0, 7);
+    ctx.quadraticCurveTo(-6, 0, 0, -7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // Spinning arcs
+    for (let i = 0; i < 2; i++) {
+      const aOff = (Math.PI) * i + time * 3;
+      ctx.strokeStyle = '#fa0';
+      ctx.globalAlpha = 0.4;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(fs.x, fs.y, fsPulse + 5, aOff, aOff + 0.7);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
 
   // Trail
   for (let i = 0; i < trail.length; i++) {

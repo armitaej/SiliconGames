@@ -825,6 +825,25 @@ footer a:hover { color: var(--neon-pink); }
       </div>
     </div>
 
+    <div class="cabinet" data-game="hired" onclick="launchGame('games/hired.html', 'HIRED')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F4BC;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Hired</div>
+        <div class="game-desc">Build your company from a garage to a space elevator. Click to earn, hire employees for passive income, and upgrade your building. Pixel art idle tycoon.</div>
+        <div class="game-tags">
+          <span class="tag">Idle</span>
+          <span class="tag">Clicker</span>
+          <span class="tag">Tycoon</span>
+        </div>
+        <button class="play-btn" onclick="event.stopPropagation(); launchGame('games/hired.html', 'HIRED')">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="hired" onclick="event.stopPropagation(); toggleLike('hired')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+        </div>
+      </div>
+    </div>
+
     <div class="cabinet" data-game="bracket" onclick="launchGame('games/evan-bracket-2026.html', 'EVAN\'S 2026 MARCH MADNESS BRACKET')">
       <div class="cabinet-screen">
         <div class="screen-art">&#x1F3C0;</div>
