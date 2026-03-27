@@ -169,6 +169,7 @@
     <div class="info">
       <span><span class="label">Per Click</span><span id="per-click">$1</span></span>
       <span><span class="label">Per Sec</span><span id="per-sec">$0</span></span>
+      <span><span class="label">Multiplier</span><span id="multiplier-display" style="color:#fa4">x1</span></span>
       <span><span class="label">Employees</span><span id="emp-count">0</span></span>
     </div>
   </div>
@@ -219,29 +220,31 @@
 <script>
 // ==================== GAME DATA ====================
 
+// unlockTier = minimum building tier index required to hire this employee
 const EMPLOYEE_TYPES = [
-  { id: 'intern',    name: 'Intern',       icon: '👤', color: '#4a6', baseCost: 10,     costMult: 1.15, baseIncome: 1,     desc: '+$1/s each' },
-  { id: 'worker',    name: 'Worker',       icon: '👷', color: '#48f', baseCost: 100,    costMult: 1.15, baseIncome: 5,     desc: '+$5/s each' },
-  { id: 'analyst',   name: 'Analyst',      icon: '📊', color: '#a4f', baseCost: 1100,   costMult: 1.15, baseIncome: 25,    desc: '+$25/s each' },
-  { id: 'designer',  name: 'Designer',     icon: '🎨', color: '#f4a', baseCost: 12000,  costMult: 1.15, baseIncome: 120,   desc: '+$120/s each' },
-  { id: 'engineer',  name: 'Engineer',     icon: '⚙️', color: '#fa4', baseCost: 130000, costMult: 1.15, baseIncome: 600,   desc: '+$600/s each' },
-  { id: 'manager',   name: 'Manager',      icon: '💼', color: '#4af', baseCost: 1400000,costMult: 1.15, baseIncome: 3000,  desc: '+$3K/s each' },
-  { id: 'director',  name: 'Director',     icon: '🏛️', color: '#ff4', baseCost: 20000000,costMult:1.15, baseIncome: 15000, desc: '+$15K/s each' },
-  { id: 'vp',        name: 'VP',           icon: '⭐', color: '#f84', baseCost: 330000000,costMult:1.15,baseIncome: 80000,  desc: '+$80K/s each' },
-  { id: 'ceo',       name: 'CEO',          icon: '👑', color: '#ffd700',baseCost:5000000000,costMult:1.15,baseIncome:400000,desc: '+$400K/s each'},
+  { id: 'intern',    name: 'Intern',    icon: '👤', color: '#4a6',    baseCost: 10,          costMult: 1.15, baseIncome: 1,      desc: '+$1/s each',    unlockTier: 0 },
+  { id: 'worker',    name: 'Worker',    icon: '👷', color: '#48f',    baseCost: 100,         costMult: 1.15, baseIncome: 5,      desc: '+$5/s each',    unlockTier: 1 },
+  { id: 'analyst',   name: 'Analyst',   icon: '📊', color: '#a4f',    baseCost: 1100,        costMult: 1.15, baseIncome: 25,     desc: '+$25/s each',   unlockTier: 2 },
+  { id: 'designer',  name: 'Designer',  icon: '🎨', color: '#f4a',    baseCost: 12000,       costMult: 1.15, baseIncome: 120,    desc: '+$120/s each',  unlockTier: 2 },
+  { id: 'engineer',  name: 'Engineer',  icon: '⚙️', color: '#fa4',    baseCost: 130000,      costMult: 1.15, baseIncome: 600,    desc: '+$600/s each',  unlockTier: 3 },
+  { id: 'manager',   name: 'Manager',   icon: '💼', color: '#4af',    baseCost: 1400000,     costMult: 1.15, baseIncome: 3000,   desc: '+$3K/s each',   unlockTier: 4 },
+  { id: 'director',  name: 'Director',  icon: '🏛️', color: '#ff4',    baseCost: 20000000,    costMult: 1.15, baseIncome: 15000,  desc: '+$15K/s each',  unlockTier: 5 },
+  { id: 'vp',        name: 'VP',        icon: '⭐', color: '#f84',    baseCost: 330000000,   costMult: 1.15, baseIncome: 80000,  desc: '+$80K/s each',  unlockTier: 6 },
+  { id: 'ceo',       name: 'CEO',       icon: '👑', color: '#ffd700', baseCost: 5000000000,  costMult: 1.15, baseIncome: 400000, desc: '+$400K/s each', unlockTier: 7 },
 ];
 
+// incomeMultiplier: multiplies ALL passive income (stacks multiplicatively)
 const BUILDING_TIERS = [
-  { name: 'Garage',           cost: 0,          floors: 1, color: '#665544', roofColor: '#887766', windowColor: '#445566' },
-  { name: 'Small Office',     cost: 500,        floors: 2, color: '#556677', roofColor: '#778899', windowColor: '#aaccee' },
-  { name: 'Office Building',  cost: 5000,       floors: 3, color: '#667788', roofColor: '#8899aa', windowColor: '#bbddff' },
-  { name: 'Tall Office',      cost: 50000,      floors: 5, color: '#556688', roofColor: '#7788aa', windowColor: '#99ccff' },
-  { name: 'Business Tower',   cost: 500000,     floors: 8, color: '#4477aa', roofColor: '#5588bb', windowColor: '#aaddff' },
-  { name: 'Corporate HQ',     cost: 5000000,    floors: 12,color: '#336699', roofColor: '#4477aa', windowColor: '#88ccff' },
-  { name: 'Skyscraper',       cost: 50000000,   floors: 18,color: '#3366aa', roofColor: '#4488cc', windowColor: '#99ddff' },
-  { name: 'Mega Tower',       cost: 500000000,  floors: 25,color: '#2255aa', roofColor: '#3377cc', windowColor: '#aaeeff' },
-  { name: 'Global HQ',        cost: 5000000000, floors: 35,color: '#2244aa', roofColor: '#3366cc', windowColor: '#bbf0ff' },
-  { name: 'Space Elevator',   cost: 100000000000,floors:50,color: '#1133aa', roofColor: '#2255dd', windowColor: '#ccf4ff' },
+  { name: 'Garage',          cost: 0,             floors: 1,  color: '#665544', roofColor: '#887766', windowColor: '#445566', incomeMultiplier: 1.0,  bonus: 'Starting out' },
+  { name: 'Small Office',    cost: 500,           floors: 2,  color: '#556677', roofColor: '#778899', windowColor: '#aaccee', incomeMultiplier: 1.25, bonus: '+25% income', unlocks: 'Worker' },
+  { name: 'Office Building', cost: 5000,          floors: 3,  color: '#667788', roofColor: '#8899aa', windowColor: '#bbddff', incomeMultiplier: 1.6,  bonus: '+60% income', unlocks: 'Analyst & Designer' },
+  { name: 'Tall Office',     cost: 50000,         floors: 5,  color: '#556688', roofColor: '#7788aa', windowColor: '#99ccff', incomeMultiplier: 2.2,  bonus: '2.2x income', unlocks: 'Engineer' },
+  { name: 'Business Tower',  cost: 500000,        floors: 8,  color: '#4477aa', roofColor: '#5588bb', windowColor: '#aaddff', incomeMultiplier: 3.0,  bonus: '3x income',   unlocks: 'Manager' },
+  { name: 'Corporate HQ',    cost: 5000000,       floors: 12, color: '#336699', roofColor: '#4477aa', windowColor: '#88ccff', incomeMultiplier: 4.5,  bonus: '4.5x income', unlocks: 'Director' },
+  { name: 'Skyscraper',      cost: 50000000,      floors: 18, color: '#3366aa', roofColor: '#4488cc', windowColor: '#99ddff', incomeMultiplier: 7.0,  bonus: '7x income',   unlocks: 'VP' },
+  { name: 'Mega Tower',      cost: 500000000,     floors: 25, color: '#2255aa', roofColor: '#3377cc', windowColor: '#aaeeff', incomeMultiplier: 11.0, bonus: '11x income',  unlocks: 'CEO' },
+  { name: 'Global HQ',       cost: 5000000000,    floors: 35, color: '#2244aa', roofColor: '#3366cc', windowColor: '#bbf0ff', incomeMultiplier: 18.0, bonus: '18x income' },
+  { name: 'Space Elevator',  cost: 100000000000,  floors: 50, color: '#1133aa', roofColor: '#2255dd', windowColor: '#ccf4ff', incomeMultiplier: 30.0, bonus: '30x income' },
 ];
 
 const CLICK_UPGRADES = [
@@ -298,12 +301,20 @@ function getHireCost(empType) {
   return Math.floor(empType.baseCost * Math.pow(empType.costMult, count));
 }
 
+function getBuildingMultiplier() {
+  return BUILDING_TIERS[state.buildingTier].incomeMultiplier;
+}
+
 function getTotalIncome() {
   let total = 0;
   EMPLOYEE_TYPES.forEach(e => {
     total += state.employees[e.id] * e.baseIncome;
   });
-  return total;
+  return total * getBuildingMultiplier();
+}
+
+function isEmployeeUnlocked(emp) {
+  return state.buildingTier >= emp.unlockTier;
 }
 
 function getTotalEmployees() {
@@ -357,18 +368,33 @@ function buildHireButtons() {
   const list = document.getElementById('hire-list');
   list.innerHTML = '';
   EMPLOYEE_TYPES.forEach(emp => {
+    const unlocked = isEmployeeUnlocked(emp);
     const btn = document.createElement('button');
     btn.className = 'hire-btn';
     btn.id = 'hire-' + emp.id;
-    btn.onclick = () => hireEmployee(emp);
-    btn.innerHTML = `
-      <div class="btn-icon" style="background:${emp.color}22;border-color:${emp.color}44">${emp.icon}</div>
-      <div class="btn-info">
-        <div class="btn-name">${emp.name} <span class="btn-count" id="count-${emp.id}">x${state.employees[emp.id]}</span></div>
-        <div class="btn-detail">${emp.desc}</div>
-      </div>
-      <div class="btn-cost" id="cost-${emp.id}">${formatMoney(getHireCost(emp))}</div>
-    `;
+    if (unlocked) btn.onclick = () => hireEmployee(emp);
+
+    if (!unlocked) {
+      const reqTier = BUILDING_TIERS[emp.unlockTier];
+      btn.innerHTML = `
+        <div class="btn-icon" style="background:#22222244;border-color:#44444488;filter:grayscale(1)">🔒</div>
+        <div class="btn-info">
+          <div class="btn-name" style="color:#556">${emp.name}</div>
+          <div class="btn-detail" style="color:#445">Requires: ${reqTier.name}</div>
+        </div>
+        <div class="btn-cost" style="color:#445">${emp.desc}</div>
+      `;
+      btn.disabled = true;
+    } else {
+      btn.innerHTML = `
+        <div class="btn-icon" style="background:${emp.color}22;border-color:${emp.color}44">${emp.icon}</div>
+        <div class="btn-info">
+          <div class="btn-name">${emp.name} <span class="btn-count" id="count-${emp.id}">x${state.employees[emp.id]}</span></div>
+          <div class="btn-detail">${emp.desc}</div>
+        </div>
+        <div class="btn-cost" id="cost-${emp.id}">${formatMoney(getHireCost(emp))}</div>
+      `;
+    }
     list.appendChild(btn);
   });
 }
@@ -376,24 +402,34 @@ function buildHireButtons() {
 function buildUpgradeButtons() {
   const list = document.getElementById('upgrade-list');
   list.innerHTML = '';
+
+  // Show current building info at top
+  const cur = BUILDING_TIERS[state.buildingTier];
+  const curDiv = document.createElement('div');
+  curDiv.style.cssText = 'padding:10px 14px;font-size:7px;color:#fa0;border-bottom:1px solid #1a1a30;line-height:1.8';
+  curDiv.innerHTML = `▶ ${cur.name} &nbsp;|&nbsp; ${cur.bonus} &nbsp;|&nbsp; ${cur.floors} floors`;
+  list.appendChild(curDiv);
+
   BUILDING_TIERS.forEach((tier, i) => {
-    if (i <= state.buildingTier) return; // already bought or current
+    if (i <= state.buildingTier) return;
     const btn = document.createElement('button');
     btn.className = 'upgrade-btn';
     btn.id = 'upgrade-' + i;
     btn.onclick = () => upgradeBuildingTo(i);
+    const unlockLine = tier.unlocks ? `<div class="btn-detail" style="color:#8f8">🔓 Unlocks: ${tier.unlocks}</div>` : '';
     btn.innerHTML = `
       <div class="btn-icon" style="background:${tier.color}44;border-color:${tier.color}88">🏢</div>
       <div class="btn-info">
         <div class="btn-name">${tier.name}</div>
-        <div class="btn-detail">${tier.floors} floors</div>
+        <div class="btn-detail" style="color:#fa4">📈 ${tier.bonus}</div>
+        ${unlockLine}
       </div>
       <div class="btn-cost">${formatMoney(tier.cost)}</div>
     `;
     list.appendChild(btn);
   });
-  if (list.children.length === 0) {
-    list.innerHTML = '<div style="padding:14px;font-size:8px;color:#556;">MAX LEVEL!</div>';
+  if (list.querySelectorAll('button').length === 0) {
+    list.innerHTML += '<div style="padding:14px;font-size:8px;color:#556;">MAX LEVEL!</div>';
   }
 }
 
@@ -424,6 +460,7 @@ function buildClickUpgradeButtons() {
 // ==================== ACTIONS ====================
 
 function hireEmployee(emp) {
+  if (!isEmployeeUnlocked(emp)) return;
   const cost = getHireCost(emp);
   if (state.money < cost) return;
   state.money -= cost;
@@ -440,8 +477,10 @@ function upgradeBuildingTo(tierIndex) {
   state.buildingTier = tierIndex;
   updateUI();
   buildUpgradeButtons();
+  buildHireButtons(); // re-render in case new employees unlocked
   drawBuilding();
-  showNotification('Building Upgraded!', `Welcome to your new ${tier.name}!\n${tier.floors} floors of corporate glory.`);
+  const unlockMsg = tier.unlocks ? `\nUnlocked: ${tier.unlocks}!` : '';
+  showNotification('Building Upgraded!', `${tier.name}\n${tier.bonus}${unlockMsg}\n${tier.floors} floors of corporate glory.`);
 }
 
 function buyClickUpgrade(cu) {
@@ -470,22 +509,24 @@ function closeNotification() {
 function updateUI() {
   const income = getTotalIncome();
 
+  const mult = getBuildingMultiplier();
   document.getElementById('money-display').textContent = formatMoney(state.money);
   document.getElementById('per-click').textContent = formatMoney(state.clickPower);
   document.getElementById('per-sec').textContent = formatMoney(income) + '/s';
+  document.getElementById('multiplier-display').textContent = 'x' + mult;
   document.getElementById('emp-count').textContent = getTotalEmployees();
 
   // Update hire button states & costs
   EMPLOYEE_TYPES.forEach(emp => {
     const btn = document.getElementById('hire-' + emp.id);
+    if (!btn) return;
+    if (!isEmployeeUnlocked(emp)) return; // locked buttons stay disabled
     const costEl = document.getElementById('cost-' + emp.id);
     const countEl = document.getElementById('count-' + emp.id);
-    if (btn) {
-      const cost = getHireCost(emp);
-      btn.disabled = state.money < cost;
-      if (costEl) costEl.textContent = formatMoney(cost);
-      if (countEl) countEl.textContent = 'x' + state.employees[emp.id];
-    }
+    const cost = getHireCost(emp);
+    btn.disabled = state.money < cost;
+    if (costEl) costEl.textContent = formatMoney(cost);
+    if (countEl) countEl.textContent = 'x' + state.employees[emp.id];
   });
 
   // Update upgrade button states
