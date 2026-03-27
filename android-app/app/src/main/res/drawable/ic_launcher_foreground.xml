@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background glow -->
+    <path
+        android:fillColor="#1A00F0FF"
+        android:pathData="M54,54m-40,0a40,40 0,1,1 80,0a40,40 0,1,1 -80,0" />
+
+    <!-- Outer ring - neon cyan -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="2.5"
+        android:pathData="M54,54m-28,0a28,28 0,1,1 56,0a28,28 0,1,1 -56,0" />
+
+    <!-- Inner ring - neon pink -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF2D75"
+        android:strokeWidth="1.5"
+        android:pathData="M54,54m-20,0a20,20 0,1,1 40,0a20,20 0,1,1 -40,0" />
+
+    <!-- Controller/gamepad shape - "S" for Silicon -->
+    <!-- Left d-pad -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M42,48 L42,44 L46,44 L46,48 L50,48 L50,52 L46,52 L46,56 L42,56 L42,52 L38,52 L38,48 Z" />
+
+    <!-- Right buttons -->
+    <path
+        android:fillColor="#FF2D75"
+        android:pathData="M62,46m-3,0a3,3 0,1,1 6,0a3,3 0,1,1 -6,0" />
+    <path
+        android:fillColor="#39FF14"
+        android:pathData="M68,52m-3,0a3,3 0,1,1 6,0a3,3 0,1,1 -6,0" />
+    <path
+        android:fillColor="#B44DFF"
+        android:pathData="M62,58m-3,0a3,3 0,1,1 6,0a3,3 0,1,1 -6,0" />
+    <path
+        android:fillColor="#FFE600"
+        android:pathData="M56,52m-3,0a3,3 0,1,1 6,0a3,3 0,1,1 -6,0" />
+
+    <!-- Bottom accent line -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M38,66 L70,66"
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="1" />
+
+</vector>

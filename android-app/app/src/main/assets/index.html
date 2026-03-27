@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SiliconGames — Digital Arcade</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;700;900&display=swap');
+
+:root {
+  --neon-pink: #ff2d75;
+  --neon-cyan: #00f0ff;
+  --neon-green: #39ff14;
+  --neon-yellow: #ffe600;
+  --neon-purple: #b44dff;
+  --bg-dark: #0a0a12;
+  --bg-card: #111122;
+  --scanline-opacity: 0.04;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg-dark);
+  color: #e0e0e0;
+  font-family: 'Orbitron', 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* CRT Scanline overlay on the whole page */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, var(--scanline-opacity)) 2px,
+    rgba(0, 0, 0, var(--scanline-opacity)) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Animated grid background */
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,240,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,240,255,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: gridScroll 20s linear infinite;
+  z-index: 0;
+}
+@keyframes gridScroll {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(60px); }
+}
+
+/* Floating particles */
+.particles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+.particle {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  animation: float linear infinite;
+  opacity: 0;
+}
+@keyframes float {
+  0% { transform: translateY(100vh) scale(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+}
+
+/* Header */
+header {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 50px 20px 20px;
+}
+
+.logo {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(28px, 5vw, 56px);
+  letter-spacing: 4px;
+  color: #fff;
+  text-shadow:
+    0 0 10px var(--neon-cyan),
+    0 0 20px var(--neon-cyan),
+    0 0 40px var(--neon-cyan),
+    0 0 80px rgba(0,240,255,0.3);
+  animation: logoGlow 3s ease-in-out infinite alternate;
+  margin-bottom: 8px;
+}
+@keyframes logoGlow {
+  0% { text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan), 0 0 40px var(--neon-cyan), 0 0 80px rgba(0,240,255,0.3); }
+  100% { text-shadow: 0 0 5px var(--neon-pink), 0 0 15px var(--neon-pink), 0 0 30px var(--neon-pink), 0 0 60px rgba(255,45,117,0.3); }
+}
+
+.tagline {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(11px, 1.8vw, 16px);
+  color: var(--neon-cyan);
+  letter-spacing: 8px;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 6px;
+}
+
+.coin-counter {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 8px rgba(255,230,0,0.5);
+  margin-top: 10px;
+  animation: blink 1.2s steps(2) infinite;
+}
+@keyframes blink {
+  50% { opacity: 0.6; }
+}
+
+/* Decorative neon line */
+.neon-line {
+  width: 80%;
+  max-width: 700px;
+  height: 2px;
+  margin: 20px auto 40px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-pink), var(--neon-cyan), transparent);
+  box-shadow: 0 0 8px var(--neon-cyan), 0 0 16px rgba(0,240,255,0.3);
+  animation: lineShimmer 4s ease-in-out infinite;
+}
+@keyframes lineShimmer {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+/* Games Grid */
+.arcade-floor {
+  position: relative;
+  z-index: 10;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 28px;
+  justify-items: center;
+}
+
+/* Game Cabinet Card */
+.cabinet {
+  width: 100%;
+  max-width: 340px;
+  background: var(--bg-card);
+  border: 2px solid #222;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+.cabinet::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-pink), var(--neon-purple));
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.cabinet:hover::before {
+  opacity: 1;
+}
+.cabinet:hover {
+  transform: translateY(-8px) scale(1.02);
+  border-color: transparent;
+  box-shadow:
+    0 20px 60px rgba(0,240,255,0.15),
+    0 0 30px rgba(255,45,117,0.1);
+}
+
+.cabinet-screen {
+  width: 100%;
+  aspect-ratio: 16/10;
+  background: #080818;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* CRT effect on the game preview */
+.cabinet-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.08) 1px,
+    rgba(0, 0, 0, 0.08) 2px
+  );
+  pointer-events: none;
+}
+
+.screen-art {
+  font-size: 64px;
+  filter: drop-shadow(0 0 20px currentColor);
+  animation: cabinetPulse 2s ease-in-out infinite alternate;
+}
+@keyframes cabinetPulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 15px currentColor); }
+  100% { transform: scale(1.05); filter: drop-shadow(0 0 25px currentColor); }
+}
+
+/* Per-game colors */
+.cabinet[data-game="lolo"] .screen-art { color: var(--neon-pink); }
+.cabinet[data-game="lolo"] .game-title { color: var(--neon-pink); text-shadow: 0 0 10px rgba(255,45,117,0.5); }
+.cabinet[data-game="lolo"] .play-btn { background: var(--neon-pink); box-shadow: 0 0 20px rgba(255,45,117,0.4); }
+
+.cabinet[data-game="starwars"] .screen-art { color: var(--neon-yellow); }
+.cabinet[data-game="starwars"] .game-title { color: var(--neon-yellow); text-shadow: 0 0 10px rgba(255,230,0,0.5); }
+.cabinet[data-game="starwars"] .play-btn { background: var(--neon-yellow); color: #000; box-shadow: 0 0 20px rgba(255,230,0,0.4); }
+
+.cabinet[data-game="snake"] .screen-art { color: var(--neon-green); }
+.cabinet[data-game="snake"] .game-title { color: var(--neon-green); text-shadow: 0 0 10px rgba(57,255,20,0.5); }
+.cabinet[data-game="snake"] .play-btn { background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57,255,20,0.4); }
+
+.cabinet[data-game="ssb"] .screen-art { color: var(--neon-purple); }
+.cabinet[data-game="ssb"] .game-title { color: var(--neon-purple); text-shadow: 0 0 10px rgba(180,77,255,0.5); }
+.cabinet[data-game="ssb"] .play-btn { background: var(--neon-purple); box-shadow: 0 0 20px rgba(180,77,255,0.4); }
+
+
+.cabinet[data-game="jetfighter"] .screen-art { color: var(--neon-cyan); }
+.cabinet[data-game="jetfighter"] .game-title { color: var(--neon-cyan); text-shadow: 0 0 10px rgba(0,240,255,0.5); }
+.cabinet[data-game="jetfighter"] .play-btn { background: var(--neon-cyan); color: #000; box-shadow: 0 0 20px rgba(0,240,255,0.4); }
+
+.cabinet[data-game="maze"] .screen-art { color: var(--neon-purple); }
+.cabinet[data-game="maze"] .game-title { color: var(--neon-purple); text-shadow: 0 0 10px rgba(180,77,255,0.5); }
+.cabinet[data-game="maze"] .play-btn { background: var(--neon-purple); box-shadow: 0 0 20px rgba(180,77,255,0.4); }
+
+.cabinet[data-game="moto"] .screen-art { color: var(--neon-green); }
+.cabinet[data-game="moto"] .game-title { color: var(--neon-green); text-shadow: 0 0 10px rgba(57,255,20,0.5); }
+.cabinet[data-game="moto"] .play-btn { background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57,255,20,0.4); }
+
+.cabinet[data-game="kingdom"] .screen-art { color: var(--neon-green); }
+.cabinet[data-game="kingdom"] .game-title { color: var(--neon-green); text-shadow: 0 0 10px rgba(57,255,20,0.5); }
+.cabinet[data-game="kingdom"] .play-btn { background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57,255,20,0.4); }
+
+.cabinet[data-game="mking"] .screen-art { color: #DAA520; }
+.cabinet[data-game="mking"] .game-title { color: #DAA520; text-shadow: 0 0 10px rgba(218,165,32,0.5); }
+.cabinet[data-game="mking"] .play-btn { background: #DAA520; color: #000; box-shadow: 0 0 20px rgba(218,165,32,0.4); }
+
+.cabinet[data-game="towerdef"] .screen-art { color: var(--neon-yellow); }
+.cabinet[data-game="towerdef"] .game-title { color: var(--neon-yellow); text-shadow: 0 0 10px rgba(255,230,0,0.5); }
+.cabinet[data-game="towerdef"] .play-btn { background: var(--neon-yellow); color: #000; box-shadow: 0 0 20px rgba(255,230,0,0.4); }
+
+.cabinet[data-game="chess"] .screen-art { color: #8B4513; }
+.cabinet[data-game="chess"] .game-title { color: #8B4513; text-shadow: 0 0 10px rgba(139,69,19,0.5); }
+.cabinet[data-game="chess"] .play-btn { background: #8B4513; box-shadow: 0 0 20px rgba(139,69,19,0.4); }
+
+.cabinet[data-game="checkers"] .screen-art { color: #CD3333; }
+.cabinet[data-game="checkers"] .game-title { color: #CD3333; text-shadow: 0 0 10px rgba(205,51,51,0.5); }
+.cabinet[data-game="checkers"] .play-btn { background: #CD3333; box-shadow: 0 0 20px rgba(205,51,51,0.4); }
+
+.cabinet[data-game="bracket"] .screen-art { color: #DAA520; }
+.cabinet[data-game="bracket"] .game-title { color: #DAA520; text-shadow: 0 0 10px rgba(218,165,32,0.5); }
+.cabinet[data-game="bracket"] .play-btn { background: #DAA520; color: #000; box-shadow: 0 0 20px rgba(218,165,32,0.4); }
+
+.cabinet[data-game="sports"] .screen-art { color: #ff6b35; }
+.cabinet[data-game="sports"] .game-title { color: #ff6b35; text-shadow: 0 0 10px rgba(255,107,53,0.5); }
+.cabinet[data-game="sports"] .play-btn { background: #ff6b35; color: #000; box-shadow: 0 0 20px rgba(255,107,53,0.4); }
+
+.cabinet[data-game="slingshot"] .screen-art { color: #4af; }
+.cabinet[data-game="slingshot"] .game-title { color: #4af; text-shadow: 0 0 10px rgba(68,170,255,0.5); }
+.cabinet[data-game="slingshot"] .play-btn { background: #4af; color: #000; box-shadow: 0 0 20px rgba(68,170,255,0.4); }
+
+/* Slingshot level picker on card */
+.slingshot-level-picker { margin-bottom: 14px; }
+.slingshot-level-picker-label {
+  font-size: 9px; letter-spacing: 2px; color: #8af; text-transform: uppercase;
+  margin-bottom: 8px; font-family: 'Orbitron', sans-serif; opacity: 0.7;
+}
+.slingshot-level-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.sl-lvl-btn {
+  background: rgba(68,170,255,0.06); border: 1px solid rgba(68,170,255,0.2);
+  border-radius: 5px; color: #8af; font-size: 10px; font-weight: 600;
+  cursor: pointer; padding: 5px 2px; transition: all 0.15s;
+  font-family: 'Orbitron', sans-serif;
+}
+.sl-lvl-btn:hover { background: rgba(68,170,255,0.2); border-color: #4af; color: #fff; }
+.sl-lvl-btn.sl-active {
+  background: rgba(68,170,255,0.3); border-color: #4af; color: #fff;
+  box-shadow: 0 0 8px rgba(68,170,255,0.4);
+}
+
+.cabinet-info {
+  padding: 20px;
+  text-align: center;
+}
+
+.game-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+.game-desc {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.game-tags {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.tag {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #aaa;
+  font-family: 'Orbitron', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.play-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  padding: 10px 28px;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+.play-btn:hover {
+  transform: scale(1.08);
+  filter: brightness(1.2);
+}
+
+/* Game iframe overlay */
+#game-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  display: none;
+  flex-direction: column;
+}
+#game-overlay.active {
+  display: flex;
+}
+
+#game-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #0a0a16;
+  border-bottom: 2px solid #222;
+  min-height: 48px;
+  z-index: 10;
+}
+
+#game-topbar-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0,240,255,0.5);
+}
+
+.back-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  padding: 8px 18px;
+  background: none;
+  border: 2px solid var(--neon-pink);
+  color: var(--neon-pink);
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+.back-btn:hover {
+  background: var(--neon-pink);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(255,45,117,0.4);
+}
+
+#game-frame {
+  flex: 1;
+  border: none;
+  width: 100%;
+  background: #000;
+}
+
+/* Footer */
+footer {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 30px 20px 40px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  color: #444;
+  letter-spacing: 2px;
+}
+footer a {
+  color: var(--neon-cyan);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+footer a:hover { color: var(--neon-pink); }
+
+/* Visit counter */
+.visit-counter {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: var(--neon-green);
+  text-shadow: 0 0 8px rgba(57,255,20,0.5);
+  margin-top: 8px;
+}
+
+/* Like button */
+.game-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.like-btn {
+  background: none;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #888;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.like-btn:hover {
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+}
+.like-btn.liked {
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+  text-shadow: 0 0 6px rgba(255,45,117,0.5);
+}
+.like-btn .heart { font-size: 14px; }
+.hs-badge {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 6px rgba(255,230,0,0.4);
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+  .games-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .cabinet { max-width: 100%; }
+  header { padding: 30px 16px 16px; }
+  .logo { letter-spacing: 2px; }
+  .tagline { letter-spacing: 3px; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+
+<div class="particles" id="particles"></div>
+
+<header>
+  <div class="logo">SILICON GAMES</div>
+  <div class="tagline">Digital Arcade</div>
+  <div class="coin-counter">INSERT COIN TO PLAY</div>
+  <div class="visit-counter" id="visit-counter"></div>
+</header>
+
+<div class="neon-line"></div>
+
+<main class="arcade-floor">
+  <div class="games-grid">
+
+    <!-- Lolo's Quest -->
+    <div class="cabinet" data-game="lolo" onclick="launchGame('games/lolo-puzzle.html', 'LOLO\'S QUEST')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3AE;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Lolo's Quest</div>
+        <div class="game-desc">Navigate deadly dungeons, solve block puzzles, dodge enemies, and collect hearts to escape each level.</div>
+        <div class="game-tags">
+          <span class="tag">Puzzle</span>
+          <span class="tag">Action</span>
+          <span class="tag">10 Levels</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="lolo" onclick="event.stopPropagation(); toggleLike('lolo')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="lolo"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Star Wars: Galaxy Bounty -->
+    <div class="cabinet" data-game="starwars" onclick="launchGame('games/star_wars_game.html', 'STAR WARS: GALAXY BOUNTY')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F680;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Galaxy Bounty</div>
+        <div class="game-desc">Choose your bounty hunter and blast through the galaxy in this Star Wars-inspired space combat adventure.</div>
+        <div class="game-tags">
+          <span class="tag">Action</span>
+          <span class="tag">Space</span>
+          <span class="tag">Shooter</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="starwars" onclick="event.stopPropagation(); toggleLike('starwars')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="starwars"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Snake Gauntlet -->
+    <div class="cabinet" data-game="snake" onclick="launchGame('games/snake.html', 'SNAKE GAUNTLET')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F40D;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Snake Gauntlet</div>
+        <div class="game-desc">The classic snake game evolved — survive waves of challenges, power-ups, and obstacles in this intense gauntlet.</div>
+        <div class="game-tags">
+          <span class="tag">Classic</span>
+          <span class="tag">Arcade</span>
+          <span class="tag">Survival</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="snake" onclick="event.stopPropagation(); toggleLike('snake')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="snake"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Super Smash Bros N64 -->
+    <div class="cabinet" data-game="ssb" onclick="launchGame('games/ssb-n64.html', 'SUPER SMASH ARENA')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F4A5;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Smash Arena</div>
+        <div class="game-desc">16 fighters, one arena. Pick your character, master their specials, and smash your opponent off the stage.</div>
+        <div class="game-tags">
+          <span class="tag">Fighting</span>
+          <span class="tag">2 Player</span>
+          <span class="tag">16 Fighters</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="ssb" onclick="event.stopPropagation(); toggleLike('ssb')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="ssb"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Storm Eagle: Jet Combat -->
+    <div class="cabinet" data-game="jetfighter" onclick="launchGame('games/jet-fighter.html', 'STORM EAGLE: JET COMBAT')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x2708;&#xFE0F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Storm Eagle</div>
+        <div class="game-desc">Pilot a jet fighter through intense aerial combat. Dodge missiles, take down enemy squadrons, and rule the skies.</div>
+        <div class="game-tags">
+          <span class="tag">Shooter</span>
+          <span class="tag">Arcade</span>
+          <span class="tag">Combat</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="jetfighter" onclick="event.stopPropagation(); toggleLike('jetfighter')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="jetfighter"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shadow Labyrinth: 3D Maze -->
+    <div class="cabinet" data-game="maze" onclick="launchGame('games/maze-game.html', 'SHADOW LABYRINTH')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F30C;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Shadow Labyrinth</div>
+        <div class="game-desc">Find your way through a shifting 3D maze. Each turn could be a dead end — or the exit. Can you escape?</div>
+        <div class="game-tags">
+          <span class="tag">3D</span>
+          <span class="tag">Maze</span>
+          <span class="tag">Puzzle</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="maze" onclick="event.stopPropagation(); toggleLike('maze')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="maze"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pixel Moto: Excite Racer -->
+    <div class="cabinet" data-game="moto" onclick="launchGame('games/moto-racer.html', 'PIXEL MOTO: EXCITE RACER')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3CD;&#xFE0F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Pixel Moto</div>
+        <div class="game-desc">Tear through pixel-art tracks on your motorbike. Hit ramps, avoid crashes, and push for the fastest time.</div>
+        <div class="game-tags">
+          <span class="tag">Racing</span>
+          <span class="tag">Arcade</span>
+          <span class="tag">Pixel Art</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="moto" onclick="event.stopPropagation(); toggleLike('moto')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="moto"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mountain King -->
+    <div class="cabinet" data-game="mking" onclick="launchGame('games/mountain-king.html', 'MOUNTAIN KING')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x2694;&#xFE0F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Mountain King</div>
+        <div class="game-desc">Play as the legendary Mountain King! Stomp, stun, and smash through 11 stages of dark fantasy. Unlock Avatar form at level 6!</div>
+        <div class="game-tags">
+          <span class="tag">Action RPG</span>
+          <span class="tag">Dark Fantasy</span>
+          <span class="tag">11 Stages</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="mking" onclick="event.stopPropagation(); toggleLike('mking')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="mking"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legend of the Lost Kingdom -->
+    <div class="cabinet" data-game="kingdom" onclick="launchGame('games/legend-kingdom.html', 'LEGEND OF THE LOST KINGDOM')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F5E1;&#xFE0F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Legend of the Lost Kingdom</div>
+        <div class="game-desc">Explore a vast overworld and conquer 3 dungeons in this top-down Zelda-style adventure. Slay monsters, find keys, defeat bosses!</div>
+        <div class="game-tags">
+          <span class="tag">Adventure</span>
+          <span class="tag">RPG</span>
+          <span class="tag">3 Dungeons</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="kingdom" onclick="event.stopPropagation(); toggleLike('kingdom')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="kingdom"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tower Command: Tower Defense -->
+    <div class="cabinet" data-game="towerdef" onclick="launchGame('games/tower-defense.html', 'TOWER COMMAND')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3F0;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Tower Command</div>
+        <div class="game-desc">Build archer towers, mage spires, and cannons to defend your castle from waves of goblins, knights, and dragons.</div>
+        <div class="game-tags">
+          <span class="tag">Strategy</span>
+          <span class="tag">Tower Defense</span>
+          <span class="tag">Medieval</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="towerdef" onclick="event.stopPropagation(); toggleLike('towerdef')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="towerdefense"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chess Master -->
+    <div class="cabinet" data-game="chess" onclick="launchGame('games/chess.html', 'CHESS MASTER')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x265A;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Chess Master</div>
+        <div class="game-desc">Challenge the AI in the ultimate game of strategy. Classic wood board with full rules including castling, en passant, and promotion.</div>
+        <div class="game-tags">
+          <span class="tag">Strategy</span>
+          <span class="tag">Board Game</span>
+          <span class="tag">AI</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="chess" onclick="event.stopPropagation(); toggleLike('chess')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="chess"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Checkers Classic -->
+    <div class="cabinet" data-game="checkers" onclick="launchGame('games/checkers.html', 'CHECKERS CLASSIC')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x26C0;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Checkers Classic</div>
+        <div class="game-desc">Jump, capture, and crown your way to victory against a crafty AI opponent. Mandatory jumps, multi-captures, and king promotions.</div>
+        <div class="game-tags">
+          <span class="tag">Strategy</span>
+          <span class="tag">Board Game</span>
+          <span class="tag">AI</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="checkers" onclick="event.stopPropagation(); toggleLike('checkers')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="checkers"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cabinet" data-game="sports" onclick="launchGame('games/sports-arcade.html', 'SPORTS ARCADE')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3C6;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Sports Arcade</div>
+        <div class="game-desc">Six arcade sports in one! Basketball, football, baseball, hockey, soccer, and gaga ball — all phone friendly!</div>
+        <div class="game-tags">
+          <span class="tag">Basketball</span>
+          <span class="tag">Football</span>
+          <span class="tag">Baseball</span>
+          <span class="tag">Hockey</span>
+          <span class="tag">Soccer</span>
+          <span class="tag">Gaga Ball</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="sports" onclick="event.stopPropagation(); toggleLike('sports')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="sports"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slingshot -->
+    <div class="cabinet" data-game="slingshot" onclick="launchSlingshot()">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1FA90;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Slingshot</div>
+        <div class="game-desc">Navigate gravitational fields with limited thrust. Slingshot around planets to reach the portal across 14 punishing levels.</div>
+        <div class="game-tags">
+          <span class="tag">Physics</span>
+          <span class="tag">Space</span>
+          <span class="tag">14 Levels</span>
+        </div>
+        <div class="slingshot-level-picker" onclick="event.stopPropagation()">
+          <div class="slingshot-level-picker-label">Start at level</div>
+          <div class="slingshot-level-grid" id="slingshot-level-grid"></div>
+        </div>
+        <button class="play-btn" onclick="event.stopPropagation(); launchSlingshot()">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="slingshot" onclick="event.stopPropagation(); toggleLike('slingshot')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="slingshot"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cabinet" data-game="bracket" onclick="launchGame('games/evan-bracket-2026.html', 'EVAN\'S 2026 MARCH MADNESS BRACKET')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3C0;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">March Madness 2026</div>
+        <div class="game-desc">Evan's interactive NCAA bracket tracker. Live ESPN scores auto-update on refresh. Track picks vs. actual results with point scoring.</div>
+        <div class="game-tags">
+          <span class="tag">Bracket</span>
+          <span class="tag">NCAA</span>
+          <span class="tag">Live Scores</span>
+        </div>
+        <button class="play-btn">VIEW</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="bracket" onclick="event.stopPropagation(); toggleLike('bracket')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="bracket"></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  SILICON GAMES &copy; 2026 &mdash; Built by Cooper, Eli and Lucas Armitage &nbsp;&mdash;&nbsp; Last updated March 21, 2026
+</footer>
+
+<!-- Game Overlay -->
+<div id="game-overlay">
+  <div id="game-topbar">
+    <button class="back-btn" onclick="closeGame()">&#9664; BACK TO ARCADE</button>
+    <div id="game-topbar-title"></div>
+  </div>
+  <iframe id="game-frame" sandbox="allow-scripts allow-same-origin allow-popups allow-pointer-lock"></iframe>
+</div>
+
+<script>
+// Floating particles
+(function() {
+  const container = document.getElementById('particles');
+  const colors = ['#ff2d75', '#00f0ff', '#39ff14', '#b44dff', '#ffe600'];
+  for (let i = 0; i < 40; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.boxShadow = `0 0 6px ${p.style.background}`;
+    p.style.animationDuration = (8 + Math.random() * 16) + 's';
+    p.style.animationDelay = (Math.random() * 12) + 's';
+    p.style.width = (1.5 + Math.random() * 2.5) + 'px';
+    p.style.height = p.style.width;
+    container.appendChild(p);
+  }
+})();
+
+// Launch game in iframe
+function launchGame(url, title) {
+  const overlay = document.getElementById('game-overlay');
+  const frame = document.getElementById('game-frame');
+  const titleEl = document.getElementById('game-topbar-title');
+  frame.src = url;
+  titleEl.textContent = title;
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  // Auto-focus iframe so keyboard works immediately
+  frame.addEventListener('load', () => { frame.focus(); frame.contentWindow.focus(); }, { once: true });
+}
+
+// ESC key to close game
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeGame();
+});
+
+// Visit counter
+(function() {
+  let visits = parseInt(localStorage.getItem('sg_visits') || '0') + 1;
+  localStorage.setItem('sg_visits', visits);
+  document.getElementById('visit-counter').textContent = 'VISITS: ' + visits;
+})();
+
+// Like system
+function toggleLike(gameKey) {
+  const lsKey = 'sg_liked_' + gameKey;
+  const countKey = 'sg_likes_' + gameKey;
+  const isLiked = localStorage.getItem(lsKey) === '1';
+  let count = parseInt(localStorage.getItem(countKey) || '0');
+  if (isLiked) {
+    count = Math.max(0, count - 1);
+    localStorage.setItem(lsKey, '0');
+  } else {
+    count++;
+    localStorage.setItem(lsKey, '1');
+  }
+  localStorage.setItem(countKey, count);
+  refreshLikes();
+}
+
+function refreshLikes() {
+  document.querySelectorAll('.like-btn').forEach(btn => {
+    const key = btn.dataset.like;
+    const liked = localStorage.getItem('sg_liked_' + key) === '1';
+    const count = parseInt(localStorage.getItem('sg_likes_' + key) || '0');
+    btn.classList.toggle('liked', liked);
+    btn.querySelector('.heart').innerHTML = liked ? '&#9829;' : '&#9825;';
+    btn.querySelector('.like-count').textContent = count;
+  });
+}
+
+// High score badges on cards
+function refreshHighScoreBadges() {
+  document.querySelectorAll('[data-hs]').forEach(el => {
+    const key = el.dataset.hs;
+    const scores = JSON.parse(localStorage.getItem('sg_hs_' + key) || '[]');
+    if (scores.length > 0) {
+      el.textContent = 'BEST: ' + scores[0].score + ' (' + scores[0].name + ')';
+    }
+  });
+}
+
+refreshLikes();
+refreshHighScoreBadges();
+
+// Refresh badges when returning from a game
+function closeGame() {
+  const overlay = document.getElementById('game-overlay');
+  const frame = document.getElementById('game-frame');
+  frame.src = '';
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+  refreshLikes();
+  refreshHighScoreBadges();
+}
+
+// Slingshot level picker
+let slingshotStartLevel = 1;
+(function() {
+  const levelNames = [
+    'First Flight','Binary Stars','Gauntlet','Slingshot Alley','The Squeeze',
+    'Gravity Well','Orbital Dance','Event Horizon','The Maze','Dead Drift',
+    'Pulsar Corridor','Twin Titans','No Margin','Singularity'
+  ];
+  const grid = document.getElementById('slingshot-level-grid');
+  levelNames.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'sl-lvl-btn' + (i === 0 ? ' sl-active' : '');
+    btn.textContent = i + 1;
+    btn.title = name;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      slingshotStartLevel = i + 1;
+      grid.querySelectorAll('.sl-lvl-btn').forEach(b => b.classList.remove('sl-active'));
+      btn.classList.add('sl-active');
+    });
+    grid.appendChild(btn);
+  });
+})();
+
+function launchSlingshot() {
+  launchGame('games/Slingshot.html#' + slingshotStartLevel, 'SLINGSHOT');
+}
+
+// Coin counter text cycle
+const coinTexts = ['INSERT COIN TO PLAY', 'SELECT A GAME', 'PRESS START', 'PLAYER 1 READY'];
+let coinIdx = 0;
+setInterval(() => {
+  coinIdx = (coinIdx + 1) % coinTexts.length;
+  document.querySelector('.coin-counter').textContent = coinTexts[coinIdx];
+}, 2500);
+</script>
+</body>
+</html>

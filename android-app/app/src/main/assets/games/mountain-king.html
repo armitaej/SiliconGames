@@ -1,0 +1,1638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Mountain King</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #1a1a2e;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 960px;
+            height: 640px;
+            background: #0f0f1e;
+            border: 4px solid #DAA520;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(218, 165, 32, 0.3);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0);
+            z-index: 200;
+            display: none;
+        }
+
+        #menuScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a15;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+
+        #menuScreen h1 {
+            font-size: 72px;
+            color: #DAA520;
+            margin-bottom: 40px;
+            text-shadow: 0 0 20px rgba(218, 165, 32, 0.6);
+        }
+
+        #menuScreen p {
+            font-size: 24px;
+            color: #aaa;
+            margin-bottom: 20px;
+        }
+
+        #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 150;
+            display: none;
+            border: 2px solid #DAA520;
+        }
+
+        #gameOverScreen h1 {
+            font-size: 48px;
+            color: #DAA520;
+            margin-bottom: 20px;
+        }
+
+        #gameOverScreen p {
+            font-size: 20px;
+            margin: 10px 0;
+            color: #ccc;
+        }
+
+        #gameOverScreen button {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 18px;
+            background: #DAA520;
+            color: black;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #gameOverScreen button:hover {
+            background: #FFD700;
+        }
+
+        #victoryScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 150;
+            display: none;
+            border: 2px solid #DAA520;
+        }
+
+        #victoryScreen h1 {
+            font-size: 48px;
+            color: #DAA520;
+            margin-bottom: 20px;
+        }
+
+        #victoryScreen p {
+            font-size: 20px;
+            margin: 10px 0;
+            color: #ccc;
+        }
+
+        #victoryScreen button {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 18px;
+            background: #DAA520;
+            color: black;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #victoryScreen button:hover {
+            background: #FFD700;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="960" height="640"></canvas>
+        <div id="menuScreen">
+            <h1>MOUNTAIN KING</h1>
+            <p>A Dark Fantasy Adventure</p>
+            <p style="font-size: 14px; margin-top: 20px; color: #888;">WASD / Arrow Keys = Move &nbsp;|&nbsp; SPACE / Z = Attack</p>
+            <p style="font-size: 14px; color: #888;">Q = Stomp &nbsp;|&nbsp; E = Storm Bolt &nbsp;|&nbsp; R = Avatar (Lv6)</p>
+            <p style="font-size: 18px; margin-top: 30px;">Press SPACE to Begin</p>
+        </div>
+        <div id="gameOverScreen">
+            <h1>GAME OVER</h1>
+            <p>You have fallen in battle...</p>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <p>Stage Reached: <span id="finalStage">1</span></p>
+            <button onclick="location.reload()">Try Again</button>
+        </div>
+        <div id="victoryScreen">
+            <h1>VICTORY!</h1>
+            <p>You have defeated the Dark Lord!</p>
+            <p>Final Score: <span id="victoryScore">0</span></p>
+            <button onclick="location.reload()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Constants
+        const CANVAS_WIDTH = 960;
+        const CANVAS_HEIGHT = 640;
+        const TILE_SIZE = 32;
+        const GRID_WIDTH = 30;
+        const GRID_HEIGHT = 20;
+        const WORLD_WIDTH = GRID_WIDTH * TILE_SIZE;
+        const WORLD_HEIGHT = GRID_HEIGHT * TILE_SIZE;
+
+        // Tile types
+        const TILE = { FLOOR: 0, WALL: 1, EXIT: 2, ENEMY_SPAWN: 3, ITEM_SPAWN: 4, BOSS_SPAWN: 5 };
+
+        // Stage data
+        const STAGES = [
+            { name: "Dun Morogh", floorColor: "#e8f0ff", wallColor: "#4a6fa5", bgColor: "#2a4a7f" },
+            { name: "Ironforge Depths", floorColor: "#d0d0d0", wallColor: "#505050", bgColor: "#2a2a3a" },
+            { name: "Loch Modan", floorColor: "#90ee90", wallColor: "#3a5a2a", bgColor: "#1a3a1a" },
+            { name: "Wetlands", floorColor: "#a8d8a8", wallColor: "#4a7a4a", bgColor: "#1a3a1a" },
+            { name: "Duskwood", floorColor: "#6a4a3a", wallColor: "#3a2a1a", bgColor: "#1a0f0a" },
+            { name: "Redridge Mountains", floorColor: "#d4a574", wallColor: "#8b5a2b", bgColor: "#3a2a1a" },
+            { name: "Burning Steppes", floorColor: "#ff8c42", wallColor: "#8b4513", bgColor: "#2a1a0a" },
+            { name: "Blackrock Depths", floorColor: "#4a4a4a", wallColor: "#1a1a1a", bgColor: "#0f0f1a" },
+            { name: "Searing Gorge", floorColor: "#ff6b35", wallColor: "#8b3a1a", bgColor: "#1a0a0a" },
+            { name: "Blackrock Spire", floorColor: "#3a3a3a", wallColor: "#0a0a0a", bgColor: "#0f0f15" },
+            { name: "Throne of the Dark Lord", floorColor: "#2a1a3a", wallColor: "#1a0a2a", bgColor: "#0a050f" }
+        ];
+
+        // Sound system
+        class SoundEngine {
+            constructor() {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            playTone(freq, duration, type = 'sine', volume = 0.3) {
+                try {
+                    const now = this.audioContext.currentTime;
+                    const osc = this.audioContext.createOscillator();
+                    const gain = this.audioContext.createGain();
+
+                    osc.type = type;
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(volume, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+                    osc.connect(gain);
+                    gain.connect(this.audioContext.destination);
+
+                    osc.start(now);
+                    osc.stop(now + duration);
+                } catch (e) {
+                    // Silent fail
+                }
+            }
+
+            meleeHit() {
+                this.playTone(200, 0.1, 'sine', 0.2);
+                this.playTone(250, 0.05, 'sine', 0.15);
+            }
+
+            stompBoom() {
+                this.playTone(100, 0.3, 'sine', 0.3);
+                this.playTone(80, 0.25, 'sine', 0.2);
+            }
+
+            boltWhoosh() {
+                this.playTone(400, 0.15, 'sine', 0.2);
+                this.playTone(500, 0.1, 'sine', 0.15);
+            }
+
+            avatarHorn() {
+                this.playTone(600, 0.2, 'sine', 0.3);
+                this.playTone(800, 0.15, 'sine', 0.25);
+                this.playTone(1000, 0.1, 'sine', 0.2);
+            }
+
+            levelUp() {
+                this.playTone(500, 0.15, 'sine', 0.25);
+                this.playTone(700, 0.15, 'sine', 0.25);
+                this.playTone(900, 0.2, 'sine', 0.3);
+            }
+
+            enemyDeath() {
+                this.playTone(150, 0.1, 'sine', 0.15);
+                this.playTone(100, 0.15, 'sine', 0.2);
+            }
+
+            itemPickup() {
+                this.playTone(800, 0.05, 'sine', 0.2);
+                this.playTone(1000, 0.05, 'sine', 0.2);
+                this.playTone(1200, 0.08, 'sine', 0.25);
+            }
+        }
+
+        // Stage maps
+        function createStageMap(stageNum) {
+            const map = Array(GRID_HEIGHT).fill(null).map(() => Array(GRID_WIDTH).fill(TILE.FLOOR));
+
+            // Add random walls/corridors based on stage
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    if (Math.random() < 0.15 && x > 1 && x < GRID_WIDTH - 2 && y > 1 && y < GRID_HEIGHT - 2) {
+                        map[y][x] = TILE.WALL;
+                    }
+                }
+            }
+
+            // Create corridors
+            for (let i = 0; i < 4; i++) {
+                const sx = Math.floor(Math.random() * (GRID_WIDTH - 4)) + 2;
+                const sy = Math.floor(Math.random() * (GRID_HEIGHT - 4)) + 2;
+                for (let j = 0; j < 6; j++) {
+                    const x = sx + j;
+                    if (x < GRID_WIDTH) {
+                        map[sy][x] = TILE.FLOOR;
+                        if (sy > 0) map[sy - 1][x] = TILE.FLOOR;
+                        if (sy < GRID_HEIGHT - 1) map[sy + 1][x] = TILE.FLOOR;
+                    }
+                }
+            }
+
+            // Place exit far from start
+            map[GRID_HEIGHT - 2][GRID_WIDTH - 2] = TILE.EXIT;
+
+            // Place enemy spawns
+            for (let i = 0; i < 4; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * (GRID_WIDTH - 4)) + 2;
+                    y = Math.floor(Math.random() * (GRID_HEIGHT - 4)) + 2;
+                } while (map[y][x] !== TILE.FLOOR);
+                map[y][x] = TILE.ENEMY_SPAWN;
+            }
+
+            // Place item spawns
+            for (let i = 0; i < 2; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * (GRID_WIDTH - 4)) + 2;
+                    y = Math.floor(Math.random() * (GRID_HEIGHT - 4)) + 2;
+                } while (map[y][x] !== TILE.FLOOR);
+                map[y][x] = TILE.ITEM_SPAWN;
+            }
+
+            // Boss spawn on final stage
+            if (stageNum === 11) {
+                map[GRID_HEIGHT / 2 | 0][GRID_WIDTH / 2 | 0] = TILE.BOSS_SPAWN;
+            }
+
+            // Clear player spawn area (3x3 around tile 2,2)
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const cy = 2 + dy;
+                    const cx = 2 + dx;
+                    if (cy >= 0 && cy < GRID_HEIGHT && cx >= 0 && cx < GRID_WIDTH) {
+                        if (map[cy][cx] === TILE.WALL) {
+                            map[cy][cx] = TILE.FLOOR;
+                        }
+                    }
+                }
+            }
+
+            // Also clear exit area
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const cy = GRID_HEIGHT - 2 + dy;
+                    const cx = GRID_WIDTH - 2 + dx;
+                    if (cy >= 0 && cy < GRID_HEIGHT && cx >= 0 && cx < GRID_WIDTH) {
+                        if (map[cy][cx] === TILE.WALL) {
+                            map[cy][cx] = TILE.FLOOR;
+                        }
+                    }
+                }
+            }
+
+            return map;
+        }
+
+        // Particle system
+        class Particle {
+            constructor(x, y, vx, vy, life, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.life = life;
+                this.maxLife = life;
+                this.color = color;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.1;
+                this.life--;
+            }
+
+            draw(ctx, cameraX, cameraY) {
+                const alpha = this.life / this.maxLife;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x - cameraX, this.y - cameraY, 4, 4);
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // Item class
+        class Item {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.width = 16;
+                this.height = 16;
+                this.collected = false;
+            }
+
+            getColor() {
+                switch (this.type) {
+                    case 'health': return '#ff3333';
+                    case 'mana': return '#3333ff';
+                    case 'coin': return '#DAA520';
+                    case 'attackGem': return '#ff8800';
+                    case 'defenseGem': return '#33ff33';
+                    case 'speedBoots': return '#ffff00';
+                    case 'xpTome': return '#aa33ff';
+                    default: return '#ffffff';
+                }
+            }
+
+            draw(ctx, cameraX, cameraY) {
+                const screenX = this.x - cameraX;
+                const screenY = this.y - cameraY;
+                ctx.fillStyle = this.getColor();
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, 8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Enemy class
+        class Enemy {
+            constructor(type, x, y, stageNum) {
+                this.type = type;
+                this.x = x;
+                this.y = y;
+                this.stageNum = stageNum;
+                this.width = 24;
+                this.height = 24;
+                this.baseStats = this.getBaseStats(type);
+                const statMult = 1 + 0.3 * stageNum;
+                this.hp = this.baseStats.hp * statMult;
+                this.maxHp = this.hp;
+                // Speed caps at 2x base to prevent enemies from being invisible-fast
+                this.speed = this.baseStats.speed * Math.min(statMult, 2.0);
+                this.damage = this.baseStats.damage * statMult;
+                this.detectionRange = 200;
+                this.attackRange = 40;
+                this.color = this.getColor();
+                this.xpReward = this.baseStats.xpReward + stageNum * 10;
+                this.vx = 0;
+                this.vy = 0;
+                this.wanderTimer = 0;
+                this.chasing = false;
+                this.flashTimer = 0;
+                this.stunTimer = 0;
+                this.slowTimer = 0;
+                this.attackTimer = 0;
+            }
+
+            getBaseStats(type) {
+                const stats = {
+                    wolf: { hp: 30, speed: 2, damage: 8, xpReward: 20 },
+                    trogg: { hp: 40, speed: 1, damage: 10, xpReward: 25 },
+                    spider: { hp: 25, speed: 2.5, damage: 7, xpReward: 22 },
+                    murloc: { hp: 35, speed: 1.5, damage: 9, xpReward: 24 },
+                    skeleton: { hp: 45, speed: 1, damage: 11, xpReward: 30 },
+                    orc: { hp: 60, speed: 1.8, damage: 15, xpReward: 40 },
+                    ogre: { hp: 80, speed: 1.5, damage: 20, xpReward: 50 },
+                    elemental: { hp: 50, speed: 2, damage: 12, xpReward: 35 },
+                    dragon: { hp: 100, speed: 2.5, damage: 25, xpReward: 60 },
+                    demon: { hp: 90, speed: 2.2, damage: 22, xpReward: 55 }
+                };
+                return stats[type] || stats.wolf;
+            }
+
+            getColor() {
+                const colors = {
+                    wolf: '#888888',
+                    trogg: '#886633',
+                    spider: '#330033',
+                    murloc: '#336699',
+                    skeleton: '#ccccaa',
+                    orc: '#33aa33',
+                    ogre: '#666633',
+                    elemental: '#ff6666',
+                    dragon: '#aa3333',
+                    demon: '#990000'
+                };
+                return colors[this.type] || '#999999';
+            }
+
+            update(playerX, playerY, walls, enemies) {
+                // Stun/slow/cooldown
+                if (this.stunTimer > 0) {
+                    this.stunTimer--;
+                    this.vx = 0;
+                    this.vy = 0;
+                    return;
+                }
+
+                if (this.slowTimer > 0) {
+                    this.slowTimer--;
+                }
+
+                if (this.attackTimer > 0) {
+                    this.attackTimer--;
+                }
+
+                // Detection
+                const dx = playerX - this.x;
+                const dy = playerY - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < this.detectionRange) {
+                    this.chasing = true;
+                    const angle = Math.atan2(dy, dx);
+                    const speed = this.slowTimer > 0 ? this.speed * 0.5 : this.speed;
+                    this.vx = Math.cos(angle) * speed;
+                    this.vy = Math.sin(angle) * speed;
+                    this.wanderTimer = 0;
+                } else {
+                    this.chasing = false;
+                    this.wanderTimer--;
+                    if (this.wanderTimer <= 0) {
+                        this.vx = (Math.random() - 0.5) * this.speed;
+                        this.vy = (Math.random() - 0.5) * this.speed;
+                        this.wanderTimer = 60 + Math.random() * 60;
+                    }
+                }
+
+                // Collision with walls
+                const newX = this.x + this.vx;
+                const newY = this.y + this.vy;
+
+                let canMoveX = true;
+                let canMoveY = true;
+
+                for (let wall of walls) {
+                    if (this.checkCollisionWithTile(newX, this.y, wall)) canMoveX = false;
+                    if (this.checkCollisionWithTile(this.x, newY, wall)) canMoveY = false;
+                }
+
+                if (canMoveX) this.x = newX;
+                if (canMoveY) this.y = newY;
+
+                // Keep in bounds
+                this.x = Math.max(0, Math.min(WORLD_WIDTH - this.width, this.x));
+                this.y = Math.max(0, Math.min(WORLD_HEIGHT - this.height, this.y));
+
+                if (this.flashTimer > 0) this.flashTimer--;
+            }
+
+            checkCollisionWithTile(x, y, tile) {
+                return x < tile.x + tile.width &&
+                       x + this.width > tile.x &&
+                       y < tile.y + tile.height &&
+                       y + this.height > tile.y;
+            }
+
+            takeDamage(amount) {
+                this.hp -= amount;
+                this.flashTimer = 10;
+            }
+
+            draw(ctx, cameraX, cameraY) {
+                const screenX = this.x - cameraX;
+                const screenY = this.y - cameraY;
+
+                if (this.flashTimer > 0) {
+                    ctx.fillStyle = '#ffff00';
+                    ctx.globalAlpha = 0.7;
+                }
+
+                ctx.fillStyle = this.flashTimer > 0 ? '#ffff00' : this.color;
+                ctx.fillRect(screenX, screenY, this.width, this.height);
+
+                ctx.fillStyle = '#000000';
+                ctx.globalAlpha = 1;
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(Math.ceil(this.hp), screenX + this.width / 2, screenY - 5);
+            }
+        }
+
+        // Boss class
+        class Boss {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 48;
+                this.height = 48;
+                this.hp = 2000;
+                this.maxHp = 2000;
+                this.speed = 1.5;
+                this.damage = 40;
+                this.detectionRange = 400;
+                this.attackRange = 80;
+                this.color = '#660000';
+                this.vx = 0;
+                this.vy = 0;
+                this.flashTimer = 0;
+                this.attackTimer = 0;
+                this.attackMode = 0;
+                this.attackCycle = 0;
+                this.minionSpawner = 0;
+            }
+
+            update(playerX, playerY, walls) {
+                if (this.attackTimer > 0) {
+                    this.attackTimer--;
+                }
+
+                const dx = playerX - this.x;
+                const dy = playerY - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                this.attackCycle++;
+
+                if (dist < this.detectionRange) {
+                    // Attack patterns
+                    if (this.attackCycle % 120 < 40) {
+                        // Chase player
+                        const angle = Math.atan2(dy, dx);
+                        this.vx = Math.cos(angle) * this.speed;
+                        this.vy = Math.sin(angle) * this.speed;
+                    } else if (this.attackCycle % 120 < 80) {
+                        // Teleport towards player
+                        if (this.attackCycle % 120 === 40) {
+                            this.x = playerX + (Math.random() - 0.5) * 150;
+                            this.y = playerY + (Math.random() - 0.5) * 150;
+                        }
+                        this.vx = 0;
+                        this.vy = 0;
+                    } else {
+                        // Hover
+                        this.vx = (Math.random() - 0.5) * 0.5;
+                        this.vy = (Math.random() - 0.5) * 0.5;
+                    }
+                } else {
+                    this.vx *= 0.95;
+                    this.vy *= 0.95;
+                }
+
+                // Movement with wall collision
+                const newX = this.x + this.vx;
+                const newY = this.y + this.vy;
+
+                let canMoveX = true;
+                let canMoveY = true;
+
+                for (let wall of walls) {
+                    if (newX < wall.x + wall.width &&
+                        newX + this.width > wall.x &&
+                        this.y < wall.y + wall.height &&
+                        this.y + this.height > wall.y) canMoveX = false;
+                    if (this.x < wall.x + wall.width &&
+                        this.x + this.width > wall.x &&
+                        newY < wall.y + wall.height &&
+                        newY + this.height > wall.y) canMoveY = false;
+                }
+
+                if (canMoveX) this.x = newX;
+                if (canMoveY) this.y = newY;
+
+                this.x = Math.max(0, Math.min(WORLD_WIDTH - this.width, this.x));
+                this.y = Math.max(0, Math.min(WORLD_HEIGHT - this.height, this.y));
+
+                if (this.flashTimer > 0) this.flashTimer--;
+            }
+
+            takeDamage(amount) {
+                this.hp -= amount;
+                this.flashTimer = 10;
+            }
+
+            draw(ctx, cameraX, cameraY) {
+                const screenX = this.x - cameraX;
+                const screenY = this.y - cameraY;
+
+                // Draw boss
+                ctx.fillStyle = this.flashTimer > 0 ? '#ffff00' : this.color;
+                ctx.fillRect(screenX, screenY, this.width, this.height);
+
+                // Draw horns
+                ctx.fillStyle = '#aa3333';
+                ctx.beginPath();
+                ctx.moveTo(screenX + 10, screenY);
+                ctx.lineTo(screenX + 5, screenY - 15);
+                ctx.lineTo(screenX + 15, screenY);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(screenX + this.width - 10, screenY);
+                ctx.lineTo(screenX + this.width - 5, screenY - 15);
+                ctx.lineTo(screenX + this.width - 15, screenY);
+                ctx.fill();
+
+                // HP bar
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(screenX, screenY - 15, this.width, 10);
+                ctx.fillStyle = '#ff3333';
+                ctx.fillRect(screenX, screenY - 15, (this.hp / this.maxHp) * this.width, 10);
+            }
+        }
+
+        // Player class
+        class Player {
+            constructor(startX, startY) {
+                this.x = startX;
+                this.y = startY;
+                this.width = 24;
+                this.height = 24;
+                this.vx = 0;
+                this.vy = 0;
+                this.speed = 3;
+                this.hp = 150;
+                this.maxHp = 150;
+                this.mana = 100;
+                this.maxMana = 100;
+                this.attackPower = 30;
+                this.defense = 5;
+                this.level = 1;
+                this.xp = 0;
+                this.xpToNext = 80;
+                this.score = 0;
+                this.facing = 1; // 1 = right, -1 = left
+
+                // Attack
+                this.attackCooldown = 0;
+                this.attacking = false;
+                this.attackDuration = 0;
+
+                // Abilities
+                this.stomping = false;
+                this.stompCooldown = 0;
+                this.stompDuration = 10;
+                this.bolting = false;
+                this.boltCooldown = 0;
+                this.avatarActive = false;
+                this.avatarCooldown = 0;
+                this.avatarDuration = 0;
+
+                // Stats boost
+                this.atkBonus = 0;
+                this.defBonus = 0;
+                this.speedBonus = 0;
+
+                this.particles = [];
+            }
+
+            addParticle(x, y, vx, vy, life, color) {
+                this.particles.push(new Particle(x, y, vx, vy, life, color));
+            }
+
+            update(keys, walls) {
+                // Movement
+                this.vx = 0;
+                this.vy = 0;
+
+                const moveSpeed = this.speed + this.speedBonus;
+                if (keys['arrowup'] || keys['w']) {
+                    this.vy = -moveSpeed;
+                }
+                if (keys['arrowdown'] || keys['s']) {
+                    this.vy = moveSpeed;
+                }
+                if (keys['arrowleft'] || keys['a']) {
+                    this.vx = -moveSpeed;
+                    this.facing = -1;
+                }
+                if (keys['arrowright'] || keys['d']) {
+                    this.vx = moveSpeed;
+                    this.facing = 1;
+                }
+
+                // Avatar form affects speed
+                if (this.avatarActive) {
+                    this.vx *= 2;
+                    this.vy *= 2;
+                }
+
+                // Collision with walls
+                const newX = this.x + this.vx;
+                const newY = this.y + this.vy;
+
+                let canMoveX = true;
+                let canMoveY = true;
+
+                for (let wall of walls) {
+                    if (newX < wall.x + wall.width &&
+                        newX + this.width > wall.x &&
+                        this.y < wall.y + wall.height &&
+                        this.y + this.height > wall.y) canMoveX = false;
+                    if (this.x < wall.x + wall.width &&
+                        this.x + this.width > wall.x &&
+                        newY < wall.y + wall.height &&
+                        newY + this.height > wall.y) canMoveY = false;
+                }
+
+                if (canMoveX) this.x = newX;
+                if (canMoveY) this.y = newY;
+
+                this.x = Math.max(0, Math.min(WORLD_WIDTH - this.width, this.x));
+                this.y = Math.max(0, Math.min(WORLD_HEIGHT - this.height, this.y));
+
+                // Mana regen
+                if (this.mana < this.maxMana) {
+                    this.mana = Math.min(this.maxMana, this.mana + 0.02);
+                }
+
+                // Cooldowns
+                if (this.attackCooldown > 0) this.attackCooldown--;
+                if (this.stompCooldown > 0) this.stompCooldown--;
+                if (this.boltCooldown > 0) this.boltCooldown--;
+                if (this.avatarCooldown > 0) this.avatarCooldown--;
+
+                // Avatar duration
+                if (this.avatarActive) {
+                    this.avatarDuration--;
+                    if (this.avatarDuration <= 0) {
+                        this.avatarActive = false;
+                        this.avatarCooldown = 1800;
+                    }
+                }
+
+                // Attack duration
+                if (this.attackDuration > 0) {
+                    this.attackDuration--;
+                }
+
+                // Particles
+                for (let p of this.particles) {
+                    p.update();
+                }
+                this.particles = this.particles.filter(p => p.life > 0);
+            }
+
+            takeDamage(amount) {
+                const reduction = Math.floor(amount * (this.defense + this.defBonus) / 100);
+                const finalDamage = Math.max(1, amount - reduction);
+                this.hp = Math.max(0, this.hp - finalDamage);
+            }
+
+            heal(amount) {
+                this.hp = Math.min(this.maxHp, this.hp + amount);
+            }
+
+            addMana(amount) {
+                this.mana = Math.min(this.maxMana, this.mana + amount);
+            }
+
+            addXp(amount) {
+                this.xp += amount;
+                while (this.xp >= this.xpToNext) {
+                    this.levelUp();
+                }
+            }
+
+            levelUp() {
+                this.xp -= this.xpToNext;
+                this.level++;
+                this.maxHp += 20;
+                this.hp = this.maxHp;
+                this.maxMana += 10;
+                this.mana = this.maxMana;
+                this.attackPower += 5;
+                this.defense += 2;
+                this.speed += 0.2;
+                this.xpToNext = Math.floor(this.xpToNext * 1.15);
+
+                // Particles
+                for (let i = 0; i < 20; i++) {
+                    this.addParticle(
+                        this.x + this.width / 2,
+                        this.y + this.height / 2,
+                        (Math.random() - 0.5) * 8,
+                        (Math.random() - 0.5) * 8,
+                        30,
+                        '#FFD700'
+                    );
+                }
+            }
+
+            draw(ctx, cameraX, cameraY) {
+                const screenX = this.x - cameraX;
+                const screenY = this.y - cameraY;
+
+                // Avatar form glow
+                if (this.avatarActive) {
+                    ctx.fillStyle = 'rgba(68, 136, 255, 0.3)';
+                    ctx.beginPath();
+                    ctx.arc(screenX + this.width / 2, screenY + this.height / 2, 48, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Body
+                ctx.fillStyle = '#555555';
+                if (this.avatarActive) {
+                    ctx.fillRect(screenX - 12, screenY - 12, 48, 48);
+                } else {
+                    ctx.fillRect(screenX, screenY, this.width, this.height);
+                }
+
+                // Gold belt
+                ctx.fillStyle = '#DAA520';
+                if (this.avatarActive) {
+                    ctx.fillRect(screenX - 12, screenY + 18, 48, 6);
+                } else {
+                    ctx.fillRect(screenX, screenY + 10, this.width, 4);
+                }
+
+                // Helmet base
+                ctx.fillStyle = '#DAA520';
+                const helmetX = screenX + (this.avatarActive ? 6 : 3);
+                const helmetY = screenY + (this.avatarActive ? -12 : -6);
+                const helmetW = this.avatarActive ? 36 : 18;
+                const helmetH = this.avatarActive ? 18 : 9;
+                ctx.fillRect(helmetX, helmetY, helmetW, helmetH);
+
+                // Helmet horns
+                ctx.fillStyle = '#DAA520';
+                ctx.beginPath();
+                ctx.moveTo(helmetX + 4, helmetY);
+                ctx.lineTo(helmetX + 2, helmetY - 8);
+                ctx.lineTo(helmetX + 6, helmetY);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(helmetX + helmetW - 4, helmetY);
+                ctx.lineTo(helmetX + helmetW - 2, helmetY - 8);
+                ctx.lineTo(helmetX + helmetW - 6, helmetY);
+                ctx.fill();
+
+                // Attack hammer
+                if (this.attackDuration > 0) {
+                    ctx.strokeStyle = '#DAA520';
+                    ctx.lineWidth = 3;
+                    const angle = (this.stompDuration - this.attackDuration) * 0.1 * this.facing;
+                    const hammerX = screenX + this.width / 2 + Math.cos(angle) * 20;
+                    const hammerY = screenY + this.height / 2 + Math.sin(angle) * 20;
+                    ctx.beginPath();
+                    ctx.moveTo(screenX + this.width / 2, screenY + this.height / 2);
+                    ctx.lineTo(hammerX, hammerY);
+                    ctx.stroke();
+                }
+
+                // Particles
+                for (let p of this.particles) {
+                    p.draw(ctx, cameraX, cameraY);
+                }
+            }
+        }
+
+        // Main game class
+        class MountainKing {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.menuScreen = document.getElementById('menuScreen');
+                this.gameOverScreen = document.getElementById('gameOverScreen');
+                this.victoryScreen = document.getElementById('victoryScreen');
+
+                this.gameState = 'menu'; // menu, playing, gameOver, victory
+                this.currentStage = 0;
+                this.stageMap = [];
+                this.walls = [];
+                this.enemies = [];
+                this.items = [];
+                this.boss = null;
+                this.particles = [];
+
+                this.player = new Player(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+                this.sound = new SoundEngine();
+
+                this.keys = {};
+                this.cameraX = 0;
+                this.cameraY = 0;
+
+                this.stageIntroTimer = 0;
+                this.allEnemiesDefeated = false;
+                this.exitOpened = false;
+
+                this.setupEventListeners();
+                this.gameLoop();
+            }
+
+            setupEventListeners() {
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.key.toLowerCase()] = true;
+
+                    if (this.gameState === 'menu' && e.code === 'Space') {
+                        e.preventDefault();
+                        this.startGame();
+                    }
+
+                    if (this.gameState === 'playing') {
+                        if (e.key === 'z' || e.code === 'Space') {
+                            e.preventDefault();
+                            this.playerMeleeAttack();
+                        }
+                        if (e.key === 'q') {
+                            e.preventDefault();
+                            this.playerStomp();
+                        }
+                        if (e.key === 'e') {
+                            e.preventDefault();
+                            this.playerStormBolt();
+                        }
+                        if (e.key === 'r') {
+                            e.preventDefault();
+                            this.playerAvatar();
+                        }
+                    }
+                });
+
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.key.toLowerCase()] = false;
+                });
+            }
+
+            startGame() {
+                this.gameState = 'playing';
+                this.currentStage = 0;
+                this.player = new Player(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+                this.player.score = 0;
+                this.menuScreen.style.display = 'none';
+                this.loadStage(1);
+            }
+
+            loadStage(stageNum) {
+                this.currentStage = stageNum;
+                this.stageMap = createStageMap(stageNum);
+                this.walls = [];
+                this.enemies = [];
+                this.items = [];
+                this.boss = null;
+                this.particles = [];
+                this.stageIntroTimer = 90;
+                this.allEnemiesDefeated = false;
+                this.exitOpened = false;
+
+                // Parse tiles
+                for (let y = 0; y < GRID_HEIGHT; y++) {
+                    for (let x = 0; x < GRID_WIDTH; x++) {
+                        const tileType = this.stageMap[y][x];
+                        const worldX = x * TILE_SIZE;
+                        const worldY = y * TILE_SIZE;
+
+                        if (tileType === TILE.WALL) {
+                            this.walls.push({ x: worldX, y: worldY, width: TILE_SIZE, height: TILE_SIZE });
+                        } else if (tileType === TILE.ENEMY_SPAWN) {
+                            const enemyTypes = ['wolf', 'trogg', 'spider', 'murloc', 'skeleton', 'orc', 'ogre', 'elemental', 'dragon', 'demon'];
+                            const type = enemyTypes[Math.floor(Math.random() * Math.min(stageNum + 1, enemyTypes.length))];
+                            this.enemies.push(new Enemy(type, worldX + TILE_SIZE / 2, worldY + TILE_SIZE / 2, stageNum));
+                        } else if (tileType === TILE.ITEM_SPAWN) {
+                            const itemTypes = ['health', 'mana', 'coin', 'attackGem', 'defenseGem', 'speedBoots', 'xpTome'];
+                            const type = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+                            this.items.push(new Item(worldX + TILE_SIZE / 2, worldY + TILE_SIZE / 2, type));
+                        } else if (tileType === TILE.BOSS_SPAWN) {
+                            this.boss = new Boss(worldX + TILE_SIZE / 2, worldY + TILE_SIZE / 2);
+                        }
+                    }
+                }
+
+                // Reset player position
+                this.player.x = TILE_SIZE * 2;
+                this.player.y = TILE_SIZE * 2;
+            }
+
+            playerMeleeAttack() {
+                if (this.player.attackCooldown > 0) return;
+
+                this.player.attacking = true;
+                this.player.attackDuration = this.player.stompDuration;
+                this.player.attackCooldown = 20;
+                this.sound.meleeHit();
+
+                // Check enemy hits (center-to-center)
+                const atkCX = this.player.x + this.player.width / 2;
+                const atkCY = this.player.y + this.player.height / 2;
+                for (let enemy of this.enemies) {
+                    if (enemy.dead) continue;
+                    const dx = (enemy.x + enemy.width / 2) - atkCX;
+                    const dy = (enemy.y + enemy.height / 2) - atkCY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < this.player.attackPower * 2 + 40 && Math.abs(dx) < 60) {
+                        let damage = this.player.attackPower + this.player.atkBonus;
+                        if (Math.random() < 0.2) {
+                            damage *= 1.5;
+                            enemy.stunTimer = 60;
+                        }
+                        enemy.takeDamage(damage);
+                        if (enemy.hp <= 0) {
+                            this.playerDefeatEnemy(enemy);
+                        }
+                    }
+                }
+
+                // Boss hit
+                if (this.boss) {
+                    const dx = this.boss.x - this.player.x;
+                    const dy = this.boss.y - this.player.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < this.player.attackPower * 2 + 60 && Math.abs(dx) < 80) {
+                        let damage = this.player.attackPower + this.player.atkBonus;
+                        if (Math.random() < 0.2) {
+                            damage *= 1.5;
+                        }
+                        this.boss.takeDamage(damage);
+                        if (this.boss.hp <= 0) {
+                            this.defeatBoss();
+                        }
+                    }
+                }
+            }
+
+            playerStomp() {
+                if (this.player.stompCooldown > 0 || this.player.mana < 25) return;
+
+                this.player.mana -= 25;
+                this.player.stompCooldown = 180;
+                this.sound.stompBoom();
+
+                // Create expanding circle
+                for (let i = 0; i < 16; i++) {
+                    const angle = (i / 16) * Math.PI * 2;
+                    this.particles.push(new Particle(
+                        this.player.x + this.player.width / 2,
+                        this.player.y + this.player.height / 2,
+                        Math.cos(angle) * 4,
+                        Math.sin(angle) * 4,
+                        30,
+                        '#DAA520'
+                    ));
+                }
+
+                // Damage enemies
+                for (let enemy of this.enemies) {
+                    if (enemy.dead) continue;
+                    const dx = enemy.x - this.player.x;
+                    const dy = enemy.y - this.player.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 80) {
+                        const damage = 40 + this.player.level * 5;
+                        enemy.takeDamage(damage);
+                        enemy.slowTimer = 120;
+                        if (enemy.hp <= 0) {
+                            this.playerDefeatEnemy(enemy);
+                        }
+                    }
+                }
+
+                // Boss damage
+                if (this.boss) {
+                    const dx = this.boss.x - this.player.x;
+                    const dy = this.boss.y - this.player.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 100) {
+                        const damage = 40 + this.player.level * 5;
+                        this.boss.takeDamage(damage);
+                        if (this.boss.hp <= 0) {
+                            this.defeatBoss();
+                        }
+                    }
+                }
+            }
+
+            playerStormBolt() {
+                if (this.player.boltCooldown > 0 || this.player.mana < 35) return;
+
+                this.player.mana -= 35;
+                this.player.boltCooldown = 300;
+                this.sound.boltWhoosh();
+
+                // Find nearest enemy
+                let nearest = null;
+                let nearestDist = Infinity;
+
+                for (let enemy of this.enemies) {
+                    if (enemy.dead) continue;
+                    const dx = enemy.x - this.player.x;
+                    const dy = enemy.y - this.player.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < nearestDist) {
+                        nearestDist = dist;
+                        nearest = enemy;
+                    }
+                }
+
+                if (nearest) {
+                    const damage = 60 + this.player.level * 8;
+                    nearest.takeDamage(damage);
+                    nearest.stunTimer = 300;
+                    if (nearest.hp <= 0) {
+                        this.playerDefeatEnemy(nearest);
+                    }
+                }
+
+                // Boss bolt
+                if (this.boss && nearestDist > 500) {
+                    const damage = 60 + this.player.level * 8;
+                    this.boss.takeDamage(damage);
+                    this.boss.stunTimer = 300;
+                    if (this.boss.hp <= 0) {
+                        this.defeatBoss();
+                    }
+                }
+            }
+
+            playerAvatar() {
+                if (this.player.level < 6 || this.player.avatarCooldown > 0 || this.player.mana < 80) return;
+
+                this.player.mana -= 80;
+                this.player.avatarActive = true;
+                this.player.avatarDuration = 600;
+                this.sound.avatarHorn();
+
+                for (let i = 0; i < 30; i++) {
+                    this.particles.push(new Particle(
+                        this.player.x + this.player.width / 2,
+                        this.player.y + this.player.height / 2,
+                        (Math.random() - 0.5) * 6,
+                        (Math.random() - 0.5) * 6,
+                        60,
+                        '#4488ff'
+                    ));
+                }
+            }
+
+            playerDefeatEnemy(enemy) {
+                this.player.addXp(enemy.xpReward);
+                this.player.score += enemy.xpReward;
+                this.sound.enemyDeath();
+                // Mark for removal instead of filtering mid-loop
+                enemy.dead = true;
+
+                // Chance to drop item
+                if (Math.random() < 0.3) {
+                    const itemTypes = ['health', 'mana', 'coin', 'attackGem', 'defenseGem', 'speedBoots', 'xpTome'];
+                    const type = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+                    this.items.push(new Item(enemy.x, enemy.y, type));
+                }
+            }
+
+            // Called once per frame after all combat is resolved
+            cleanupDead() {
+                const hadEnemies = this.enemies.length > 0;
+                this.enemies = this.enemies.filter(e => !e.dead);
+                this.items = this.items.filter(i => !i.collected);
+                if (hadEnemies && this.enemies.length === 0 && !this.boss) {
+                    this.allEnemiesDefeated = true;
+                    this.exitOpened = true;
+                }
+            }
+
+            defeatBoss() {
+                this.player.addXp(200);
+                this.player.score += 500;
+                this.sound.enemyDeath();
+                this.boss = null;
+                this.gameState = 'victory';
+                this.victoryScreen.style.display = 'block';
+                document.getElementById('victoryScore').textContent = this.player.score;
+                setTimeout(() => showHS(this.player.score), 1500);
+            }
+
+            updateCamera() {
+                this.cameraX = this.player.x - CANVAS_WIDTH / 2 + this.player.width / 2;
+                this.cameraY = this.player.y - CANVAS_HEIGHT / 2 + this.player.height / 2;
+
+                this.cameraX = Math.max(0, Math.min(WORLD_WIDTH - CANVAS_WIDTH, this.cameraX));
+                this.cameraY = Math.max(0, Math.min(WORLD_HEIGHT - CANVAS_HEIGHT, this.cameraY));
+            }
+
+            update() {
+                if (this.gameState !== 'playing') return;
+
+                // Update stage intro
+                if (this.stageIntroTimer > 0) {
+                    this.stageIntroTimer--;
+                }
+
+                // Player update
+                this.player.update(this.keys, this.walls);
+
+                // Enemy updates
+                for (let enemy of this.enemies) {
+                    if (enemy.dead) continue;
+                    enemy.update(this.player.x, this.player.y, this.walls, this.enemies);
+                }
+
+                // Boss update
+                if (this.boss) {
+                    this.boss.update(this.player.x, this.player.y, this.walls);
+                }
+
+                // Enemy collisions with player (center-to-center distance)
+                const pcx = this.player.x + this.player.width / 2;
+                const pcy = this.player.y + this.player.height / 2;
+
+                for (let enemy of this.enemies) {
+                    if (enemy.dead) continue;
+                    const dx = (enemy.x + enemy.width / 2) - pcx;
+                    const dy = (enemy.y + enemy.height / 2) - pcy;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < this.player.width / 2 + enemy.width / 2 && enemy.attackTimer === 0) {
+                        this.player.takeDamage(enemy.damage);
+                        enemy.attackTimer = 30;
+                    }
+                }
+
+                // Boss collision with player (center-to-center distance)
+                if (this.boss) {
+                    const dx = (this.boss.x + this.boss.width / 2) - pcx;
+                    const dy = (this.boss.y + this.boss.height / 2) - pcy;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < this.player.width / 2 + this.boss.width / 2 && this.boss.attackTimer === 0) {
+                        this.player.takeDamage(this.boss.damage);
+                        this.boss.attackTimer = 40;
+                    }
+                }
+
+                // Item collection
+                for (let item of this.items) {
+                    if (!item.collected) {
+                        const dx = item.x - this.player.x;
+                        const dy = item.y - this.player.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist < 30) {
+                            item.collected = true;
+                            this.sound.itemPickup();
+
+                            switch (item.type) {
+                                case 'health':
+                                    this.player.heal(50);
+                                    break;
+                                case 'mana':
+                                    this.player.addMana(40);
+                                    break;
+                                case 'coin':
+                                    this.player.score += 10;
+                                    break;
+                                case 'attackGem':
+                                    this.player.atkBonus += 5;
+                                    this.player.score += 50;
+                                    break;
+                                case 'defenseGem':
+                                    this.player.defBonus += 3;
+                                    this.player.score += 50;
+                                    break;
+                                case 'speedBoots':
+                                    this.player.speedBonus += 0.5;
+                                    this.player.score += 50;
+                                    break;
+                                case 'xpTome':
+                                    this.player.addXp(50);
+                                    this.player.score += 30;
+                                    break;
+                            }
+                        }
+                    }
+                }
+
+                // Exit detection
+                if (this.exitOpened && !this.boss) {
+                    for (let y = 0; y < GRID_HEIGHT; y++) {
+                        for (let x = 0; x < GRID_WIDTH; x++) {
+                            if (this.stageMap[y][x] === TILE.EXIT) {
+                                const tileX = x * TILE_SIZE;
+                                const tileY = y * TILE_SIZE;
+                                const dx = this.player.x - (tileX + TILE_SIZE / 2);
+                                const dy = this.player.y - (tileY + TILE_SIZE / 2);
+                                if (Math.sqrt(dx * dx + dy * dy) < 30) {
+                                    if (this.currentStage < 11) {
+                                        this.loadStage(this.currentStage + 1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Cleanup dead enemies and collected items
+                this.cleanupDead();
+
+                // Game over check
+                if (this.player.hp <= 0) {
+                    this.gameState = 'gameOver';
+                    this.gameOverScreen.style.display = 'block';
+                    document.getElementById('finalScore').textContent = this.player.score;
+                    document.getElementById('finalStage').textContent = this.currentStage;
+                    setTimeout(() => showHS(this.player.score), 500);
+                }
+
+                this.updateCamera();
+            }
+
+            draw() {
+                if (this.gameState === 'menu') {
+                    this.ctx.fillStyle = '#0a0a15';
+                    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                    return;
+                }
+
+                const stage = STAGES[this.currentStage - 1];
+                if (!stage) {
+                    this.ctx.fillStyle = '#0a0a15';
+                    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                    return;
+                }
+                this.ctx.fillStyle = stage.bgColor;
+                this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+                // Draw tiles
+                this.ctx.fillStyle = stage.floorColor;
+                for (let y = 0; y < GRID_HEIGHT; y++) {
+                    for (let x = 0; x < GRID_WIDTH; x++) {
+                        const tileType = this.stageMap[y][x];
+                        const screenX = x * TILE_SIZE - this.cameraX;
+                        const screenY = y * TILE_SIZE - this.cameraY;
+
+                        if (tileType === TILE.WALL) {
+                            this.ctx.fillStyle = stage.wallColor;
+                            this.ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                        } else if (tileType === TILE.EXIT) {
+                            this.ctx.fillStyle = this.exitOpened ? '#00aa00' : '#333333';
+                            this.ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                            this.ctx.strokeStyle = '#ffff00';
+                            this.ctx.lineWidth = 2;
+                            this.ctx.strokeRect(screenX + 2, screenY + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                        } else {
+                            this.ctx.fillStyle = stage.floorColor;
+                            this.ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                            this.ctx.strokeStyle = stage.wallColor;
+                            this.ctx.lineWidth = 0.5;
+                            this.ctx.strokeRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                        }
+                    }
+                }
+
+                // Draw items
+                for (let item of this.items) {
+                    if (!item.collected) {
+                        item.draw(this.ctx, this.cameraX, this.cameraY);
+                    }
+                }
+
+                // Draw enemies
+                for (let enemy of this.enemies) {
+                    enemy.draw(this.ctx, this.cameraX, this.cameraY);
+                }
+
+                // Draw boss
+                if (this.boss) {
+                    this.boss.draw(this.ctx, this.cameraX, this.cameraY);
+                }
+
+                // Draw player
+                this.player.draw(this.ctx, this.cameraX, this.cameraY);
+
+                // Draw particles
+                for (let p of this.particles) {
+                    p.draw(this.ctx, this.cameraX, this.cameraY);
+                }
+
+                // Draw HUD
+                this.drawHUD();
+
+                // Draw stage intro
+                if (this.stageIntroTimer > 0) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, ' + (1 - this.stageIntroTimer / 90) * 0.7 + ')';
+                    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                    this.ctx.fillStyle = '#DAA520';
+                    this.ctx.font = 'bold 48px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText('Stage ' + this.currentStage + ': ' + stage.name, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+                }
+            }
+
+            drawHUD() {
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = 'bold 14px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.textBaseline = 'top';
+
+                // Left side
+                let y = 10;
+                this.ctx.fillText('HP: ' + Math.ceil(this.player.hp) + '/' + this.player.maxHp, 10, y);
+                y += 20;
+                this.ctx.fillText('MANA: ' + Math.ceil(this.player.mana) + '/' + this.player.maxMana, 10, y);
+                y += 20;
+                this.ctx.fillText('XP: ' + Math.ceil(this.player.xp) + '/' + this.player.xpToNext, 10, y);
+                y += 20;
+                this.ctx.fillText('LVL ' + this.player.level, 10, y);
+
+                // HP bar
+                this.ctx.fillStyle = '#333333';
+                this.ctx.fillRect(10, 52, 100, 10);
+                this.ctx.fillStyle = '#ff3333';
+                this.ctx.fillRect(10, 52, (this.player.hp / this.player.maxHp) * 100, 10);
+
+                // Mana bar
+                this.ctx.fillStyle = '#333333';
+                this.ctx.fillRect(10, 72, 100, 10);
+                this.ctx.fillStyle = '#3333ff';
+                this.ctx.fillRect(10, 72, (this.player.mana / this.player.maxMana) * 100, 10);
+
+                // XP bar
+                this.ctx.fillStyle = '#333333';
+                this.ctx.fillRect(10, 92, 100, 10);
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.fillRect(10, 92, (this.player.xp / this.player.xpToNext) * 100, 10);
+
+                // Right side
+                this.ctx.textAlign = 'right';
+                y = 10;
+                this.ctx.fillText('SCORE: ' + this.player.score, CANVAS_WIDTH - 10, y);
+                y += 20;
+                this.ctx.fillText(STAGES[this.currentStage - 1].name, CANVAS_WIDTH - 10, y);
+                y += 20;
+                this.ctx.fillStyle = '#DAA520';
+                this.ctx.fillText('ATK: ' + (this.player.attackPower + this.player.atkBonus), CANVAS_WIDTH - 10, y);
+                y += 20;
+                this.ctx.fillText('DEF: ' + (this.player.defense + this.player.defBonus), CANVAS_WIDTH - 10, y);
+                y += 20;
+                this.ctx.fillText('SPD: ' + (this.player.speed + this.player.speedBonus).toFixed(1), CANVAS_WIDTH - 10, y);
+
+                // Ability icons at bottom
+                this.ctx.textAlign = 'center';
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = 'bold 12px Arial';
+
+                const abilityY = CANVAS_HEIGHT - 40;
+                const abilities = [
+                    { key: 'Q', name: 'STOMP', cooldown: this.player.stompCooldown, maxCooldown: 180, cost: 25 },
+                    { key: 'E', name: 'BOLT', cooldown: this.player.boltCooldown, maxCooldown: 300, cost: 35 },
+                    { key: 'R', name: 'AVATAR', cooldown: this.player.avatarCooldown, maxCooldown: 1800, cost: 80 }
+                ];
+
+                let abilityX = CANVAS_WIDTH / 2 - 80;
+                for (let ability of abilities) {
+                    const isAvailable = ability.cooldown === 0 && this.player.mana >= ability.cost;
+                    this.ctx.fillStyle = isAvailable ? '#00ff00' : '#666666';
+                    this.ctx.fillRect(abilityX, abilityY, 40, 30);
+
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.fillText(ability.key, abilityX + 20, abilityY + 5);
+                    this.ctx.font = '10px Arial';
+                    this.ctx.fillText(ability.name, abilityX + 20, abilityY + 16);
+
+                    if (ability.cooldown > 0) {
+                        const percent = Math.ceil((ability.cooldown / ability.maxCooldown) * 100);
+                        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                        this.ctx.fillRect(abilityX, abilityY, 40, 30);
+                        this.ctx.fillStyle = '#ffffff';
+                        this.ctx.font = '8px Arial';
+                        this.ctx.fillText(percent + '%', abilityX + 20, abilityY + 15);
+                    }
+
+                    abilityX += 50;
+                    this.ctx.font = 'bold 12px Arial';
+                }
+            }
+
+            gameLoop() {
+                try {
+                    this.update();
+                    this.draw();
+                } catch (e) {
+                    console.error('Game loop error:', e);
+                }
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        }
+
+        // High score functions
+        const HS_KEY = 'sg_hs_mountainking';
+        function getHS() { try { return JSON.parse(localStorage.getItem(HS_KEY)) || []; } catch(e) { return []; } }
+        function showHS(score) {
+            const ol = document.getElementById('hs-overlay');
+            ol.style.display = 'flex';
+            const scores = getHS();
+            document.getElementById('hs-game-score').textContent = 'YOUR SCORE: ' + score;
+            const listEl = document.getElementById('hs-list');
+            listEl.innerHTML = scores.length ? scores.map((s,i) => `<div style="display:flex;justify-content:space-between;padding:2px 0;color:${i<3?'#ff0':'#aaa'};font-size:12px"><span>${i+1}. ${s.name}</span><span>${s.score}</span></div>`).join('') : '<div style="color:#666;text-align:center;font-size:12px">No scores yet</div>';
+            const isHigh = scores.length < 10 || score > (scores[scores.length-1]?.score || 0);
+            document.getElementById('hs-input').style.display = isHigh ? 'block' : 'none';
+            document.getElementById('hs-save-btn').style.display = isHigh ? 'inline-block' : 'none';
+            if (isHigh) document.getElementById('hs-name').focus();
+        }
+        function saveHS() {
+            const name = document.getElementById('hs-name').value.trim() || 'PLAYER';
+            const score = parseInt(document.getElementById('hs-game-score').textContent.replace(/\D/g,'')) || 0;
+            const scores = getHS();
+            scores.push({name, score});
+            scores.sort((a,b) => b.score - a.score);
+            if (scores.length > 10) scores.length = 10;
+            localStorage.setItem(HS_KEY, JSON.stringify(scores));
+            document.getElementById('hs-save-btn').style.display = 'none';
+            document.getElementById('hs-input').style.display = 'none';
+            showHS(score);
+        }
+        function closeHS() { document.getElementById('hs-overlay').style.display = 'none'; }
+
+        // Start the game
+        const game = new MountainKing();
+    </script>
+<div id="hs-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:none;justify-content:center;align-items:center;z-index:10000;flex-direction:column">
+  <div style="background:#1a1a2e;border:3px solid #DAA520;border-radius:8px;padding:24px;max-width:320px;width:90%;box-shadow:0 0 20px rgba(218,165,32,0.4)">
+    <h2 style="color:#DAA520;text-align:center;margin:0 0 12px 0;font-size:18px;font-family:Courier New">HIGH SCORES</h2>
+    <div id="hs-game-score" style="color:#ff0;text-align:center;font-size:14px;margin-bottom:16px;font-family:Courier New;font-weight:bold">YOUR SCORE: 0</div>
+    <div id="hs-list" style="margin-bottom:16px;font-family:Courier New;max-height:180px;overflow-y:auto"></div>
+    <div id="hs-input" style="display:none;margin-bottom:12px">
+      <input id="hs-name" type="text" placeholder="Enter name..." maxlength="16" style="width:100%;padding:8px;background:#0a0a1a;border:2px solid #DAA520;color:#DAA520;font-family:Courier New;font-size:12px;box-sizing:border-box">
+    </div>
+    <div style="text-align:center">
+      <button id="hs-save-btn" style="display:none;padding:8px 16px;margin-right:8px;background:#DAA520;color:#000;border:none;border-radius:4px;cursor:pointer;font-family:Courier New;font-weight:bold;font-size:12px">SAVE</button>
+      <button id="hs-close-btn" style="padding:8px 16px;background:#ff0;color:#000;border:none;border-radius:4px;cursor:pointer;font-family:Courier New;font-weight:bold;font-size:12px">CLOSE</button>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById('hs-save-btn').addEventListener('click', saveHS);
+document.getElementById('hs-close-btn').addEventListener('click', closeHS);
+document.getElementById('hs-name').addEventListener('keypress', (e) => { if(e.key === 'Enter') saveHS(); });
+</script>
+</body>
+</html>

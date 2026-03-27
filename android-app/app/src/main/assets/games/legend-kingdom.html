@@ -1,0 +1,1900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Legend of the Lost Kingdom</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        #game {
+            display: block;
+            border: 4px solid #0ff;
+            background: #000;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game"></canvas>
+
+    <script>
+        // ============================================================================
+        // GAME CONSTANTS
+        // ============================================================================
+        const TILE_SIZE = 32;
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 600;
+        const FPS = 60;
+
+        // ============================================================================
+        // TILE DEFINITIONS
+        // ============================================================================
+        const TILE_TYPES = {
+            FLOOR: 0,
+            WALL: 1,
+            DOOR: 2,
+            ENEMY_SPAWN: 3,
+            ITEM_SPAWN: 4,
+            BOSS_SPAWN: 5,
+            CHEST: 6
+        };
+
+        // ============================================================================
+        // CANVAS SETUP
+        // ============================================================================
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+
+        // ============================================================================
+        // CHARACTER SPRITES
+        // ============================================================================
+        const spriteImgLook = new Image(); spriteImgLook.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAwCAYAAABqkJjhAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqAxUPLwRFQfRwAAAIG3pUWHRSYXcgcHJvZmlsZSB0eXBlIGFwcDExAAB4nO2cS3okqQ6F56yilgBCIFgOz3Hvf9RHhMPO9LvunfRArq+ckRHEj54HmNi1f/4Jwf358ydETt5xS95TCP76OZ+RC+UmKc9ML7fXy3fOMZL4jHH6TvDlPG/N4bVSuwQf34ZcsDSeYSyPMHw+wZzS3mCShPKK7YbiCoZnipI5hkixEkAx5hyJJp6EWLNeVYdbNQZc6iflhIcpE0AlpuhzfHGZUn22j+qTfcFJfO/tR2dp5SBRYoa9wrnmnZfcU/h1kO4hBuFtDti0hb6aIjxNkaPC3UWnJfD6niOUMzBmEGoSRGfMGv30mdoeY/XJUusKKV/jG0LgrrlbyHKzL3QJDSF9vJfHgx0RSUlwWCPKeUpUi7KwAKOPWIEJIBYvhQNXQtrxZOeOq6pJx4gKbJKQdQp8Ay64PFKETZp2BDPBZsyZAMm5AAdgbLRpw4YMS/AUryEU6kcW2gcpahEwICfEaT/OkIc8TCAvE9DGFZJ92ZQZHgy8Aag7rxWYXHPkeTyud3VLe1fb/HVe3TeJfQtolQy3t5y5c/+Y3RWdlO4l9lHakCU0apgTBqe4/Bx3Fa/bAmQXmYTD6gW+I7eaIsTNXb7nwSd48F4D2i47TtI5a9Gp0/HK4wUf6dltx/5/queiTZML6UThpP+jv8QjtRBkRNRA7GjjuHfefvQ9g6z2koj56i5sywkxwo0Br+NDTZOWg86jTRqqJ+QrI9Eo1Swan1Ahfo9uL3d7muHsqVvECC9doJivOslqaVY9QvVmvh1LBe+EjswUdj1xTTx2H3W00Xptq0UJGw1BTVoTRD71OP0aGLgpdk8TGUboAUFJvgT/NUavP1TKOwl7llgE4rN0uA8ShoGnBeaTtKhC3sEFWFvkimLWN+CVY5ZCAyGf2p4YUKHJDbKb4DrEGZJbMkOpVVLoiDJDjjkm3CNEDWnAVdCmZTQ24gVx1/9e75xAv1iW9iUtKrSnZmAV7mnb5ryhWid37iRPXl2borUk2lvn6qpurAG0VLTxm146Tk4YtGD4pP9Uy+kdfXDh0J4KeXodjROPyOhCwEdeVLWmLgmwPTuKb5UUpwrYi23779Y497jI/bTGPUyz3tvnTgifpByB/GQVO41zrcTIMdXbpdsjd7n0/VL4aMnHvr9axt09gwc+DOhFbYmzH2O00iksH1GuM3CatRF3SWWUInOvhH2Gh7j4xjBtKUgOuRwnv3aNnlxr/79rT8vo1UbqnHsTBD8r7bjgWW+joyvmZk87rd1lT8FaOafmdbWFthkoId7IbtupLMqu9CeT53uTf2ux+3nxeSdkUyq6GKUFTeq+VekwbUbXkCXZa0Cj14ghdZRnh5kzT9/gweph9FU2YKpH7UzEKruwX++oEqD+ECOUuxY7yhlOlCMT2AOqTKiAQEpEn8IEvc/5EpaEWhet+luM3aMaHwXb9G4TSuVZIT/f431QyI89fq+2e9waOalwqj5u38gHklAouAIR9UQ9ei1vqId+BpQxpvG4wn9EmGZdpSSfWtP9afLZR8LyAVXVy0DeRWzG9Tolz7gTw4PI6UCteBW/s5kZJ5aa44HEn/jglYHYYcN+Q1pAXNNdRfPVRTQN+U+QHsmCJfDy6KS7hFIwmO9dxvmu+yVNtGDzB2Fi7lTV+iB+IjVwEPNSVCf0UxyMYCz112N5eRzux9fT6HVnGxQkT2F42Ge6zzeaqExAU3p0nNd3jrv3nue3PsrHvaObb7H4KhTus1jgtYl/nrH90pAyJkhJvcS9zQv7HrhJ7bEQnKBeCHWK3XAtmB91MsdcY7JuhhGpWMSj47BaNhmh+6KDU9K+XFjHGYW9KBWHxgx1oQxDRVH6fUUlTCy5wYe9ER+sIP580w+/7hEYe49A6B3qFj2DcfMeQEnPN7iDXSHKvON3gAvJaxl/dk/f7u6Vv/A6zznKrEgcN+kjrV7VCez/yvZY/ArUfpfYC159tR3FxKFoi+AQhFUCiiQbewJsVzdJj2OJdEYYt26rRkshlHBs76/uB50cd6iQCz8eXp6bFJKkEoJUzA5F0ibGZtAHh6/Bb6h7hwF+lYZTDg3sYWtpW0oiXQtaGNje8IK8puVR+av2BsfLSmm12fzujnqFElZsOHKFtkbgIPw9Nlhf89i1YtfYIDWh10tisGE+n1kepcZ5oeprwfBKqDn/udr8LDbud2rzs9i436nNz2Ljfqc2P4uNU7X5bRy+C4P7mzh8Fwb3N3F4DMOziEDYLhHxUbtBSsH5avrKncsULF99RG2wyrqHin7yhjOoH9Targtb3opdPYa3iIMf3Fo/CcjeXwvI0Y/sHpvwUoDft+871/i4xqtCRcbgnnCgwmEkUes4PoxQcfzD3nnhPFk62kn7Bwf75if6e7QwoTRtujWGbJwOYWVBY+mqvIbH7spDMcOIo60VUuGN8V5aZHgJIV8RuuR3C/e5zaWKmfnDqe2vfz4e/AxkIAMZyEAGMpCBDGQgAxnIQAYykIEMZCADGchABjKQgQxkIAMZyEAGMpCBDGQgAxnIQAYykIEMZCADGchABjKQgQxkIAMZyEAGMpCBDGQgAxnIQAYykIEMZCADGchABjKQgQxkIAMZyEAGMpCBDGQgAxnIQP9Z0M6psJ+VU5s17kjecampldmS/h1/Gr2tvHhNHtSkkv4d7l5pcowt4XnrpXDUP3pchfWv7cYRM3Hr0VGeUmT5QPrHdgev1Jj87D6s4qvsNFsmPCzVL/cvkQmue/ksqScAABCFSURBVGjeVZl7rKZXVcZ/a+33u5zrnDln5sy9LZ0O5SKF0pIWw8UqUMQ/lBANioJiTRBBTQyoMVETY2KkicREYxClCRjl2oKQcClSCQ2UVElbexs6nU7buXXmnNNzzne+67vX8o+13+8MMznJl+/y7r3XetaznvVs+cgdvwDqII6bIyKIKnhNHmfME6KCAO5OSgkRJ7sjYghgpuAgCEYGMioKUiFiIIK74F4DgkpCRRAxzB0H3MBxzAwsUSVFFMABEE04UBkTVBJu8YG7I+64GSIgxB+AqqDqOILggGLZ4jci5dEgQgQAw8tu3A0RARzzGkhghuOIavwhCBnV2DwiiGgcyg0zoxIRLBsAKaXYtBniCdGM4AgV2XI8VBJg8XCJT63OmBmqEbnmiOKxe4cSYUNFERLuXjal4BKHxCKbHiExj0eJCGY17kYlknAzXAzMUa1iO5oRqVABc8guWM6RIY0nxaKGKKhfkaEmJWUTXj5TSSVrcShVxT3gR3wVl0x2IWkc2LKBR2BUFQUDARXFLccXJHAV+VQcQyVwnr1GcFTLrjzeVwXRGlFHAnwBTOLzlBTVhKAIThIhSQMtx3KNiBbYCLUb1mTEQVURTVQN5kQa0E9K2qKwssXmRAr48Ui7eyztYIC74SLlWVoOGv9SwW6kWSIgYiXKQu0Js4yqoSQyVs5ZYKdgbogJleUCesBFwTPi8Xj3KDRUwQwxx3BqywUShlsuhaYl1VEgSJSQWQZVHAEyolKirgXfToWSUncKqSmaFMxqjIxIQkSocA8oAF5CXZKEo6UoAvgpKeJSMGW4SVAakKomnYUZYut4g2cnqrzSSG95z3GkPN8xzGpUqzg0HgcQncKsEtWIQpR0/FDKGR3Mgm+neNVS1SUKUiosCjB+H4jxaW00SE2pMASRYi1rZA92mJ6UsgyAFXgV2q2aRSOlgUXVhKO458CoBKaSSnBqhCY2nCIKDRymB2sOFEQcsEspsuOB38BqsACUDKlONx2pVlDHLCMIagTpa0M1kqbrQnC0+G71RhYSLkptkX5pKr6k3wREHKV0sea/RQOJ88iU3hwHy9PPjBw1ZAnDEMtxcDeqlihWqCISJ7hnxCXaq0bHU1VcKNGxKaZzaTqkWN6iVpjyQjmoT9Ptu62z1EwDKxFHcKxADndUFTAUxUWorCzhbiWwUYQtVQwpnaaUbGmxDdarlLDM9LcNdzdly3QjEgtOya1g3EtRYSAa0c2RKTOQwsOxiSi8yl1AohtFv2e3EKRZprTSJkqlxK8syOxOgz4TKb9rQllg4REA91J0LqhIBOaK7zavXZqiTlhpQBW6WyuRIkU0sCdiqArmGWvqAyVVttvkCh3hTCkszqOlGe1ya+iNAhZ3RBMiqdRPaUqVYOZYEUEiintCCs1VXoMkAXXElSuD6NbAotCe2JSmALIFltutFilFN6xzzWTiOGna6/wKJgpGaWizYZCC4wgimRoVJSlAFKNowp0S4SmFhAprsmnkUG1NCUm8tpxptYTObEWvN+Hy+pDhOJNUWJivWNk7iwB1nem0Q0+bwWiSybVD0deN3rXS5uVKpYdEkxIvxV5YooGEopjnwDcRiWCJkGuhScHNmZurWF8f8eTpS96Zq+XY0cShZaGunXNna07+SP3A8l5ZXeny9LNb1NlotVrsX55h394Og1FNzpGtgFtGkiDawhBaqSqNR3Z7SdEelboUlgQ0lVNd0cXEonEU9ui02jz48AVP7W3uuGOFn3nDsq8sJVSiyYxH8NQzEz5x10UefuKiv/Vn98j8HFxeH/DIo5f5v5Ntv/GVh2SmUzEYT0rpKE4qhTkBbRXm8mbeQDxYSj5yx9vLhneLYVfQElXsHjg25bsPnPG3vW1GPvKhIz4za2z1jPG4sEywE4vzFe7C+jocPVRFtavR62e++vUNPvEv67z06mOysq/NYFhTJS3Dg5VOWzWqtcChKAd3KlSi+s0wzzEGiV6RioR6Jmmbb/3gKf/d316R97/voF+63Gd7zWm1hPn5Fp12UJS7kGtDcI4cEYbDzKg2BiOjEufX3rWfm16zxO9/9LQrR2XvcpdxXReZkorIKYtrClHvdTSu2qgafpekFFWIaCIVXs42YW6mw73fO+2/9Z5lef+vr/rzZ3t0Z5VDS116mzVPPjLg5NN9zm1keXHHGA0ndFJi31Li2IGuv/TaLtedaJPawtkLY64+1uZjf30NH/qDp/3WhesCeU0DaIpbBLeYaFJKQVIpUTWqCoQkqcCC0iKdmXbFo09c4h1v78gHP3DI1y7tsLy3xfYa/NNnL8o3H+nxnLTclrtUy3MuexK6qJAzk2Fm8uCI1jcvcbyd5d237fV33L7MTt949Y0zvPe9i/LFz1/iltcepj+YkDQEvguY56BAnZIsiFDtKi9BZbdl1u4kTWz3xpxdW/cPv/46Tj814qHHjLlWn7/6zHl61y/5vrcd46rlDq1UdEgdo7qr4xIKLZtz6cLE//L7F7nnvqflox94iX/72xvc/tYD/q+ffoLNF1ek1Yq5MVUVqGCT0tIb+UqhNVWNBdxAdwdESstNmjh9ZpNHH9qQT/1nnwv9Dpv12Jd/43oOzTnDnTGT3oDaNfRvCl2SvSllIYmysKLs/+Wj/Pihbf/wnaeoF2bksedG/PmfXO9/+zfn/I23XC2DSY1Et0CT/ITWpsyCqklJmooq0jhR0RZVgvXNCb/5q8fFOxXfOTvy53Z2/Ni7jzNbOYPNSZnRYu5CIDvkK1SYqIAKPsr0L4+55oZl5LajrA/H/tlH+t4h8+qbW3Lu4oBOpdTjCTnH2JVzDoZqtLco6rmMPEXcNIqqoZdza+v+qhNtvvzjIXv2dTl84wFBhMkwpJ+6osQ0TFHAwTDxLLOYAV0gtRI76wOWT8wzv9Jm8doFPnXvJXnDzV2/sLaJqpAtYxYuVPzlqYliltFc5yKsndpqvIzk3XaLF7dGrK66nD63xfmueKs2Fo7Pez3IaErhM3gjKSVG/KKXGwME2R2fsmdMMpPRmD0vWxLvTzgzP8fOtkl3NjOaZFLVaAgvQ66VySckrJpZaRDKTLvFeDxha7vPcJzZ6I3Ys1DxzKiiM9fCXNAumI2mJG84JmB6hZfRtHEHIZFIuzOgKnlcM3eg63VvzGRO/NQF6M4ktnYm9PpjejtjxpMRlQo5O5McjKGaytQs4bQ8/tQlqqrLbLdLr1ezvjnmmTObXr16UZIJrdUOWUP7Nm6RicXI5B66oPgJ6O7o00ws4UsoVmdkTpEErRnn/h/tMD6Xff9KV+ZmWuRsvLjVY2kxcWR1kZxBWmVqTklotZTBYIR7i//4+4+65hrLGa3gO/c9zh//8IvOODN3bFFK8MhT2R3mUQT3iqm5iKjmw2IcIVgYJCm4dbg1RlKXz33s91hdnXHRCu1UPHbqBT74Zx/n2iNLUkuKFo2hqQrFtLTYZTjq+T33PgDzLUY7O6Bw5PASk74xuDSgmkmluRfma5SxW9hJEiwTRiFRkBK2aczaBp5JEjSlKbF1aptOK3Fw/wJ4zWTUh26Lf7v7W3Jw/5xU7S5UgqT4vqKhivrDCTdcf1j+7pNf4r/ve5iZ/Xugjnlv5+wOm89sUteOeHREdQ9TUME1Yq4N/2gpOM3FmKlwnGxWDBuoJ2Mymd75bdTDcJSU6Ozdw50f/4J8/0eP+MtOHKA/GgafiwT9uu9yniblplcdkT+989Pc9e/3Caos7Z1jtuogKNavseSYgquQEXJMQ1DMPtQxKTTk8Xo6QjU+rzj1oCb3MtTO3s4sabbN+cvb/OFf3CVf+a/v+xtveon0B6My+kf3rHOmyjk3UoJJdma6Xd5067XyqXu+6d9+4GH5nXe+xZc783J+vObjjSGSFwiLWFH3BqF4sQtiUiicLoKKI1nKyK+4ON6qmKyN8bHjowld7/CZL36PT37p68zOKG++9Trpj4KJaHw/g2w1FZZwMlIcxUldg2R+5pYTcvL0ef7ozrsYavbkynBr5OPtmtZcqwjASUxY3pjWvuv/aiEymx4DF4uOn53J+kQsm3dymx/+z2P++KOnuPkVR2R5ZZb+YIRoSFz1VOa/KHKtUgqcya4b6eb0h32OHdrHsaNJ3vlzS9J7YYyPjcH5gZgbtdcx75W5a+riWIgUF1AzyCBmTH3ZJPjQyZtj6lqwLeM9v7Qiq/tnZf/yPL2dcXRQbRz+6HgNkatJXbpSGBVR5Yluu8O589scWE3cftshX66ErbU+9dqY8caYVpWCAUSnVpZLsIEVQvMya3lThK5oVTF6YSgpK+vPbnLiSMWtr1vyut7x9c0h7ZZipRUXlwOjjoJ1Q70YcWa7Qt+L4Njq9zl6ZIbVfW1uesUeuXxqC1Wjf2pbkieqKkRTGOHh43pIiuh04YFgEgyhCXKvpn9uB2pj+/ker7thWRYXlPlFld4gF+ezsbl2B3oaD1CKCy6F2V1iQjUfM57UPjPT4u6vnJXTSx3fe2CG8VbtNnK2Tm6IF3XmaDFRmvuN4rR7g15FU0zgGyfXUZz10+t+1etX+fLjPX/gh1syP5eY1IZIFRszwlX8CUcIVPTKNyyunZIwqWF1ZVa+cPcL/o+fedYP/+IxDv30qlx8aI32YpvtC33fOtkTrDiVBXeB42aIEbDAoqrSe2JbbDuTtGLjx1u89F1Xs/T6VfmHfz7rZ86Yry63o9Ak7vvMM553b6xEBPXGfZGIROC4wkxYWZrjDTeekGuOrLB5qcfh2w67Sebyo2veWmzLzrltek9uSmpMa2/czV37KFq4s/Hohuxc6PvM4qxceOCSLx1fZOkVy4w3Rv6alx+TW2+4VlJVvOOGFq0xh3xqIGqTRpG4HnAUy8FKSZWZbov5dkfOffkig50hL3vf9Vx+bI3x2tCl4ww2R+S6FIhdYUyHqiZVitdOvTny1qzK2R+c91F/zLW/ci3PPXieF+5do9OtCgOG5jUMXMvdXmMyBhJiVN71qmJdn0wXzw7SgjcdvU38G0lYgatvv4aLD14CVcxrtzo3znL4ZCmornbD1Jn0Q8X5yOm/0OfwWw7x3MNnee3FW+Tn3/wOGechQkK0Km5POKdxVRYXOlY0u/pUwu7aqUrxtNyYTCYsLbT57v3f8ONynLW7duisVDK30GF0eeiSYXRxJJoUlURFQsvYJBae2ejiUNREBptD7+7rsvH4i/zUpZulXbf56tc+7wcPLpN9ghM9QKkQbaAa3VEkbmXDH57eOzTXTY2RYtT1hIP799Dy0zx6/92exh3+9/4LPr8yD4vK0tIe6V/YYfboTNinHuY1ZqRWRb1l9M8NvNVVGa2NOP2D51mZW2TwmpPc87XP+UuuOsTi3Az9wbBc+kgxTwqbN6pQosFFZ51utuiA0lkE0JTothI3vPyonNueUHufAwvzLA5g9HwfSYoNs++c2RHUyblceJem0jvTEzGw7PTP7vDKw6vMd+CpU0/6zN5lXnnioOS6DuqTVnFy8lSLhBVbFatTqGj6UrGImgEUBy/SczyquerwCtv9Ib2dEfv2J1I7yVPPbnjv/MAXDnalf36Ham+XznILz07Vrug/uyPjF/reWlB58Zmez/XgmquXpD+a+GhiHNi7IMtLC9QWt0yYoy64JETtCrLNKII6/D/TGTBDWRImzQAAAjhlWElmSUkqAAgAAAADAA4BAgDkAAAAMgAAADsBAgAlAAAAFgEAAGmHBAABAAAAOwEAAAAAAABTaWduYXR1cmU6IEY3MFlCQVB2d2pUZ3ZhVDZwU1dtS0xISmNzMzNLblVTM0ZsTlJ3T3Vhc1JBREo4R3ZIQi9aVDVJRm5PT3JReDZzaUJiZ29NQjNEOGdzaXlFZThhT2M3Q3RWTkMwYjdiblNiN2xOU3FOSkFsWmprRStKeE5DVmhyNDlmaWlBR0VsTytmT1pYeXZCSEZHU0ZMUDJReFRzVUU0ZHM0TEJBNzFxc2NWaTk0bG5DQzFja3duTmFVa0h2Qm1oVEIyMVRxZXFQdzJNZG5STWdSeUEyZ1RHeEYvMFE9PQBjNGQ0ZWExOS1jY2Y4LTQwNzUtOGQzNy1jODQwNGY4OGU1N2IAAQCGkgcA6wAAAE0BAAAAAAAAQVNDSUkAAABTaWduYXR1cmU6IEY3MFlCQVB2d2pUZ3ZhVDZwU1dtS0xISmNzMzNLblVTM0ZsTlJ3T3Vhc1JBREo4R3ZIQi9aVDVJRm5PT3JReDZzaUJiZ29NQjNEOGdzaXlFZThhT2M3Q3RWTkMwYjdiblNiN2xOU3FOSkFsWmprRStKeE5DVmhyNDlmaWlBR0VsTytmT1pYeXZCSEZHU0ZMUDJReFRzVUU0ZHM0TEJBNzFxc2NWaTk0bG5DQzFja3duTmFVa0h2Qm1oVEIyMVRxZXFQdzJNZG5STWdSeUEyZ1RHeEYvMFE9PdMTjHIAAAAldEVYdGRhdGU6Y3JlYXRlADIwMjYtMDMtMjFUMTU6NDQ6MDIrMDA6MDAJ4is5AAAAJXRFWHRkYXRlOm1vZGlmeQAyMDI2LTAzLTIxVDE1OjQzOjIzKzAwOjAwfjGENQAAADB0RVh0ZXhpZjpBcnRpc3QAYzRkNGVhMTktY2NmOC00MDc1LThkMzctYzg0MDRmODhlNTdikrhPFQAAABN0RVh0ZXhpZjpFeGlmT2Zmc2V0ADMxNfe5WSsAAADqelRYdGV4aWY6SW1hZ2VEZXNjcmlwdGlvbgAACJkFwclygjAAANBf6d2DbBXsjIcECYiQAAm0cgPEGMG0EGX5+75HBZfV6z22Xx/I1i4QJNP8YHyq2O6Pfj/PURA2yjTPMqcm6nE2k3elMnAMHX8K4LZknyckCRnTZacErPlvDM2jw5VYvdapSGO7rwK7Wm3XktZ2j+mAQ9CXj87bhAt2i/to7W9CAN/ryeZGyp91ggHyKYoSI12Yyj3rqqwIAlsfVFOIvdVL19Wbbpa4yrtggs87g4bOhnZIZiO+yizm2QoMzvwFbbX0cPgHtRNLHUx2ulgAAAF+elRYdGV4aWY6VXNlckNvbW1lbnQAACiRTVPZkcUwCGslBeQDHxjcf2OLEGTfTJxxuIQEOfo+vt7n2PvY4pF+4BiieOE2wnQNl4NX3jac433U32fNyI8YjYwd336jboQeYAiiHa+LlDD7/go7C8OisI5JcAeGRIJFCYscA0REXBQZYdTBg4Bs0ItQGgEqUdzQzSxwu9U9uShdaPI4qyuQRjUGSLDYyJBqspRKAKDaVze8jtQpzUVLRBS5/nFGf0YregU2cMvbSWPCd1vlw64BBQmg9OmJ+CFRGCA/sBCQmKPG2cZ/WRJu8QPkT3uv1KCGGHvYiyFJrqE8I3Zx11BLc2rz2x1lUfuYOBnsVXFJBw16EU7hT89bmOslOPYA66TyI7W31Jg/UDTxpddkMq/XMVf0FvOMgJykomTAAq0dmKawpXxqwl0eJUZusJbL5g+LXOHUCG3mxIWl2Paq8eaNf8pljNnHQrintKza59wOZSytu1Y3RyRc2/wZEZnnDwVPtAaNvfacAAAAAElFTkSuQmCC';
+        const spriteImgSword = new Image(); spriteImgSword.src = 'data:image/png;base64,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';
+        const dungeonEntranceImg = new Image(); dungeonEntranceImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAA3lBMVEUAAAAREREiIiIRABEAABEAEREAEQAREQARIgAiIgAiEREzIhEzEREiEQAiIhFEIhEzIiIRESJVIiIiESJVIhFVMxFmMyJ3MyJVMyJEIiJ3MxGZRCIzESKIRCJ3RCK7VSLddzNmMxGIMxHuqkTdmUSqVSLuzHf/3YhVRDNmIhFEERFVMzMRIhFmRDNEMzMzIjNEMyIzMxEiIjMzM0QzMzMRIjNEM0R3VVV3RDNVRERmRESZZkSIVTNmMzOqZkQRIiIRAAAiIkSZVTNERERmRCJERFVVRFWIRDMzMyIiM0TGJPgJAAACxUlEQVQ4yy2T4XbbNgyFCYqWMlIWBVGhyHp2567Z2iqyPNrVlERp1s1bt/d/oQFucHz8w/x4cS9ACwEgMyGEAoBVnhdFfvOD1qbU6yLnEgwAASIDYKgoKqOtNaZcE5wDA7UmAT5UgHpd2dI2XEYXIAhYOenUK1Bker0ubdvaW++7kJOEUAJkDQwg0letjY1t8G82nbdFWTCQu5pdkkIG7kcC2tZvd2+321tjioKa5FpCfk0B4HRpGhu67u1Pm83+loFMiaJ2bBbJpDPkwPru3c/v7+66fVMBAQDara45qU1ljPV+/+6XX+/uNtsYNf0mCFDcIxNQUQvbdvs3m+2WPvEDXxKZ00qtFFwVNI2o3e8/fur2m23/gUJmdJdmWeTFTQH31IJt+M6W7aYbDldAkHmOoOV4rEr7mw3W+rbcb5sBlcjYvKwRZRpP50NvQ7U2radqfegVKXxGmp9DJ8fzeZp+n32wobTB+6YNtRLiMxY5jdnJlMbp4fHxaVnm5bYxTWjsMy1JICaJwMQ4jX0TfPRfdtud0Y2N1AEpAr6g5PvjOOz0H5nWxy9PYedjjLXCrwITFSbqf3rYaX45KuvnPxevbXQqJZGuxOk0TX8NkXbLpZ+WGIOtESSSBy7aIx488Mvirfhl2dVlxPtXQLKHVAcy5GpHzGG5xNLUK5reawsa0t9DBCjJWQ0qhhCN1VAR8MIKiSz8E6zTIdCzczjMl6OJqrrPUFwzkEI6R6ONj0A6rh8uITgSyChFkvRc5fk09aWOc9BRu+GbD4bkSdzxJIFjnut/e8o2D8dhXpaFgBvAjLaJ6StFkKQxTX1oLnQaLpfZ11LQCpBjkgnA8TSNbnr0A+159t/C8TCCSwDsAfG7SzlRPfQP/XP/fBhJNSWFSSAUfP4fvpxO5KXmbz7ji2xTiBxe2Cg5TSCTGxNPlt6A5P8y4v/cYVUGakpP6wAAAABJRU5ErkJggg==';
+        const FACING_ROTATION = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
+
+        // ============================================================================
+        // DUNGEON MAPS
+        // ============================================================================
+        const DUNGEONS = {
+            OVERWORLD: {
+                name: 'Overworld',
+                width: 30,
+                height: 22,
+                map: [
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,1],
+                    [1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+                ],
+                doors: [
+                    { tileX: 13, tileY: 7, targetDungeon: 0, targetRoom: 0, spawnX: 8*32+16, spawnY: 1*32+16 },
+                    { tileX: 19, tileY: 13, targetDungeon: 1, targetRoom: 0, spawnX: 8*32+16, spawnY: 1*32+16 },
+                    { tileX: 7, tileY: 13, targetDungeon: 2, targetRoom: 0, spawnX: 8*32+16, spawnY: 1*32+16 }
+                ]
+            },
+            FOREST_TEMPLE: {
+                name: 'Forest Temple',
+                rooms: [
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,3,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,3,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: -1, targetRoom: -1, spawnX: 13*32+16, spawnY: 8*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 0, targetRoom: 1, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,1,1,1,0,0,0,0,0,1,1,1,0,0,0,0,1],
+                            [1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1],
+                            [1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,1,1,1,0,0,0,0,0,1,1,1,0,0,0,0,1],
+                            [1,0,3,0,1,0,1,0,0,0,0,0,1,0,1,0,3,0,0,1],
+                            [1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 0, targetRoom: 0, spawnX: 8*32+16, spawnY: 13*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 0, targetRoom: 2, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1],
+                            [1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1],
+                            [1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1],
+                            [1,3,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,3,1],
+                            [1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 0, targetRoom: 1, spawnX: 8*32+16, spawnY: 13*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 0, targetRoom: 3, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,3,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,3,1],
+                            [1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 0, targetRoom: 2, spawnX: 8*32+16, spawnY: 13*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 0, targetRoom: 4, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 0, targetRoom: 3, spawnX: 8*32+16, spawnY: 13*32+16 }
+                        ]
+                    }
+                ]
+            },
+            SHADOW_CAVERN: {
+                name: 'Shadow Cavern',
+                rooms: [
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,3,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,3,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: -1, targetRoom: -1, spawnX: 19*32+16, spawnY: 14*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 1, targetRoom: 1, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,1,1,1,0,0,0,0,0,1,1,1,0,0,0,0,1],
+                            [1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1],
+                            [1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,1,1,1,0,0,0,0,0,1,1,1,0,0,0,0,1],
+                            [1,0,3,0,1,0,1,0,0,0,0,0,1,0,1,0,3,0,0,1],
+                            [1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 1, targetRoom: 0, spawnX: 8*32+16, spawnY: 13*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 1, targetRoom: 2, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1],
+                            [1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1],
+                            [1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1],
+                            [1,3,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,3,1],
+                            [1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 1, targetRoom: 1, spawnX: 8*32+16, spawnY: 13*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 1, targetRoom: 3, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,3,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,3,1],
+                            [1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 1, targetRoom: 2, spawnX: 8*32+16, spawnY: 13*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 1, targetRoom: 4, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 1, targetRoom: 3, spawnX: 8*32+16, spawnY: 13*32+16 }
+                        ]
+                    }
+                ]
+            },
+            DRAGON_KEEP: {
+                name: 'Dragon Keep',
+                rooms: [
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,3,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,3,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: -1, targetRoom: -1, spawnX: 7*32+16, spawnY: 14*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 2, targetRoom: 1, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,1,1,1,0,0,0,0,0,1,1,1,0,0,0,0,1],
+                            [1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1],
+                            [1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,1,1,1,0,0,0,0,0,1,1,1,0,0,0,0,1],
+                            [1,0,3,0,1,0,1,0,0,0,0,0,1,0,1,0,3,0,0,1],
+                            [1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 2, targetRoom: 0, spawnX: 8*32+16, spawnY: 13*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 2, targetRoom: 2, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1],
+                            [1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1],
+                            [1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1],
+                            [1,3,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,3,1],
+                            [1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 2, targetRoom: 1, spawnX: 8*32+16, spawnY: 13*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 2, targetRoom: 3, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,3,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,3,1],
+                            [1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 2, targetRoom: 2, spawnX: 8*32+16, spawnY: 13*32+16 },
+                            { tileX: 8, tileY: 14, targetDungeon: 2, targetRoom: 4, spawnX: 8*32+16, spawnY: 1*32+16 }
+                        ]
+                    },
+                    {
+                        width: 20,
+                        height: 15,
+                        map: [
+                            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+                        ],
+                        doors: [
+                            { tileX: 8, tileY: 0, targetDungeon: 2, targetRoom: 3, spawnX: 8*32+16, spawnY: 13*32+16 }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        // ============================================================================
+        // GAME STATE
+        // ============================================================================
+        let gameState = {
+            screen: 'menu', // 'menu', 'playing', 'victory'
+            currentDungeon: -1,
+            currentRoom: 0,
+            transitioning: false,
+            transitionProgress: 0,
+            exploredRooms: new Set(),
+            frameCount: 0,
+            bossesDefeated: new Set()
+        };
+
+        let player = {
+            x: 10 * 32 + 16,
+            y: 7 * 32 + 16,
+            width: 24,
+            height: 24,
+            speed: 3,
+            hp: 100,
+            maxHp: 100,
+            invincible: false,
+            invincibilityTimer: 0,
+            score: 0,
+            coins: 0,
+            keys: 0,
+            facing: 'down',
+            attackCooldown: 0,
+            shieldActive: false,
+            level: 1,
+            xp: 0,
+            xpToNext: 100,
+            attackPower: 25,
+            defense: 0,
+            inventory: {
+                bow: false,
+                boomerang: false,
+                speedBoots: false,
+                defenseRing: false,
+                attackAmulet: false,
+                bombs: 0,
+                arrows: 0
+            },
+            selectedItem: null,
+            magicCooldown: 0
+        };
+
+        let enemies = [];
+        let projectiles = [];
+        let items = [];
+        let particles = [];
+
+        // ============================================================================
+        // SOUND SYSTEM
+        // ============================================================================
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(frequency, duration, type = 'sine') {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.frequency.value = frequency;
+            osc.type = type;
+            gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+            osc.start(audioContext.currentTime);
+            osc.stop(audioContext.currentTime + duration);
+        }
+
+        function playAttackSound() { playSound(440, 0.1, 'square'); }
+        function playHitSound() { playSound(220, 0.15, 'square'); }
+        function playDamageSound() { playSound(100, 0.2, 'sine'); }
+        function playItemSound() { playSound(880, 0.1, 'sine'); }
+        function playBossSound() { playSound(55, 0.3, 'sine'); }
+
+        // ============================================================================
+        // TILE PARSING & ROOM MANAGEMENT
+        // ============================================================================
+        function getCurrentRoomData() {
+            if (gameState.currentDungeon === -1) {
+                return DUNGEONS.OVERWORLD;
+            } else if (gameState.currentDungeon === 0) {
+                return DUNGEONS.FOREST_TEMPLE.rooms[gameState.currentRoom];
+            } else if (gameState.currentDungeon === 1) {
+                return DUNGEONS.SHADOW_CAVERN.rooms[gameState.currentRoom];
+            } else if (gameState.currentDungeon === 2) {
+                return DUNGEONS.DRAGON_KEEP.rooms[gameState.currentRoom];
+            }
+            return null;
+        }
+
+        function loadRoom() {
+            enemies = [];
+            items = [];
+            projectiles = [];
+            const roomData = getCurrentRoomData();
+            if (!roomData) return;
+
+            for (let y = 0; y < roomData.map.length; y++) {
+                for (let x = 0; x < roomData.map[y].length; x++) {
+                    const tile = roomData.map[y][x];
+                    const centerX = x * TILE_SIZE + TILE_SIZE / 2;
+                    const centerY = y * TILE_SIZE + TILE_SIZE / 2;
+
+                    if (tile === TILE_TYPES.ENEMY_SPAWN) {
+                        const enemyType = Math.random() > 0.5 ? 'slime' : 'skeleton';
+                        if (gameState.currentDungeon === 1) {
+                            const t = Math.random();
+                            if (t > 0.6) enemies.push(createEnemy('bat', centerX, centerY));
+                            else if (t > 0.3) enemies.push(createEnemy('darkKnight', centerX, centerY));
+                            else enemies.push(createEnemy('skeleton', centerX, centerY));
+                        } else if (gameState.currentDungeon === 2) {
+                            const t = Math.random();
+                            if (t > 0.5) enemies.push(createEnemy('darkKnight', centerX, centerY));
+                            else enemies.push(createEnemy('skeleton', centerX, centerY));
+                        } else {
+                            enemies.push(createEnemy(enemyType, centerX, centerY));
+                        }
+                    } else if (tile === TILE_TYPES.BOSS_SPAWN) {
+                        const bossType = gameState.currentDungeon === 0 ? 'treant' : gameState.currentDungeon === 1 ? 'shadowLord' : 'dragon';
+                        enemies.push(createBoss(bossType, centerX, centerY));
+                    } else if (tile === TILE_TYPES.ITEM_SPAWN) {
+                        const itemType = Math.random() > 0.7 ? 'heart' : 'coin';
+                        items.push({ x: centerX, y: centerY, type: itemType, radius: 8 });
+                    } else if (tile === TILE_TYPES.CHEST) {
+                        let chestItemType = 'heart';
+                        let chestItemValue = null;
+                        if (gameState.currentDungeon === 0 && gameState.currentRoom === 1) {
+                            chestItemType = 'speedBoots';
+                        } else if (gameState.currentDungeon === 0 && gameState.currentRoom === 2) {
+                            chestItemType = 'arrows';
+                            chestItemValue = 5;
+                        } else if (gameState.currentDungeon === 1 && gameState.currentRoom === 0) {
+                            chestItemType = 'defenseRing';
+                        } else if (gameState.currentDungeon === 1 && gameState.currentRoom === 2) {
+                            chestItemType = 'bombs';
+                            chestItemValue = 5;
+                        } else if (gameState.currentDungeon === 2 && gameState.currentRoom === 0) {
+                            chestItemType = 'attackAmulet';
+                        } else if (gameState.currentDungeon === 2 && gameState.currentRoom === 2) {
+                            chestItemType = 'arrows';
+                            chestItemValue = 5;
+                        }
+                        items.push({ x: centerX, y: centerY, type: 'chest', chestItem: chestItemType, chestValue: chestItemValue, radius: 8 });
+                    }
+                }
+            }
+        }
+
+        function isWall(x, y) {
+            const roomData = getCurrentRoomData();
+            if (!roomData) return true;
+            const tileX = Math.floor(x / TILE_SIZE);
+            const tileY = Math.floor(y / TILE_SIZE);
+            if (tileX < 0 || tileX >= roomData.map[0].length || tileY < 0 || tileY >= roomData.map.length) return true;
+            return roomData.map[tileY][tileX] === TILE_TYPES.WALL;
+        }
+
+        function isDoor(x, y) {
+            const roomData = getCurrentRoomData();
+            if (!roomData) return null;
+            const tileX = Math.floor(x / TILE_SIZE);
+            const tileY = Math.floor(y / TILE_SIZE);
+            if (tileX < 0 || tileX >= roomData.map[0].length || tileY < 0 || tileY >= roomData.map.length) return null;
+            if (roomData.map[tileY][tileX] === TILE_TYPES.DOOR) {
+                if (roomData.doors) {
+                    return roomData.doors.find(d => d.tileX === tileX && d.tileY === tileY);
+                }
+            }
+            return null;
+        }
+
+        // ============================================================================
+        // ENTITY CREATION
+        // ============================================================================
+        function createEnemy(type, x, y) {
+            const enemies_config = {
+                slime: { width: 20, height: 20, hp: 20, speed: 1.5, damage: 10, color: '#88dd00', detectionRange: 150, attackRange: 25, attackCooldown: 60 },
+                skeleton: { width: 22, height: 22, hp: 35, speed: 2, damage: 15, color: '#aaa', detectionRange: 160, attackRange: 25, attackCooldown: 50 },
+                bat: { width: 18, height: 18, hp: 15, speed: 2.5, damage: 12, color: '#cc00ff', detectionRange: 180, attackRange: 20, attackCooldown: 40 },
+                darkKnight: { width: 24, height: 24, hp: 50, speed: 2, damage: 20, color: '#003366', detectionRange: 170, attackRange: 25, attackCooldown: 70 }
+            };
+            const config = enemies_config[type];
+            return {
+                x, y,
+                ...config,
+                type,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                maxHp: config.hp,
+                attackTimer: 0,
+                wanderTimer: 0,
+                chasing: false,
+                flashTimer: 0,
+                stunTimer: 0
+            };
+        }
+
+        function createBoss(type, x, y) {
+            const boss_config = {
+                treant: { width: 40, height: 40, hp: 150, speed: 1, damage: 25, color: '#00aa00', detectionRange: 300, attackRange: 40, attackCooldown: 80, moveTimer: 0, pauseTimer: 0 },
+                shadowLord: { width: 38, height: 38, hp: 180, speed: 1.5, damage: 30, color: '#330055', detectionRange: 350, attackRange: 35, attackCooldown: 100, moveTimer: 0, pauseTimer: 0, teleportCooldown: 0 },
+                dragon: { width: 50, height: 50, hp: 250, speed: 1.2, damage: 35, color: '#dd3300', detectionRange: 400, attackRange: 60, attackCooldown: 120, moveTimer: 0, pauseTimer: 0, breathTimer: 0 }
+            };
+            const config = boss_config[type];
+            return {
+                x, y,
+                ...config,
+                type,
+                maxHp: config.hp,
+                attackTimer: 0,
+                flashTimer: 0,
+                isBoss: true
+            };
+        }
+
+        // ============================================================================
+        // PLAYER INPUT
+        // ============================================================================
+        const keys = {};
+        document.addEventListener('keydown', e => {
+            if (document.getElementById('hs-overlay')?.style.display === 'flex') return;
+            keys[e.code] = true;
+            e.preventDefault();
+        });
+        document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+        // Click/tap to start from menu
+        canvas.addEventListener('click', () => {
+            if (gameState.screen === 'menu') {
+                gameState.screen = 'playing';
+            } else if (gameOver) {
+                restartGame();
+            }
+            // Resume audio context on user gesture
+            if (audioContext.state === 'suspended') audioContext.resume();
+        });
+
+        // Touch controls
+        let touchDpad = { active: false, dx: 0, dy: 0 };
+        let touchAttack = false;
+        let touchShield = false;
+        let touchCycle = false;
+        let touchUse = false;
+        let touchMagic = false;
+
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            if (gameState.screen === 'menu') { gameState.screen = 'playing'; return; }
+            if (gameOver) { restartGame(); return; }
+            if (audioContext.state === 'suspended') audioContext.resume();
+            for (const t of e.changedTouches) {
+                const rect = canvas.getBoundingClientRect();
+                const sx = (t.clientX - rect.left) / rect.width * CANVAS_WIDTH;
+                const sy = (t.clientY - rect.top) / rect.height * CANVAS_HEIGHT;
+                if (sx < CANVAS_WIDTH * 0.35 && sy > CANVAS_HEIGHT * 0.6) {
+                    touchDpad.active = true;
+                    touchDpad.cx = sx; touchDpad.cy = sy;
+                } else if (sx > CANVAS_WIDTH * 0.75 && sy > CANVAS_HEIGHT * 0.6) {
+                    if (sy < CANVAS_HEIGHT * 0.8) touchAttack = true;
+                    else touchShield = true;
+                } else if (sx > CANVAS_WIDTH * 0.7 && sx < CANVAS_WIDTH * 0.85 && sy > CANVAS_HEIGHT * 0.65 && sy < CANVAS_HEIGHT * 0.8) {
+                    touchCycle = true;
+                } else if (sx > CANVAS_WIDTH * 0.7 && sx < CANVAS_WIDTH * 0.85 && sy > CANVAS_HEIGHT * 0.8 && sy < CANVAS_HEIGHT * 0.95) {
+                    touchUse = true;
+                }
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', e => {
+            e.preventDefault();
+            for (const t of e.changedTouches) {
+                const rect = canvas.getBoundingClientRect();
+                const sx = (t.clientX - rect.left) / rect.width * CANVAS_WIDTH;
+                const sy = (t.clientY - rect.top) / rect.height * CANVAS_HEIGHT;
+                if (touchDpad.active && sx < CANVAS_WIDTH * 0.5) {
+                    touchDpad.dx = sx - touchDpad.cx;
+                    touchDpad.dy = sy - touchDpad.cy;
+                }
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', e => {
+            e.preventDefault();
+            touchDpad.active = false; touchDpad.dx = 0; touchDpad.dy = 0;
+            touchAttack = false; touchShield = false;
+            if (touchCycle) {
+                keys['KeyC'] = true;
+                touchCycle = false;
+            }
+            if (touchUse) {
+                keys['KeyV'] = true;
+                touchUse = false;
+            }
+        }, { passive: false });
+
+        // ============================================================================
+        // UPDATE FUNCTIONS
+        // ============================================================================
+        function updatePlayer() {
+            if (gameState.transitioning) return;
+
+            let dx = 0, dy = 0;
+
+            if (keys['ArrowUp'] || keys['KeyW']) { dy -= player.speed; player.facing = 'up'; }
+            if (keys['ArrowDown'] || keys['KeyS']) { dy += player.speed; player.facing = 'down'; }
+            if (keys['ArrowLeft'] || keys['KeyA']) { dx -= player.speed; player.facing = 'left'; }
+            if (keys['ArrowRight'] || keys['KeyD']) { dx += player.speed; player.facing = 'right'; }
+            // Touch d-pad
+            if (touchDpad.active) {
+                const deadzone = 15;
+                if (Math.abs(touchDpad.dx) > deadzone || Math.abs(touchDpad.dy) > deadzone) {
+                    const len = Math.hypot(touchDpad.dx, touchDpad.dy);
+                    dx += (touchDpad.dx / len) * player.speed;
+                    dy += (touchDpad.dy / len) * player.speed;
+                    if (Math.abs(touchDpad.dx) > Math.abs(touchDpad.dy)) player.facing = touchDpad.dx > 0 ? 'right' : 'left';
+                    else player.facing = touchDpad.dy > 0 ? 'down' : 'up';
+                }
+            }
+
+            player.x += dx;
+            player.y += dy;
+
+            if (isWall(player.x, player.y)) {
+                player.x -= dx;
+                player.y -= dy;
+            }
+
+            const doorTile = isDoor(player.x, player.y);
+            if (doorTile) {
+                transitionRoom(doorTile);
+            }
+
+            if ((keys['KeyZ'] || touchAttack) && player.attackCooldown <= 0) {
+                performAttack();
+                player.attackCooldown = 24;
+            }
+
+            player.shieldActive = keys['KeyX'] || touchShield;
+
+            // Cycle through inventory items with C key
+            if (keys['KeyC']) {
+                keys['KeyC'] = false;
+                const inventoryItems = ['bow', 'boomerang', 'speedBoots', 'defenseRing', 'attackAmulet', 'bombs', 'arrows'];
+                let currentIndex = player.selectedItem ? inventoryItems.indexOf(player.selectedItem) : -1;
+                let found = false;
+                for (let i = 0; i < inventoryItems.length; i++) {
+                    const nextIdx = (currentIndex + 1 + i) % inventoryItems.length;
+                    const item = inventoryItems[nextIdx];
+                    if (player.inventory[item] === true || player.inventory[item] > 0) {
+                        player.selectedItem = item;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    player.selectedItem = null;
+                }
+            }
+
+            // Use selected item with V key
+            if (keys['KeyV'] && player.selectedItem) {
+                keys['KeyV'] = false;
+                const item = player.selectedItem;
+                if (item === 'bow' && player.inventory.arrows > 0) {
+                    let vx = 0, vy = 0;
+                    if (player.facing === 'right') vx = 6;
+                    else if (player.facing === 'left') vx = -6;
+                    else if (player.facing === 'up') vy = -6;
+                    else if (player.facing === 'down') vy = 6;
+                    projectiles.push({ x: player.x, y: player.y, vx, vy, type: 'arrow', damage: player.attackPower, life: 50 });
+                    player.inventory.arrows--;
+                    playAttackSound();
+                } else if (item === 'boomerang' && player.attackCooldown <= 0) {
+                    let vx = 0, vy = 0;
+                    if (player.facing === 'right') vx = 6;
+                    else if (player.facing === 'left') vx = -6;
+                    else if (player.facing === 'up') vy = -6;
+                    else if (player.facing === 'down') vy = 6;
+                    projectiles.push({ x: player.x, y: player.y, vx, vy, type: 'boomerang', damage: 15, life: 60, maxDistance: 150, distance: 0, returning: false, startX: player.x, startY: player.y });
+                    player.attackCooldown = 40;
+                    playAttackSound();
+                } else if (item === 'bombs' && player.inventory.bombs > 0 && player.attackCooldown <= 0) {
+                    projectiles.push({ x: player.x, y: player.y, vx: 0, vy: 0, type: 'bomb', damage: 60, life: 45, explosionRadius: 64 });
+                    player.inventory.bombs--;
+                    player.attackCooldown = 20;
+                    playAttackSound();
+                }
+            }
+
+            // Magic Blast - unlocked at level 6, B key
+            if ((keys['KeyB'] || touchMagic) && player.level >= 6 && player.magicCooldown <= 0) {
+                let mvx = 0, mvy = 0;
+                if (player.facing === 'up') mvy = -6;
+                else if (player.facing === 'down') mvy = 6;
+                else if (player.facing === 'left') mvx = -6;
+                else if (player.facing === 'right') mvx = 6;
+                projectiles.push({
+                    x: player.x, y: player.y,
+                    vx: mvx, vy: mvy,
+                    type: 'magic',
+                    damage: Math.floor(player.attackPower * 1.5),
+                    life: 60,
+                    owner: 'player'
+                });
+                player.magicCooldown = 45;
+                playSound(380, 0.15, 'sawtooth');
+                setTimeout(() => playSound(760, 0.1, 'sine'), 50);
+                // Muzzle flash particles
+                for (let i = 0; i < 5; i++) {
+                    particles.push({
+                        x: player.x + mvx * 3, y: player.y + mvy * 3,
+                        vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+                        text: '\u2727', life: 15
+                    });
+                }
+            }
+            if (player.magicCooldown > 0) player.magicCooldown--;
+
+            player.attackCooldown--;
+            if (player.invincible) {
+                player.invincibilityTimer--;
+                if (player.invincibilityTimer <= 0) {
+                    player.invincible = false;
+                }
+            }
+
+            // Check item collection
+            items = items.filter(item => {
+                const dist = Math.hypot(item.x - player.x, item.y - player.y);
+                if (dist < 30) {
+                    playItemSound();
+                    if (item.type === 'heart') {
+                        player.hp = Math.min(player.maxHp, player.hp + 30);
+                        player.score += 5;
+                    } else if (item.type === 'coin') {
+                        player.coins++;
+                        player.score += 10;
+                    } else if (item.type === 'chest') {
+                        const itemName = item.chestItem;
+                        if (itemName === 'bow' || itemName === 'boomerang' || itemName === 'speedBoots' || itemName === 'defenseRing' || itemName === 'attackAmulet') {
+                            if (itemName === 'speedBoots') {
+                                player.speed += 1;
+                            } else if (itemName === 'defenseRing') {
+                                player.defense += 5;
+                            } else if (itemName === 'attackAmulet') {
+                                player.attackPower += 10;
+                            } else {
+                                player.inventory[itemName] = true;
+                                if (itemName === 'bow') {
+                                    player.inventory.arrows = 15;
+                                }
+                            }
+                            player.score += 50;
+                            particles.push({ x: item.x, y: item.y - 20, vx: 0, vy: -2, text: 'Item Found!', life: 60 });
+                        } else if (itemName === 'bombs' || itemName === 'arrows') {
+                            player.inventory[itemName] += (item.chestValue || 0);
+                            player.score += 25;
+                            particles.push({ x: item.x, y: item.y - 20, vx: 0, vy: -2, text: item.chestValue + ' ' + itemName, life: 60 });
+                        }
+                    }
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        let levelUpFlash = 0;
+
+        function levelUp() {
+            player.level++;
+            player.speed += 0.3;
+            player.maxHp += 15;
+            player.hp = player.maxHp;
+            player.attackPower += 5;
+            player.defense += 2;
+            player.xp -= player.xpToNext;
+            player.xpToNext += 50;
+
+            // Big sound fanfare
+            playSound(440, 0.15, 'sine');
+            setTimeout(() => playSound(554, 0.15, 'sine'), 100);
+            setTimeout(() => playSound(660, 0.15, 'sine'), 200);
+            setTimeout(() => playSound(880, 0.3, 'sine'), 300);
+
+            // Screen flash
+            levelUpFlash = 40;
+
+            // Big "LEVEL UP" text
+            particles.push({ x: player.x, y: player.y - 50, vx: 0, vy: -1.5, text: '\u2605 LEVEL ' + player.level + ' \u2605', life: 120, big: true });
+            // Stat change particles
+            particles.push({ x: player.x - 40, y: player.y - 20, vx: -0.5, vy: -2, text: 'ATK +5', life: 80 });
+            particles.push({ x: player.x + 40, y: player.y - 20, vx: 0.5, vy: -2, text: 'DEF +2', life: 80 });
+            particles.push({ x: player.x, y: player.y - 10, vx: 0, vy: -2.5, text: 'HP +15', life: 80 });
+            // Ring of sparkles
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                particles.push({ x: player.x, y: player.y, vx: Math.cos(angle) * 2, vy: Math.sin(angle) * 2, text: '\u2726', life: 40 });
+            }
+
+            // Level 6 unlock notification
+            if (player.level === 6) {
+                setTimeout(() => {
+                    particles.push({ x: player.x, y: player.y - 70, vx: 0, vy: -1, text: '\u26A1 MAGIC BLAST UNLOCKED! (B key) \u26A1', life: 150, big: true });
+                    playSound(523, 0.2, 'square');
+                    setTimeout(() => playSound(784, 0.3, 'square'), 150);
+                }, 500);
+            }
+        }
+
+        function awardXp(amount) {
+            player.xp += amount;
+            particles.push({ x: player.x, y: player.y - 40, vx: 0, vy: -3, text: '+' + amount + 'XP', life: 60 });
+            while (player.xp >= player.xpToNext) {
+                levelUp();
+            }
+        }
+
+        function performAttack() {
+            playAttackSound();
+            const range = 44;
+
+            // Facing direction in radians (atan2 convention: right=0, down=PI/2, left=PI, up=-PI/2)
+            let facingAngle = 0;
+            if (player.facing === 'right') facingAngle = 0;
+            else if (player.facing === 'down') facingAngle = Math.PI / 2;
+            else if (player.facing === 'left') facingAngle = Math.PI;
+            else if (player.facing === 'up') facingAngle = -Math.PI / 2;
+
+            enemies.forEach(enemy => {
+                const dx = enemy.x - player.x;
+                const dy = enemy.y - player.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist < range) {
+                    // Angle from player to enemy
+                    const angleToEnemy = Math.atan2(dy, dx);
+                    // Angular difference (handles wrapping correctly)
+                    let diff = angleToEnemy - facingAngle;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    // Hit if within 90 degree arc (45 degrees each side of facing)
+                    if (Math.abs(diff) < Math.PI / 2) {
+                        damageEnemy(enemy, player.attackPower);
+                    }
+                }
+            });
+        }
+
+        function damageEnemy(enemy, damage) {
+            playHitSound();
+            enemy.hp -= damage;
+            enemy.flashTimer = 8;
+            particles.push({ x: enemy.x, y: enemy.y - 20, vx: 0, vy: -2, text: damage, life: 30 });
+
+            if (enemy.hp <= 0) {
+                const points = enemy.isBoss ? 500 : enemy.type === 'slime' ? 25 : enemy.type === 'skeleton' ? 50 : enemy.type === 'bat' ? 35 : 75;
+                player.score += points;
+                playBossSound();
+                const itemType = Math.random() > 0.6 ? 'heart' : 'coin';
+                items.push({ x: enemy.x, y: enemy.y, type: itemType, radius: 8 });
+
+                // Award XP based on enemy type
+                let xpReward = 10;
+                if (enemy.isBoss) xpReward = 200;
+                else if (enemy.type === 'slime') xpReward = 15;
+                else if (enemy.type === 'skeleton') xpReward = 25;
+                else if (enemy.type === 'bat') xpReward = 20;
+                else if (enemy.type === 'darkKnight') xpReward = 40;
+                awardXp(xpReward);
+
+                if (enemy.isBoss) {
+                    gameState.bossesDefeated.add(gameState.currentDungeon);
+                    player.score += 1000; // dungeon clear bonus
+                    particles.push({ x: enemy.x, y: enemy.y - 40, vx: 0, vy: -1, text: 'BOSS DEFEATED! +1000', life: 90 });
+
+                    // Boss drops special items
+                    if (enemy.type === 'treant') {
+                        items.push({ x: enemy.x, y: enemy.y - 30, type: 'chest', chestItem: 'bow', chestValue: 15, radius: 8 });
+                    } else if (enemy.type === 'shadowLord') {
+                        items.push({ x: enemy.x, y: enemy.y - 30, type: 'chest', chestItem: 'boomerang', chestValue: null, radius: 8 });
+                    } else if (enemy.type === 'dragon') {
+                        items.push({ x: enemy.x, y: enemy.y - 30, type: 'chest', chestItem: 'bombs', chestValue: 5, radius: 8 });
+                    }
+
+                    if (gameState.bossesDefeated.size >= 3) {
+                        gameState.screen = 'victory';
+                        setTimeout(() => showHS(player.score), 1500);
+                    }
+                }
+                enemies = enemies.filter(e => e !== enemy);
+            }
+        }
+
+        function updateEnemies() {
+            enemies.forEach(enemy => {
+                const dx = player.x - enemy.x;
+                const dy = player.y - enemy.y;
+                const dist = Math.hypot(dx, dy);
+
+                // Update stun timer
+                if (enemy.stunTimer) {
+                    enemy.stunTimer--;
+                    if (enemy.stunTimer <= 0) {
+                        enemy.vx = 0;
+                        enemy.vy = 0;
+                    }
+                } else {
+                    if (dist < enemy.detectionRange) {
+                        enemy.chasing = true;
+                        const speed = enemy.speed;
+                        enemy.vx = (dx / dist) * speed;
+                        enemy.vy = (dy / dist) * speed;
+                    } else {
+                        enemy.chasing = false;
+                        enemy.wanderTimer--;
+                        if (enemy.wanderTimer <= 0) {
+                            enemy.vx = (Math.random() - 0.5) * enemy.speed;
+                            enemy.vy = (Math.random() - 0.5) * enemy.speed;
+                            enemy.wanderTimer = 60 + Math.random() * 60;
+                        }
+                    }
+                }
+
+                if (enemy.isBoss) {
+                    if (enemy.type === 'shadowLord') {
+                        enemy.teleportCooldown--;
+                        if (enemy.teleportCooldown <= 0 && dist < enemy.detectionRange && Math.random() > 0.7) {
+                            enemy.x = 100 + Math.random() * (CANVAS_WIDTH - 200);
+                            enemy.y = 100 + Math.random() * (CANVAS_HEIGHT - 200);
+                            enemy.teleportCooldown = 120;
+                        }
+                    }
+                    if (enemy.type === 'dragon') {
+                        enemy.breathTimer--;
+                        if (enemy.breathTimer <= 0 && dist < enemy.detectionRange && Math.random() > 0.8) {
+                            for (let i = 0; i < 3; i++) {
+                                const angle = (Math.atan2(dy, dx) + (i - 1) * 0.3);
+                                projectiles.push({
+                                    x: enemy.x,
+                                    y: enemy.y,
+                                    vx: Math.cos(angle) * 4,
+                                    vy: Math.sin(angle) * 4,
+                                    damage: 20,
+                                    type: 'fire'
+                                });
+                            }
+                            enemy.breathTimer = 180;
+                        }
+                    }
+                }
+
+                enemy.x += enemy.vx;
+                enemy.y += enemy.vy;
+
+                if (isWall(enemy.x, enemy.y)) {
+                    enemy.x -= enemy.vx;
+                    enemy.y -= enemy.vy;
+                    enemy.vx = (Math.random() - 0.5) * enemy.speed;
+                    enemy.vy = (Math.random() - 0.5) * enemy.speed;
+                }
+
+                // Prevent enemy-player overlap: push enemy away
+                const pdx = player.x - enemy.x;
+                const pdy = player.y - enemy.y;
+                const pdist = Math.hypot(pdx, pdy);
+                const minDist = (player.width + (enemy.width || 16)) / 2 + 4;
+                if (pdist < minDist && pdist > 0) {
+                    const pushX = (pdx / pdist) * (minDist - pdist);
+                    const pushY = (pdy / pdist) * (minDist - pdist);
+                    enemy.x -= pushX;
+                    enemy.y -= pushY;
+                }
+                if (pdist < enemy.attackRange) {
+                    enemy.attackTimer--;
+                    if (enemy.attackTimer <= 0) {
+                        if (!player.shieldActive || player.shieldActive && Math.random() > 0.75) {
+                            const damage = player.shieldActive ? Math.ceil(enemy.damage * 0.25) : enemy.damage;
+                            player.hp -= damage;
+                            playDamageSound();
+                            player.invincible = true;
+                            player.invincibilityTimer = 60;
+                            particles.push({ x: player.x, y: player.y - 20, vx: 0, vy: -2, text: damage, life: 30 });
+                        }
+                        enemy.attackTimer = enemy.attackCooldown;
+                    }
+                }
+
+                if (enemy.flashTimer > 0) enemy.flashTimer--;
+            });
+        }
+
+        function updateProjectiles() {
+            projectiles = projectiles.filter(proj => {
+                // Handle bomb explosions
+                if (proj.type === 'bomb') {
+                    proj.life--;
+                    if (proj.life <= 0) {
+                        // Explode - damage all nearby enemies
+                        enemies.forEach(enemy => {
+                            const dist = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
+                            if (dist < proj.explosionRadius) {
+                                damageEnemy(enemy, proj.damage);
+                            }
+                        });
+                        particles.push({ x: proj.x, y: proj.y, vx: 0, vy: 0, text: 'BOOM', life: 30 });
+                        return false;
+                    }
+                    return true;
+                }
+
+                // Handle boomerang mechanics
+                if (proj.type === 'boomerang') {
+                    if (!proj.returning) {
+                        proj.distance += Math.hypot(proj.vx, proj.vy);
+                        if (proj.distance >= proj.maxDistance) {
+                            proj.returning = true;
+                        }
+                    }
+                    if (proj.returning) {
+                        const angle = Math.atan2(player.y - proj.y, player.x - proj.x);
+                        proj.vx = Math.cos(angle) * 6;
+                        proj.vy = Math.sin(angle) * 6;
+                        if (Math.hypot(player.x - proj.x, player.y - proj.y) < 25) {
+                            return false;
+                        }
+                    } else {
+                        proj.x += proj.vx;
+                        proj.y += proj.vy;
+                        // Check boomerang hits on enemies
+                        enemies.forEach(enemy => {
+                            const dist = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
+                            if (dist < 20) {
+                                damageEnemy(enemy, proj.damage);
+                                enemy.stunTimer = 60;
+                                proj.returning = true;
+                            }
+                        });
+                    }
+                    if (proj.x < 0 || proj.x > CANVAS_WIDTH || proj.y < 0 || proj.y > CANVAS_HEIGHT) {
+                        return false;
+                    }
+                    return true;
+                }
+
+                // Handle arrows and other projectiles
+                proj.x += proj.vx;
+                proj.y += proj.vy;
+
+                if (proj.life !== undefined) proj.life--;
+                if (proj.life <= 0 && (proj.type === 'arrow' || proj.type === 'magic')) return false;
+
+                if (proj.x < 0 || proj.x > CANVAS_WIDTH || proj.y < 0 || proj.y > CANVAS_HEIGHT) {
+                    return false;
+                }
+
+                // Check hits on enemies (arrows and magic blasts)
+                if (proj.type === 'arrow' || proj.type === 'magic') {
+                    const hitRadius = proj.type === 'magic' ? 20 : 15;
+                    enemies.forEach(enemy => {
+                        const dist = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
+                        if (dist < hitRadius) {
+                            damageEnemy(enemy, proj.damage);
+                            proj.life = 0;
+                            if (proj.type === 'magic') {
+                                // Magic explosion particles
+                                for (let i = 0; i < 6; i++) {
+                                    particles.push({
+                                        x: proj.x, y: proj.y,
+                                        vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3,
+                                        text: '\u2726', life: 20
+                                    });
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Damage player on projectile hit (fire from dragon, etc.)
+                const pdx = player.x - proj.x;
+                const pdy = player.y - proj.y;
+                if (Math.hypot(pdx, pdy) < 25 && proj.type !== 'arrow' && proj.type !== 'boomerang' && proj.type !== 'magic') {
+                    const baseDamage = proj.damage || 10;
+                    const actualDamage = Math.max(1, baseDamage - player.defense);
+                    player.hp -= actualDamage;
+                    player.invincible = true;
+                    player.invincibilityTimer = 60;
+                    playDamageSound();
+                    return false;
+                }
+
+                return true;
+            });
+        }
+
+        function transitionRoom(doorData) {
+            if (gameState.transitioning) return;
+            gameState.transitioning = true;
+            gameState.transitionProgress = 0;
+
+            setTimeout(() => {
+                if (doorData.targetDungeon === -1) {
+                    gameState.currentDungeon = -1;
+                    gameState.currentRoom = 0;
+                    player.x = doorData.spawnX;
+                    player.y = doorData.spawnY;
+                } else {
+                    gameState.currentDungeon = doorData.targetDungeon;
+                    gameState.currentRoom = doorData.targetRoom;
+                    player.x = doorData.spawnX;
+                    player.y = doorData.spawnY;
+                }
+                gameState.exploredRooms.add(`${gameState.currentDungeon}-${gameState.currentRoom}`);
+                loadRoom();
+                gameState.transitionProgress = 0.5;
+            }, 250);
+
+            setTimeout(() => {
+                gameState.transitioning = false;
+            }, 500);
+        }
+
+        // ============================================================================
+        // RENDERING
+        // ============================================================================
+
+        function drawTile(x, y, tileType) {
+            const sx = x * TILE_SIZE;
+            const sy = y * TILE_SIZE;
+
+            if (tileType === TILE_TYPES.FLOOR) {
+                if (gameState.currentDungeon === -1) {
+                    ctx.fillStyle = '#2d5a1e';
+                } else {
+                    ctx.fillStyle = '#444';
+                }
+                ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            } else if (tileType === TILE_TYPES.WALL) {
+                if (gameState.currentDungeon === -1) {
+                    ctx.fillStyle = '#0a3d0a';
+                } else {
+                    ctx.fillStyle = '#222';
+                }
+                ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                if (gameState.currentDungeon !== -1) {
+                    ctx.strokeStyle = '#111';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                }
+            } else if (tileType === TILE_TYPES.DOOR) {
+                if (gameState.currentDungeon === -1 && dungeonEntranceImg.complete && dungeonEntranceImg.naturalWidth > 0) {
+                    // Draw grass background first, then dungeon entrance image on overworld
+                    ctx.fillStyle = '#2d5a1e';
+                    ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                    ctx.drawImage(dungeonEntranceImg, sx, sy, TILE_SIZE, TILE_SIZE);
+                } else {
+                    ctx.fillStyle = '#886622';
+                    ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                    ctx.strokeStyle = '#ffdd00';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                }
+            } else if (tileType === TILE_TYPES.CHEST || tileType === TILE_TYPES.ENEMY_SPAWN || tileType === TILE_TYPES.ITEM_SPAWN || tileType === TILE_TYPES.BOSS_SPAWN) {
+                // Spawn tiles and chest tiles render as floor
+                if (gameState.currentDungeon === -1) {
+                    ctx.fillStyle = '#2d5a1e';
+                } else {
+                    ctx.fillStyle = '#444';
+                }
+                ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            }
+        }
+
+        function drawRoom() {
+            const roomData = getCurrentRoomData();
+            if (!roomData) return;
+
+            for (let y = 0; y < roomData.map.length; y++) {
+                for (let x = 0; x < roomData.map[y].length; x++) {
+                    drawTile(x, y, roomData.map[y][x]);
+                }
+            }
+
+            // Draw dungeon darkness overlay
+            if (gameState.currentDungeon !== -1) {
+                const grad = ctx.createRadialGradient(player.x, player.y, 80, player.x, player.y, 300);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, 'rgba(0,0,0,0.7)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            }
+        }
+
+        function drawPlayer() {
+            if (player.invincible && Math.floor(gameState.frameCount / 10) % 2) return;
+
+            const isAttacking = player.attackCooldown > 12;
+            const sprite = isAttacking ? spriteImgSword : spriteImgLook;
+            const rot = FACING_ROTATION[player.facing] || 0;
+            const spriteSize = 40;
+
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(rot);
+            if (sprite.complete && sprite.naturalWidth > 0) {
+                ctx.drawImage(sprite, -spriteSize / 2, -spriteSize / 2, spriteSize, spriteSize);
+            } else {
+                // Fallback if sprites haven't loaded
+                ctx.fillStyle = '#00cc00';
+                ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(-3, -8, 6, 6);
+            }
+            ctx.restore();
+
+            if (player.shieldActive) {
+                ctx.strokeStyle = '#00ccff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, 20, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        function drawEnemy(enemy) {
+            ctx.fillStyle = enemy.flashTimer > 0 ? '#ffffff' : enemy.color;
+
+            if (enemy.isBoss) {
+                ctx.fillRect(enemy.x - enemy.width / 2, enemy.y - enemy.height / 2, enemy.width, enemy.height);
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(enemy.x - enemy.width / 2, enemy.y - enemy.height / 2, enemy.width, enemy.height);
+
+                const hpBarWidth = enemy.width;
+                const hpBarHeight = 4;
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(enemy.x - hpBarWidth / 2, enemy.y - enemy.height / 2 - 12, hpBarWidth, hpBarHeight);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(enemy.x - hpBarWidth / 2, enemy.y - enemy.height / 2 - 12, (enemy.hp / enemy.maxHp) * hpBarWidth, hpBarHeight);
+            } else {
+                if (enemy.type === 'slime') {
+                    ctx.beginPath();
+                    ctx.ellipse(enemy.x, enemy.y, enemy.width / 2, enemy.height / 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(enemy.x - enemy.width / 2, enemy.y - enemy.height / 2, enemy.width, enemy.height);
+                }
+            }
+        }
+
+        function drawItems() {
+            items.forEach(item => {
+                if (item.type === 'heart') {
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(item.x - 4, item.y - 4, 8, 8);
+                } else if (item.type === 'coin') {
+                    ctx.fillStyle = '#ffdd00';
+                    ctx.beginPath();
+                    ctx.arc(item.x, item.y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (item.type === 'chest') {
+                    // Draw chest as a glowing treasure box
+                    const bob = Math.sin(gameState.frameCount * 0.08) * 2;
+                    ctx.fillStyle = '#8B4513';
+                    ctx.fillRect(item.x - 8, item.y - 6 + bob, 16, 12);
+                    ctx.fillStyle = '#DAA520';
+                    ctx.fillRect(item.x - 8, item.y - 6 + bob, 16, 3);
+                    ctx.fillRect(item.x - 2, item.y - 6 + bob, 4, 12);
+                    // Sparkle effect
+                    ctx.fillStyle = `rgba(255,255,100,${0.5 + Math.sin(gameState.frameCount * 0.12) * 0.5})`;
+                    ctx.beginPath();
+                    ctx.arc(item.x, item.y - 10 + bob, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        function drawProjectiles() {
+            projectiles.forEach(proj => {
+                if (proj.type === 'magic') {
+                    // Glowing blue-purple magic orb
+                    const pulse = Math.sin(gameState.frameCount * 0.3) * 2;
+                    ctx.fillStyle = '#7700ff';
+                    ctx.beginPath();
+                    ctx.arc(proj.x, proj.y, 7 + pulse, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#cc88ff';
+                    ctx.beginPath();
+                    ctx.arc(proj.x, proj.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(proj.x, proj.y, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (proj.type === 'arrow') {
+                    ctx.fillStyle = '#8B4513';
+                    ctx.fillRect(proj.x - 5, proj.y - 2, 10, 4);
+                    ctx.fillStyle = '#ccc';
+                    ctx.fillRect(proj.x + 3, proj.y - 3, 4, 6);
+                } else if (proj.type === 'boomerang') {
+                    ctx.fillStyle = '#00ccff';
+                    ctx.save();
+                    ctx.translate(proj.x, proj.y);
+                    ctx.rotate(gameState.frameCount * 0.3);
+                    ctx.fillRect(-6, -2, 12, 4);
+                    ctx.fillRect(-2, -6, 4, 12);
+                    ctx.restore();
+                } else if (proj.type === 'bomb') {
+                    const timeLeft = proj.life;
+                    const flash = timeLeft < 15 && Math.floor(gameState.frameCount / 3) % 2;
+                    ctx.fillStyle = flash ? '#ff0000' : '#333';
+                    ctx.beginPath();
+                    ctx.arc(proj.x, proj.y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#ff8800';
+                    ctx.fillRect(proj.x - 1, proj.y - 9, 2, 5);
+                } else {
+                    ctx.fillStyle = '#ff6600';
+                    ctx.fillRect(proj.x - 4, proj.y - 4, 8, 8);
+                }
+            });
+        }
+
+        function drawParticles() {
+            ctx.textAlign = 'center';
+            particles = particles.filter(p => {
+                p.x += (p.vx || 0);
+                p.y += p.vy;
+                p.life--;
+                const alpha = Math.min(1, p.life / 30);
+                if (p.big) {
+                    ctx.fillStyle = `rgba(255,255,50,${alpha})`;
+                    ctx.font = 'bold 20px Courier New';
+                    ctx.strokeStyle = `rgba(0,0,0,${alpha})`;
+                    ctx.lineWidth = 3;
+                    ctx.strokeText(p.text, p.x, p.y);
+                    ctx.fillText(p.text, p.x, p.y);
+                } else {
+                    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText(p.text, p.x, p.y);
+                }
+                return p.life > 0;
+            });
+            ctx.textAlign = 'left';
+        }
+
+        function drawHUD() {
+            ctx.fillStyle = '#0ff';
+            ctx.font = 'bold 14px Courier New';
+            ctx.textAlign = 'left';
+
+            // Health bar
+            ctx.fillStyle = '#333'; ctx.fillRect(10, 10, 150, 16);
+            const hpPct = Math.max(0, player.hp) / player.maxHp;
+            ctx.fillStyle = hpPct > 0.5 ? '#0a0' : hpPct > 0.25 ? '#f80' : '#f00';
+            ctx.fillRect(10, 10, 150 * hpPct, 16);
+            ctx.fillStyle = '#fff'; ctx.font = '11px Courier New';
+            ctx.fillText(`HP: ${Math.max(0, player.hp)}/${player.maxHp}`, 14, 23);
+
+            // Level and XP info
+            ctx.fillText(`LVL: ${player.level}  XP: ${player.xp}/${player.xpToNext}`, 10, 38);
+
+            // Selected item info
+            let itemText = 'No Item';
+            if (player.selectedItem) {
+                const itemName = player.selectedItem.charAt(0).toUpperCase() + player.selectedItem.slice(1);
+                if (player.selectedItem === 'bombs' || player.selectedItem === 'arrows') {
+                    itemText = itemName + ' [' + player.inventory[player.selectedItem] + ']';
+                } else {
+                    itemText = itemName;
+                }
+            }
+            ctx.fillText(`Item: ${itemText}`, 10, 53);
+            if (player.level >= 6) {
+                const magicReady = player.magicCooldown <= 0;
+                ctx.fillStyle = magicReady ? '#c8f' : '#666';
+                ctx.fillText(`C:Cycle V:Use B:Magic${magicReady ? '\u2713' : '..'}`, 10, 68);
+            } else {
+                ctx.fillStyle = '#fff';
+                ctx.fillText(`C:Cycle V:Use`, 10, 68);
+            }
+
+            ctx.fillText(`Score: ${player.score}`, CANVAS_WIDTH - 150, 25);
+            ctx.fillText(`Coins: ${player.coins}`, 10, 83);
+            ctx.fillText(`Keys: ${player.keys}`, 10, 98);
+
+            // Player stats
+            ctx.fillStyle = '#fc0'; ctx.fillText(`ATK: ${player.attackPower}`, 10, 113);
+            ctx.fillStyle = '#0cf'; ctx.fillText(`SPD: ${player.speed.toFixed(1)}`, 70, 113);
+            ctx.fillStyle = '#8f8'; ctx.fillText(`DEF: ${player.defense}`, 140, 113);
+
+            let locName = 'Overworld';
+            if (gameState.currentDungeon === 0) locName = `Forest Temple - Room ${gameState.currentRoom + 1}`;
+            else if (gameState.currentDungeon === 1) locName = `Shadow Cavern - Room ${gameState.currentRoom + 1}`;
+            else if (gameState.currentDungeon === 2) locName = `Dragon Keep - Room ${gameState.currentRoom + 1}`;
+            ctx.textAlign = 'right';
+            ctx.fillText(locName, CANVAS_WIDTH - 10, CANVAS_HEIGHT - 10);
+
+            if (player.hp <= 0) {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                ctx.fillStyle = '#ff0000';
+                ctx.font = 'bold 32px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+            }
+
+            // Boss tracker
+            ctx.textAlign = 'left';
+            ctx.font = '11px Courier New';
+            const bosses = ['Forest', 'Shadow', 'Dragon'];
+            for (let i = 0; i < 3; i++) {
+                ctx.fillStyle = gameState.bossesDefeated.has(i) ? '#0f0' : '#555';
+                ctx.fillText((gameState.bossesDefeated.has(i) ? '\u2713 ' : '\u2022 ') + bosses[i], CANVAS_WIDTH - 150, 50 + i * 18);
+            }
+
+            // Touch buttons
+            if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                ctx.globalAlpha = 0.4;
+                // D-pad area
+                ctx.strokeStyle = '#0ff';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(80, CANVAS_HEIGHT - 100, 50, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = '#0ff'; ctx.font = '16px Courier New'; ctx.textAlign = 'center';
+                ctx.fillText('\u25B2', 80, CANVAS_HEIGHT - 140);
+                ctx.fillText('\u25BC', 80, CANVAS_HEIGHT - 55);
+                ctx.fillText('\u25C0', 40, CANVAS_HEIGHT - 96);
+                ctx.fillText('\u25B6', 120, CANVAS_HEIGHT - 96);
+                // Attack button
+                ctx.fillStyle = '#f44'; ctx.beginPath(); ctx.arc(CANVAS_WIDTH - 80, CANVAS_HEIGHT - 120, 25, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.fillText('Z', CANVAS_WIDTH - 80, CANVAS_HEIGHT - 115);
+                // Shield button
+                ctx.fillStyle = '#08f'; ctx.beginPath(); ctx.arc(CANVAS_WIDTH - 80, CANVAS_HEIGHT - 60, 25, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.fillText('X', CANVAS_WIDTH - 80, CANVAS_HEIGHT - 55);
+                // Cycle button (C)
+                ctx.fillStyle = '#8f4'; ctx.beginPath(); ctx.arc(CANVAS_WIDTH - 150, CANVAS_HEIGHT - 120, 20, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#000'; ctx.font = '14px Courier New'; ctx.fillText('C', CANVAS_WIDTH - 150, CANVAS_HEIGHT - 113);
+                // Use button (V)
+                ctx.fillStyle = '#f8f'; ctx.beginPath(); ctx.arc(CANVAS_WIDTH - 150, CANVAS_HEIGHT - 60, 20, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#000'; ctx.fillText('V', CANVAS_WIDTH - 150, CANVAS_HEIGHT - 53);
+                ctx.globalAlpha = 1;
+                ctx.textAlign = 'left';
+            }
+        }
+
+        function drawTransitionOverlay() {
+            const alpha = Math.abs(gameState.transitionProgress - 0.5) * 2;
+            ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        }
+
+        // ============================================================================
+        // GAME LOOP
+        // ============================================================================
+        let gameOver = false;
+
+        function drawMenu() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // Title
+            ctx.fillStyle = '#0f0';
+            ctx.font = 'bold 36px Courier New';
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 10; ctx.shadowColor = '#0f0';
+            ctx.fillText('LEGEND OF THE', CANVAS_WIDTH / 2, 150);
+            ctx.fillStyle = '#0ff';
+            ctx.shadowColor = '#0ff';
+            ctx.fillText('LOST KINGDOM', CANVAS_WIDTH / 2, 200);
+            ctx.shadowBlur = 0;
+
+            ctx.fillStyle = '#888';
+            ctx.font = '14px Courier New';
+            ctx.fillText('A Top-Down Adventure', CANVAS_WIDTH / 2, 260);
+
+            ctx.fillStyle = '#0a0';
+            ctx.font = '12px Courier New';
+            ctx.fillText('WASD / Arrow Keys - Move', CANVAS_WIDTH / 2, 320);
+            ctx.fillText('Z - Sword Attack', CANVAS_WIDTH / 2, 345);
+            ctx.fillText('X - Shield', CANVAS_WIDTH / 2, 370);
+            ctx.fillText('Explore 3 Dungeons. Defeat 3 Bosses.', CANVAS_WIDTH / 2, 410);
+
+            const pulse = Math.sin(gameState.frameCount * 0.05) * 0.3 + 0.7;
+            ctx.fillStyle = `rgba(255, 255, 0, ${pulse})`;
+            ctx.font = 'bold 18px Courier New';
+            ctx.fillText('PRESS SPACE OR TAP TO START', CANVAS_WIDTH / 2, 480);
+            ctx.textAlign = 'left';
+        }
+
+        function drawVictoryScreen() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ff0';
+            ctx.font = 'bold 36px Courier New';
+            ctx.shadowBlur = 10; ctx.shadowColor = '#ff0';
+            ctx.fillText('VICTORY!', CANVAS_WIDTH / 2, 200);
+            ctx.shadowBlur = 0;
+
+            ctx.fillStyle = '#0ff';
+            ctx.font = '18px Courier New';
+            ctx.fillText('All dungeons conquered!', CANVAS_WIDTH / 2, 260);
+            ctx.fillText('Final Score: ' + player.score, CANVAS_WIDTH / 2, 300);
+            ctx.textAlign = 'left';
+        }
+
+        function gameLoop() {
+            gameState.frameCount++;
+
+            if (gameState.screen === 'menu') {
+                drawMenu();
+                if (keys['Space'] || keys['Enter']) {
+                    gameState.screen = 'playing';
+                    keys['Space'] = false;
+                    keys['Enter'] = false;
+                }
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            drawRoom();
+            drawItems();
+            drawProjectiles();
+            enemies.forEach(drawEnemy);
+            drawPlayer();
+            drawParticles();
+
+            // Level up screen flash
+            if (levelUpFlash > 0) {
+                const flashAlpha = (levelUpFlash / 40) * 0.6;
+                ctx.fillStyle = `rgba(255,255,100,${flashAlpha})`;
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                levelUpFlash--;
+            }
+
+            drawHUD();
+
+            if (gameState.transitioning) {
+                gameState.transitionProgress += 0.02;
+                drawTransitionOverlay();
+            }
+
+            if (gameState.screen === 'victory') {
+                drawVictoryScreen();
+            } else if (player.hp > 0) {
+                updatePlayer();
+                updateEnemies();
+                updateProjectiles();
+            } else if (!gameOver) {
+                gameOver = true;
+                setTimeout(() => showHS(player.score), 500);
+            } else {
+                // Game over screen
+                ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#f00';
+                ctx.font = 'bold 36px Courier New';
+                ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40);
+                ctx.fillStyle = '#0ff';
+                ctx.font = '16px Courier New';
+                ctx.fillText('Score: ' + player.score, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+                const pulse = Math.sin(gameState.frameCount * 0.05) * 0.3 + 0.7;
+                ctx.fillStyle = `rgba(255, 255, 0, ${pulse})`;
+                ctx.font = 'bold 14px Courier New';
+                ctx.fillText('PRESS R OR TAP TO RESTART', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 40);
+                ctx.textAlign = 'left';
+
+                if (keys['KeyR'] || keys['Space']) {
+                    keys['KeyR'] = false;
+                    keys['Space'] = false;
+                    restartGame();
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================================================
+        // RESTART
+        // ============================================================================
+        function restartGame() {
+            player.x = 10 * 32 + 16;
+            player.y = 7 * 32 + 16;
+            player.hp = 100;
+            player.maxHp = 100;
+            player.score = 0;
+            player.coins = 0;
+            player.keys = 0;
+            player.facing = 'down';
+            player.attackCooldown = 0;
+            player.shieldActive = false;
+            player.invincible = false;
+            player.invincibilityTimer = 0;
+            player.level = 1;
+            player.xp = 0;
+            player.xpToNext = 100;
+            player.attackPower = 25;
+            player.defense = 0;
+            player.speed = 3;
+            player.inventory = {
+                bow: false,
+                boomerang: false,
+                speedBoots: false,
+                defenseRing: false,
+                attackAmulet: false,
+                bombs: 0,
+                arrows: 0
+            };
+            player.selectedItem = null;
+            player.magicCooldown = 0;
+            levelUpFlash = 0;
+            gameState.currentDungeon = -1;
+            gameState.currentRoom = 0;
+            gameState.transitioning = false;
+            gameState.transitionProgress = 0;
+            gameState.exploredRooms = new Set();
+            gameState.bossesDefeated = new Set();
+            gameState.screen = 'playing';
+            gameOver = false;
+            enemies = [];
+            projectiles = [];
+            items = [];
+            particles = [];
+            loadRoom();
+        }
+
+        // ============================================================================
+        // INITIALIZATION
+        // ============================================================================
+        loadRoom();
+        gameLoop();
+    </script>
+
+    <div id="hs-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:none;justify-content:center;align-items:center;z-index:10000;flex-direction:column">
+        <div style="background:#1a1a2e;border:3px solid #0ff;border-radius:8px;padding:24px;max-width:320px;width:90%;box-shadow:0 0 20px #0ff">
+            <h2 style="color:#fff;text-align:center;margin:0 0 12px 0;font-size:18px;font-family:Courier New">HIGH SCORES</h2>
+            <div id="hs-game-score" style="color:#ff0;text-align:center;font-size:14px;margin-bottom:16px;font-family:Courier New;font-weight:bold">YOUR SCORE: 0</div>
+            <div id="hs-list" style="margin-bottom:16px;font-family:Courier New;max-height:180px;overflow-y:auto"></div>
+            <div id="hs-input" style="display:none;margin-bottom:12px">
+                <input id="hs-name" type="text" placeholder="Enter name..." maxlength="16" style="width:100%;padding:8px;background:#0a0a1a;border:2px solid #0ff;color:#0ff;font-family:Courier New;font-size:12px;box-sizing:border-box">
+            </div>
+            <div style="text-align:center">
+                <button id="hs-save-btn" style="display:none;padding:8px 16px;margin-right:8px;background:#0ff;color:#000;border:none;border-radius:4px;cursor:pointer;font-family:Courier New;font-weight:bold;font-size:12px">SAVE</button>
+                <button id="hs-close-btn" style="padding:8px 16px;background:#ff0;color:#000;border:none;border-radius:4px;cursor:pointer;font-family:Courier New;font-weight:bold;font-size:12px">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <div style="position:fixed;bottom:6px;left:8px;font-family:monospace;font-size:10px;color:rgba(255,255,255,0.35);pointer-events:none;z-index:9999;">Updated: Mar 21, 2026</div>
+
+    <script>
+        const HS_KEY='sg_hs_kingdom';
+        const HS_MAX=5;
+        function getHS(){return JSON.parse(localStorage.getItem(HS_KEY)||'[]');}
+        function showHS(currentScore){
+            const ol=document.getElementById('hs-overlay');
+            ol.style.display='flex';
+            document.getElementById('hs-game-score').textContent='YOUR SCORE: '+currentScore;
+            const scores=getHS();
+            const qualifies=scores.length<HS_MAX||currentScore>(scores[scores.length-1]?.score||0);
+            const listEl=document.getElementById('hs-list');
+            listEl.innerHTML=scores.length===0?'<div style="color:#666;text-align:center;padding:12px">No scores yet</div>':
+                scores.map((s,i)=>'<div style="display:flex;justify-content:space-between;padding:4px 8px;color:'+(i===0?'#ff0':'#0ff')+';font-size:13px"><span>'+(i+1)+'. '+s.name+'</span><span>'+s.score+'</span></div>').join('');
+            if(qualifies&&currentScore>0){
+                document.getElementById('hs-input').style.display='block';
+                document.getElementById('hs-save-btn').style.display='inline-block';
+                document.getElementById('hs-name').value=localStorage.getItem('sg_player_name')||'';
+                document.getElementById('hs-name').focus();
+                window._hsCurrentScore=currentScore;
+            }else{
+                document.getElementById('hs-input').style.display='none';
+                document.getElementById('hs-save-btn').style.display='none';
+            }
+        }
+        function saveHS(){
+            const name=(document.getElementById('hs-name').value||'ANONYMOUS').slice(0,16).toUpperCase();
+            localStorage.setItem('sg_player_name',name);
+            let scores=getHS();
+            scores.push({name,score:window._hsCurrentScore});
+            scores.sort((a,b)=>b.score-a.score);
+            scores=scores.slice(0,HS_MAX);
+            localStorage.setItem(HS_KEY,JSON.stringify(scores));
+            document.getElementById('hs-input').style.display='none';
+            document.getElementById('hs-save-btn').style.display='none';
+            const listEl=document.getElementById('hs-list');
+            listEl.innerHTML=scores.map((s,i)=>'<div style="display:flex;justify-content:space-between;padding:4px 8px;color:'+(i===0?'#ff0':'#0ff')+';font-size:13px"><span>'+(i+1)+'. '+s.name+'</span><span>'+s.score+'</span></div>').join('');
+        }
+        function closeHS(){document.getElementById('hs-overlay').style.display='none';}
+        document.getElementById('hs-save-btn')?.addEventListener('click',saveHS);
+        document.getElementById('hs-close-btn')?.addEventListener('click',closeHS);
+        document.getElementById('hs-name')?.addEventListener('keypress',(e)=>{if(e.key==='Enter')saveHS();});
+    </script>
+</body>
+</html>
