@@ -125,7 +125,7 @@
     </div>
   </div>
   <button id="restart-btn" onclick="if(gameState==='playing')loadLevel(currentLevel)">&#x21BB;</button>
-  <div id="controls-hint">WASD / Arrow Keys — Thrust &nbsp;&nbsp;|&nbsp;&nbsp; R — Restart Level</div>
+  <div id="controls-hint">SPACE — Launch &nbsp;&nbsp;|&nbsp;&nbsp; WASD — Thrust &nbsp;&nbsp;|&nbsp;&nbsp; F — Fire Probe &nbsp;&nbsp;|&nbsp;&nbsp; T — Toggle Trails &nbsp;&nbsp;|&nbsp;&nbsp; R — Restart</div>
 </div>
 
 <div id="message-overlay">
@@ -183,6 +183,20 @@ const FUEL_STATION_RADIUS = 18; // pickup radius for fuel stations
 let ship, particles, trail, stars, levelTime, gameState, currentLevel;
 let keys = {};
 let selectedStartLevel = 0; // 0-indexed level to start at
+
+// ========== PARKED STATE & MISSILES ==========
+let shipParked = true;           // true until player launches
+let missiles = [];               // active missiles [{x,y,vx,vy,alive,trail:[{x,y}],color,age}]
+let missileTrails = [];          // persisted trails after missile dies [{points:[{x,y}],color}]
+let showMissileTrails = true;    // toggle for trail visibility
+let missileColorIndex = 0;
+const MISSILE_COLORS = ['#f44','#4f4','#ff4','#f4f','#4ff','#fa4','#4af','#af4'];
+let missileSpeed = 100;          // adjustable launch speed
+const MISSILE_SPEED_MIN = 25;
+const MISSILE_SPEED_MAX = 500;
+const MISSILE_SPEED_STEP = 25;
+// Missiles persist indefinitely (no lifetime limit)
+const MISSILE_SIZE = 3;
 
 // ========== TOUCH / JOYSTICK STATE ==========
 const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -417,6 +431,155 @@ const levels = [
       { x: 0.5, y: 0.15 },
       { x: 0.5, y: 0.85 }
     ]
+  },
+  // ===== LEVELS 15-21: EXTREME =====
+  {
+    name: "Whirlpool",
+    fuel: 20,
+    ship: { x: 50, y: -0.42 },
+    goal: { x: -50, y: 0.42 },
+    planets: [
+      { x: 0.5, y: 0.5, mass: 20000, radius: 58, color: '#c0f' },
+      { x: 0.25, y: 0.25, mass: 4000, radius: 30, color: '#f60' },
+      { x: 0.75, y: 0.25, mass: 4000, radius: 30, color: '#0cf' },
+      { x: 0.25, y: 0.75, mass: 4000, radius: 30, color: '#fc0' },
+      { x: 0.75, y: 0.75, mass: 4000, radius: 30, color: '#0fc' },
+      { x: 0.5, y: 0.2, mass: 2200, radius: 18, color: '#f0f' },
+      { x: 0.5, y: 0.8, mass: 2200, radius: 18, color: '#0ff' },
+      { x: 0.15, y: 0.5, mass: 2200, radius: 18, color: '#ff0' }
+    ],
+    fuelStations: [
+      { x: 0.85, y: 0.5 }
+    ]
+  },
+  {
+    name: "Needle's Eye",
+    fuel: 18,
+    ship: { x: 40, y: -0.4 },
+    goal: { x: -40, y: 0.4 },
+    planets: [
+      { x: 0.3, y: 0.42, mass: 8000, radius: 44, color: '#f22' },
+      { x: 0.3, y: 0.58, mass: 8000, radius: 44, color: '#22f' },
+      { x: 0.6, y: 0.35, mass: 6000, radius: 38, color: '#f82' },
+      { x: 0.6, y: 0.65, mass: 6000, radius: 38, color: '#28f' },
+      { x: 0.15, y: 0.5, mass: 3000, radius: 22, color: '#ff4' },
+      { x: 0.85, y: 0.5, mass: 3000, radius: 22, color: '#4ff' },
+      { x: 0.45, y: 0.15, mass: 2000, radius: 16, color: '#f4f' },
+      { x: 0.45, y: 0.85, mass: 2000, radius: 16, color: '#4f4' }
+    ],
+    fuelStations: [
+      { x: 0.45, y: 0.5 }
+    ]
+  },
+  {
+    name: "Chaos Theory",
+    fuel: 18,
+    ship: { x: 40, y: null },
+    goal: { x: -40, y: 0 },
+    planets: [
+      { x: 0.2, y: 0.3, mass: 5000, radius: 34, color: '#f44' },
+      { x: 0.4, y: 0.7, mass: 7000, radius: 40, color: '#44f' },
+      { x: 0.6, y: 0.25, mass: 6000, radius: 36, color: '#4f4' },
+      { x: 0.8, y: 0.6, mass: 8000, radius: 42, color: '#f84' },
+      { x: 0.35, y: 0.5, mass: 3000, radius: 24, color: '#f4f' },
+      { x: 0.65, y: 0.45, mass: 3500, radius: 26, color: '#4ff' },
+      { x: 0.5, y: 0.1, mass: 2500, radius: 20, color: '#ff4' },
+      { x: 0.5, y: 0.9, mass: 2500, radius: 20, color: '#fa4' },
+      { x: 0.1, y: 0.6, mass: 2000, radius: 16, color: '#a4f' }
+    ],
+    fuelStations: [
+      { x: 0.9, y: 0.15 }
+    ]
+  },
+  {
+    name: "Black Hole Run",
+    fuel: 15,
+    ship: { x: 40, y: -0.38 },
+    goal: { x: -40, y: 0.38 },
+    planets: [
+      { x: 0.35, y: 0.5, mass: 22000, radius: 60, color: '#201' },
+      { x: 0.7, y: 0.5, mass: 22000, radius: 60, color: '#102' },
+      { x: 0.15, y: 0.2, mass: 3000, radius: 22, color: '#f44' },
+      { x: 0.85, y: 0.2, mass: 3000, radius: 22, color: '#4f4' },
+      { x: 0.15, y: 0.8, mass: 3000, radius: 22, color: '#44f' },
+      { x: 0.85, y: 0.8, mass: 3000, radius: 22, color: '#ff4' },
+      { x: 0.52, y: 0.2, mass: 2500, radius: 18, color: '#f4f' },
+      { x: 0.52, y: 0.8, mass: 2500, radius: 18, color: '#4ff' }
+    ],
+    fuelStations: [
+      { x: 0.52, y: 0.5 },
+      { x: 0.05, y: 0.5 }
+    ]
+  },
+  {
+    name: "Gravity Storm",
+    fuel: 14,
+    ship: { x: 35, y: -0.44 },
+    goal: { x: -35, y: 0.44 },
+    planets: [
+      { x: 0.5, y: 0.5, mass: 15000, radius: 50, color: '#f00' },
+      { x: 0.2, y: 0.2, mass: 5000, radius: 32, color: '#f80' },
+      { x: 0.8, y: 0.2, mass: 5000, radius: 32, color: '#08f' },
+      { x: 0.2, y: 0.8, mass: 5000, radius: 32, color: '#80f' },
+      { x: 0.8, y: 0.8, mass: 5000, radius: 32, color: '#0f8' },
+      { x: 0.35, y: 0.35, mass: 3000, radius: 22, color: '#ff0' },
+      { x: 0.65, y: 0.35, mass: 3000, radius: 22, color: '#0ff' },
+      { x: 0.35, y: 0.65, mass: 3000, radius: 22, color: '#f0f' },
+      { x: 0.65, y: 0.65, mass: 3000, radius: 22, color: '#f44' },
+      { x: 0.5, y: 0.15, mass: 2000, radius: 14, color: '#aaf' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.3 },
+      { x: 0.5, y: 0.7 }
+    ]
+  },
+  {
+    name: "The Gauntlet II",
+    fuel: 12,
+    ship: { x: 35, y: -0.45 },
+    goal: { x: -35, y: 0.45 },
+    planets: [
+      { x: 0.15, y: 0.5, mass: 6000, radius: 36, color: '#f22' },
+      { x: 0.3, y: 0.3, mass: 5000, radius: 32, color: '#2f2' },
+      { x: 0.3, y: 0.7, mass: 5000, radius: 32, color: '#22f' },
+      { x: 0.5, y: 0.5, mass: 10000, radius: 46, color: '#fff' },
+      { x: 0.7, y: 0.3, mass: 5000, radius: 32, color: '#ff2' },
+      { x: 0.7, y: 0.7, mass: 5000, radius: 32, color: '#f2f' },
+      { x: 0.85, y: 0.5, mass: 6000, radius: 36, color: '#2ff' },
+      { x: 0.5, y: 0.15, mass: 3500, radius: 24, color: '#fa4' },
+      { x: 0.5, y: 0.85, mass: 3500, radius: 24, color: '#4af' },
+      { x: 0.15, y: 0.2, mass: 2000, radius: 14, color: '#f84' },
+      { x: 0.85, y: 0.8, mass: 2000, radius: 14, color: '#84f' }
+    ],
+    fuelStations: [
+      { x: 0.42, y: 0.15 },
+      { x: 0.58, y: 0.85 }
+    ]
+  },
+  {
+    name: "Impossible",
+    fuel: 10,
+    ship: { x: 30, y: -0.46 },
+    goal: { x: -30, y: 0.46 },
+    planets: [
+      { x: 0.5, y: 0.5, mass: 25000, radius: 62, color: '#f00' },
+      { x: 0.2, y: 0.2, mass: 6000, radius: 36, color: '#ff4' },
+      { x: 0.8, y: 0.2, mass: 6000, radius: 36, color: '#4ff' },
+      { x: 0.2, y: 0.8, mass: 6000, radius: 36, color: '#f4f' },
+      { x: 0.8, y: 0.8, mass: 6000, radius: 36, color: '#4f4' },
+      { x: 0.35, y: 0.35, mass: 4000, radius: 28, color: '#f80' },
+      { x: 0.65, y: 0.35, mass: 4000, radius: 28, color: '#08f' },
+      { x: 0.35, y: 0.65, mass: 4000, radius: 28, color: '#80f' },
+      { x: 0.65, y: 0.65, mass: 4000, radius: 28, color: '#0f8' },
+      { x: 0.5, y: 0.15, mass: 3000, radius: 20, color: '#ffa' },
+      { x: 0.5, y: 0.85, mass: 3000, radius: 20, color: '#aff' },
+      { x: 0.12, y: 0.5, mass: 2500, radius: 18, color: '#faf' }
+    ],
+    fuelStations: [
+      { x: 0.5, y: 0.28 },
+      { x: 0.5, y: 0.72 },
+      { x: 0.88, y: 0.5 }
+    ]
   }
 ];
 
@@ -538,6 +701,12 @@ function loadLevel(idx) {
   trail = [];
   levelTime = 0;
 
+  // Reset parked state and missiles
+  shipParked = true;
+  missiles = [];
+  missileTrails = [];
+  // Don't reset showMissileTrails — keep user preference across levels
+
   // Update HUD
   document.getElementById('hud-level').textContent = idx + 1;
   document.getElementById('level-name').textContent = lev.name;
@@ -548,13 +717,51 @@ function loadLevel(idx) {
 // ========== INPUT ==========
 window.addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
-  if (e.key.toLowerCase() === 'r' && gameState === 'playing') {
+  const key = e.key.toLowerCase();
+
+  if (key === 'r' && gameState === 'playing') {
     loadLevel(currentLevel);
+  }
+
+  if (key === ' ' && gameState === 'playing' && shipParked) {
+    e.preventDefault();
+    launchShip();
+  }
+
+  if (key === 'f' && gameState === 'playing') {
+    e.preventDefault();
+    fireMissile();
+  }
+
+  if (key === 't' && gameState === 'playing') {
+    e.preventDefault();
+    showMissileTrails = !showMissileTrails;
+  }
+
+  // Missile speed: +/= to increase, - to decrease
+  if ((key === '=' || key === '+') && gameState === 'playing') {
+    missileSpeed = Math.min(MISSILE_SPEED_MAX, missileSpeed + MISSILE_SPEED_STEP);
+  }
+  if (key === '-' && gameState === 'playing') {
+    missileSpeed = Math.max(MISSILE_SPEED_MIN, missileSpeed - MISSILE_SPEED_STEP);
   }
 });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
+// Scroll wheel to adjust missile speed
+window.addEventListener('wheel', e => {
+  if (gameState !== 'playing') return;
+  e.preventDefault();
+  if (e.deltaY < 0) {
+    missileSpeed = Math.min(MISSILE_SPEED_MAX, missileSpeed + MISSILE_SPEED_STEP);
+  } else {
+    missileSpeed = Math.max(MISSILE_SPEED_MIN, missileSpeed - MISSILE_SPEED_STEP);
+  }
+}, { passive: false });
+
 // ========== TOUCH INPUT ==========
+let touchStartTime = 0;
+
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   if (gameState !== 'playing') return;
@@ -569,6 +776,7 @@ canvas.addEventListener('touchstart', e => {
       touchCurrentY = t.clientY;
       touchDirX = 0;
       touchDirY = 0;
+      touchStartTime = Date.now();
       break;
     }
   }
@@ -600,6 +808,12 @@ canvas.addEventListener('touchmove', e => {
 canvas.addEventListener('touchend', e => {
   for (const t of e.changedTouches) {
     if (t.identifier === touchId) {
+      // If tap was quick, treat as launch if parked
+      const tapDuration = Date.now() - touchStartTime;
+      if (shipParked && tapDuration < 300) {
+        launchShip();
+      }
+
       touchActive = false;
       touchId = null;
       touchDirX = 0;
@@ -621,11 +835,104 @@ canvas.addEventListener('touchcancel', e => {
   }
 });
 
+// ========== LAUNCH & MISSILE FUNCTIONS ==========
+function launchShip() {
+  if (!ship || !ship.alive || ship.won || !shipParked) return;
+  shipParked = false;
+  // Give ship initial velocity in aimed direction
+  ship.vx = Math.cos(ship.angle) * missileSpeed;
+  ship.vy = Math.sin(ship.angle) * missileSpeed;
+}
+
+function fireMissile() {
+  if (!ship || !ship.alive || ship.won) return;
+  const color = MISSILE_COLORS[missileColorIndex % MISSILE_COLORS.length];
+  missileColorIndex++;
+  missiles.push({
+    x: ship.x, y: ship.y,
+    vx: Math.cos(ship.angle) * missileSpeed,
+    vy: Math.sin(ship.angle) * missileSpeed,
+    alive: true, trail: [{x: ship.x, y: ship.y}], color: color, age: 0
+  });
+}
+
+function updateMissiles(dt) {
+  for (let i = missiles.length - 1; i >= 0; i--) {
+    const m = missiles[i];
+    if (!m.alive) continue;
+
+    m.age += dt;
+
+    // Gravity from each planet
+    for (const p of ship.planets) {
+      const dx = p.x - m.x;
+      const dy = p.y - m.y;
+      const distSq = dx * dx + dy * dy;
+      const dist = Math.sqrt(distSq);
+
+      // Collision with planet
+      if (dist < p.radius) {
+        m.alive = false;
+        missileTrails.push({points: m.trail.slice(), color: m.color});
+        break;
+      }
+
+      const force = G * p.mass / distSq;
+      m.vx += (dx / dist) * force * dt;
+      m.vy += (dy / dist) * force * dt;
+    }
+
+    if (!m.alive) continue;
+
+    // Speed clamp
+    const spd = Math.sqrt(m.vx * m.vx + m.vy * m.vy);
+    if (spd > MAX_SPEED) {
+      m.vx = (m.vx / spd) * MAX_SPEED;
+      m.vy = (m.vy / spd) * MAX_SPEED;
+    }
+
+    // Drag
+    m.vx *= DRAG;
+    m.vy *= DRAG;
+
+    // Move
+    m.x += m.vx * dt;
+    m.y += m.vy * dt;
+
+    // Trail
+    m.trail.push({x: m.x, y: m.y});
+
+    // Bounds — bounce softly (same as ship)
+    const margin = 30;
+    if (m.x < -margin) { m.x = -margin; m.vx = Math.abs(m.vx) * 0.5; }
+    if (m.x > W + margin) { m.x = W + margin; m.vx = -Math.abs(m.vx) * 0.5; }
+    if (m.y < -margin) { m.y = -margin; m.vy = Math.abs(m.vy) * 0.5; }
+    if (m.y > H + margin) { m.y = H + margin; m.vy = -Math.abs(m.vy) * 0.5; }
+  }
+
+  // Clean up dead missiles
+  missiles = missiles.filter(m => m.alive);
+}
+
 // ========== GAME LOOP ==========
 let lastTime = 0;
 
 function update(dt) {
   if (gameState !== 'playing' || !ship || !ship.alive || ship.won) return;
+
+  // Update missiles always (even while parked)
+  updateMissiles(dt);
+
+  // If parked, only handle rotation
+  if (shipParked) {
+    let rotateDir = 0;
+    if (keys['a'] || keys['arrowleft']) rotateDir -= 1;
+    if (keys['d'] || keys['arrowright']) rotateDir += 1;
+    // Touch rotation (use touchDirX for rotation when parked)
+    if (touchActive && Math.abs(touchDirX) > 0.1) rotateDir += touchDirX;
+    ship.angle += rotateDir * 3 * dt; // rotate speed
+    return;
+  }
 
   levelTime += dt;
 
@@ -919,6 +1226,55 @@ function draw() {
   }
   ctx.globalAlpha = 1;
 
+  // Missile trails (persistent)
+  if (showMissileTrails) {
+    for (const mt of missileTrails) {
+      if (mt.points.length < 2) continue;
+      ctx.strokeStyle = mt.color;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(mt.points[0].x, mt.points[0].y);
+      for (let i = 1; i < mt.points.length; i++) {
+        ctx.lineTo(mt.points[i].x, mt.points[i].y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Active missile trails
+    for (const m of missiles) {
+      if (m.trail.length < 2) continue;
+      ctx.strokeStyle = m.color;
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(m.trail[0].x, m.trail[0].y);
+      for (let i = 1; i < m.trail.length; i++) {
+        ctx.lineTo(m.trail[i].x, m.trail[i].y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // Active missiles (dots)
+  for (const m of missiles) {
+    ctx.fillStyle = m.color;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, MISSILE_SIZE, 0, Math.PI * 2);
+    ctx.fill();
+    // Glow
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, MISSILE_SIZE * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
   // Particles
   for (const p of particles) {
     const alpha = p.life / p.maxLife;
@@ -959,6 +1315,30 @@ function draw() {
     ctx.shadowBlur = 0;
 
     ctx.restore();
+
+    // Aim indicator when parked
+    if (shipParked) {
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = '#4af';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.moveTo(ship.x, ship.y);
+      ctx.lineTo(ship.x + Math.cos(ship.angle) * 120, ship.y + Math.sin(ship.angle) * 120);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // "SPACE to launch" text
+      ctx.globalAlpha = 0.5 + 0.3 * Math.sin(time * 3);
+      ctx.fillStyle = '#4af';
+      ctx.font = '14px "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      const launchText = isTouchDevice ? 'TAP TO LAUNCH' : 'SPACE TO LAUNCH  |  F — FIRE PROBE  |  T — TRAILS  |  SCROLL / +- — SPEED';
+      ctx.fillText(launchText, W / 2, H - 60);
+      ctx.globalAlpha = 1;
+    }
 
     // Gravity indicator arrows (subtle)
     let totalGx = 0, totalGy = 0;
@@ -1045,6 +1425,19 @@ function draw() {
     ctx.arc(knobX, knobY, 8, 0, Math.PI * 2);
     ctx.fill();
 
+    ctx.globalAlpha = 1;
+  }
+
+  // Trail toggle indicator
+  if (gameState === 'playing') {
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = showMissileTrails ? '#4f4' : '#f44';
+    ctx.font = '10px "Segoe UI", Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('TRAILS: ' + (showMissileTrails ? 'ON' : 'OFF'), W - 20, H - 20);
+    // Missile speed indicator
+    ctx.fillStyle = '#fa0';
+    ctx.fillText('SPEED: ' + missileSpeed, W - 20, H - 36);
     ctx.globalAlpha = 1;
   }
 }
