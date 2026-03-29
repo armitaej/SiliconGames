@@ -44,7 +44,10 @@ body::after {
     rgba(0, 0, 0, var(--scanline-opacity)) 4px
   );
   pointer-events: none;
-  z-index: 9999;
+  z-index: 999;
+}
+body.game-active::after {
+  display: none;
 }
 
 /* Animated grid background */
@@ -877,7 +880,7 @@ footer a:hover { color: var(--neon-pink); }
     <button class="back-btn" onclick="closeGame()">&#9664; BACK TO ARCADE</button>
     <div id="game-topbar-title"></div>
   </div>
-  <iframe id="game-frame" sandbox="allow-scripts allow-same-origin allow-popups allow-pointer-lock"></iframe>
+  <iframe id="game-frame" sandbox="allow-scripts allow-same-origin allow-popups allow-pointer-lock allow-forms" allow="autoplay"></iframe>
 </div>
 
 <script>
@@ -907,6 +910,7 @@ function launchGame(url, title) {
   frame.src = url;
   titleEl.textContent = title;
   overlay.classList.add('active');
+  document.body.classList.add('game-active');
   document.body.style.overflow = 'hidden';
   // Auto-focus iframe so keyboard works immediately
   frame.addEventListener('load', () => { frame.focus(); frame.contentWindow.focus(); }, { once: true });
@@ -972,6 +976,7 @@ function closeGame() {
   const frame = document.getElementById('game-frame');
   frame.src = '';
   overlay.classList.remove('active');
+  document.body.classList.remove('game-active');
   document.body.style.overflow = '';
   refreshLikes();
   refreshHighScoreBadges();
