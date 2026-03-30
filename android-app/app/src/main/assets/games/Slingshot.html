@@ -103,6 +103,21 @@
     -webkit-tap-highlight-color: transparent;
   }
   #restart-btn:active { background: rgba(100,180,255,0.25); }
+  #fire-btn {
+    display: none;
+    position: absolute; bottom: 32px; right: 16px;
+    pointer-events: auto; z-index: 15;
+    width: 72px; height: 72px; border-radius: 50%;
+    background: rgba(255,80,60,0.15); border: 1.5px solid rgba(255,120,100,0.5);
+    color: #f88; font-size: 12px; font-weight: 700; cursor: pointer;
+    align-items: center; justify-content: center;
+    letter-spacing: 1px; text-transform: uppercase;
+    -webkit-tap-highlight-color: transparent;
+    text-shadow: 0 0 8px #f44;
+    flex-direction: column; gap: 2px;
+  }
+  #fire-btn:active { background: rgba(255,80,60,0.45); border-color: #f88; }
+  #fire-btn .fire-icon { font-size: 22px; line-height: 1; }
 </style>
 </head>
 <body>
@@ -125,6 +140,7 @@
     </div>
   </div>
   <button id="restart-btn" onclick="if(gameState==='playing')loadLevel(currentLevel)">&#x21BB;</button>
+  <button id="fire-btn" ontouchstart="event.stopPropagation();if(gameState==='playing')fireMissile();" onclick="if(gameState==='playing')fireMissile()"><span class="fire-icon">&#x1F680;</span>FIRE</button>
   <div id="controls-hint">SPACE — Launch &nbsp;&nbsp;|&nbsp;&nbsp; WASD — Thrust &nbsp;&nbsp;|&nbsp;&nbsp; F — Fire Probe &nbsp;&nbsp;|&nbsp;&nbsp; T — Toggle Trails &nbsp;&nbsp;|&nbsp;&nbsp; R — Restart</div>
 </div>
 
@@ -810,10 +826,11 @@ function loadLevel(idx) {
     angle: 0
   };
 
-  // Resolve planet positions
+  // Resolve planet positions — scale radii for small screens
+  const planetScale = Math.min(1.0, Math.min(W, H) / 600);
   ship.planets = lev.planets.map(p => ({
     x: p.x * W, y: p.y * H,
-    mass: p.mass, radius: p.radius, color: p.color
+    mass: p.mass, radius: Math.max(8, Math.round(p.radius * planetScale)), color: p.color
   }));
 
   ship.goal = { x: goalPos.x, y: goalPos.y, radius: GOAL_RADIUS };
@@ -1649,8 +1666,9 @@ if (selectedStartLevel > 0) {
 
 // Update controls hint and restart button for touch devices
 if (isTouchDevice) {
-  document.getElementById('controls-hint').textContent = 'Touch & drag to thrust';
+  document.getElementById('controls-hint').textContent = 'Touch & drag to thrust  |  FIRE — launch probe';
   document.getElementById('restart-btn').style.display = 'flex';
+  document.getElementById('fire-btn').style.display = 'flex';
 }
 
 lastTime = performance.now();
