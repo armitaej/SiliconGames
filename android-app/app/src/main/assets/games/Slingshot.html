@@ -118,6 +118,36 @@
   }
   #fire-btn:active { background: rgba(255,80,60,0.45); border-color: #f88; }
   #fire-btn .fire-icon { font-size: 22px; line-height: 1; }
+
+  /* ===== MOBILE RESPONSIVE ===== */
+  @media (max-width: 768px) {
+    #hud { top: 10px; left: 10px; right: 10px; }
+    .hud-label { font-size: 9px; letter-spacing: 1px; }
+    .hud-value { font-size: 16px; }
+    #fuel-bar-container { width: 100px; height: 6px; }
+    #msg-title { font-size: 32px; letter-spacing: 3px; }
+    #msg-subtitle { font-size: 14px; margin-bottom: 18px; }
+    #msg-body { font-size: 12px; max-width: 300px; margin-bottom: 14px; line-height: 1.6; }
+    #level-grid { grid-template-columns: repeat(7, 1fr); gap: 5px; max-width: 280px; }
+    .lvl-btn { padding: 5px 2px; font-size: 9px; border-radius: 6px; }
+    .lvl-btn .lvl-num { font-size: 11px; }
+    .btn { padding: 10px 28px; font-size: 13px; letter-spacing: 2px; }
+    #controls-hint { font-size: 10px; bottom: 12px; }
+    #level-select-label { font-size: 9px; letter-spacing: 2px; }
+  }
+  @media (max-width: 480px) {
+    #hud { top: 6px; left: 6px; right: 6px; }
+    .hud-label { font-size: 8px; }
+    .hud-value { font-size: 14px; }
+    #fuel-bar-container { width: 70px; height: 5px; }
+    #msg-title { font-size: 26px; letter-spacing: 2px; }
+    #msg-subtitle { font-size: 12px; }
+    #msg-body { font-size: 11px; max-width: 260px; }
+    #level-grid { gap: 3px; max-width: 240px; }
+    .lvl-btn { padding: 4px 1px; }
+    .lvl-btn .lvl-num { font-size: 10px; }
+    .btn { padding: 8px 22px; font-size: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -141,7 +171,7 @@
   </div>
   <button id="restart-btn" onclick="if(gameState==='playing')loadLevel(currentLevel)">&#x21BB;</button>
   <button id="fire-btn" ontouchstart="event.stopPropagation();if(gameState==='playing')fireMissile();" onclick="if(gameState==='playing')fireMissile()"><span class="fire-icon">&#x1F680;</span>FIRE</button>
-  <div id="controls-hint">SPACE — Launch &nbsp;&nbsp;|&nbsp;&nbsp; WASD — Thrust &nbsp;&nbsp;|&nbsp;&nbsp; F — Fire Probe &nbsp;&nbsp;|&nbsp;&nbsp; T — Toggle Trails &nbsp;&nbsp;|&nbsp;&nbsp; R — Restart</div>
+  <div id="controls-hint">SPACE — Launch &nbsp;&nbsp;|&nbsp;&nbsp; WASD — Thrust &nbsp;&nbsp;|&nbsp;&nbsp; SHIFT — Fine Aim &nbsp;&nbsp;|&nbsp;&nbsp; F — Fire Probe &nbsp;&nbsp;|&nbsp;&nbsp; T — Toggle Trails &nbsp;&nbsp;|&nbsp;&nbsp; R — Restart</div>
 </div>
 
 <div id="message-overlay">
@@ -159,10 +189,14 @@
 // ========== CANVAS SETUP ==========
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-let W, H;
+let W, H, scaleFactor;
+const DESIGN_REF = 1200; // reference dimension the game was designed for
 function resize() {
   W = canvas.width = window.innerWidth;
   H = canvas.height = window.innerHeight;
+  scaleFactor = Math.min(Math.min(W, H) / DESIGN_REF * 1.5, 1);
+  // Clamp to a minimum so things don't vanish on tiny screens
+  if (scaleFactor < 0.35) scaleFactor = 0.35;
 }
 window.addEventListener('resize', resize);
 resize();
@@ -205,9 +239,10 @@ let shipParked = true;           // true until player launches
 let missiles = [];               // active missiles [{x,y,vx,vy,alive,trail:[{x,y}],color,age}]
 let missileTrails = [];          // persisted trails after missile dies [{points:[{x,y}],color}]
 let showMissileTrails = true;    // toggle for trail visibility
+let lastShipAngle = 0;           // persisted angle across crash restarts
 let missileColorIndex = 0;
 const MISSILE_COLORS = ['#f44','#4f4','#ff4','#f4f','#4ff','#fa4','#4af','#af4'];
-let missileSpeed = 100;          // adjustable launch speed
+let missileSpeed = 500;          // adjustable launch speed (default to max)
 const MISSILE_SPEED_MIN = 25;
 const MISSILE_SPEED_MAX = 500;
 const MISSILE_SPEED_STEP = 25;
@@ -802,11 +837,11 @@ function spawnGoalParticles(x, y) {
 // ========== LEVEL SETUP ==========
 function resolvePos(def, isGoal) {
   if (isGoal) {
-    return { x: W + def.x, y: H / 2 + def.y * H };
+    return { x: W + def.x * scaleFactor, y: H / 2 + def.y * H };
   }
   return {
-    x: typeof def.x === 'number' && def.x < 5 ? def.x * W : def.x,
-    y: def.y === null ? H / 2 : (typeof def.y === 'number' && Math.abs(def.y) < 5 ? H / 2 + def.y * H : def.y)
+    x: typeof def.x === 'number' && def.x < 5 ? def.x * W : def.x * scaleFactor,
+    y: def.y === null ? H / 2 : (typeof def.y === 'number' && Math.abs(def.y) < 5 ? H / 2 + def.y * H : def.y * scaleFactor)
   };
 }
 
@@ -823,17 +858,16 @@ function loadLevel(idx) {
     maxFuel: lev.fuel,
     alive: true,
     won: false,
-    angle: 0
+    angle: lastShipAngle
   };
 
-  // Resolve planet positions — scale radii for small screens
-  const planetScale = Math.min(1.0, Math.min(W, H) / 600);
+  // Resolve planet positions — scale radii and masses for small screens
   ship.planets = lev.planets.map(p => ({
     x: p.x * W, y: p.y * H,
-    mass: p.mass, radius: Math.max(8, Math.round(p.radius * planetScale)), color: p.color
+    mass: p.mass * scaleFactor, radius: p.radius * scaleFactor, color: p.color
   }));
 
-  ship.goal = { x: goalPos.x, y: goalPos.y, radius: GOAL_RADIUS };
+  ship.goal = { x: goalPos.x, y: goalPos.y, radius: GOAL_RADIUS * scaleFactor };
 
   // Resolve fuel station positions
   ship.fuelStations = (lev.fuelStations || []).map(fs => ({
@@ -983,6 +1017,7 @@ canvas.addEventListener('touchcancel', e => {
 function launchShip() {
   if (!ship || !ship.alive || ship.won || !shipParked) return;
   shipParked = false;
+  lastShipAngle = ship.angle; // remember launch angle for restart
   // Give ship initial velocity in aimed direction
   ship.vx = Math.cos(ship.angle) * missileSpeed;
   ship.vy = Math.sin(ship.angle) * missileSpeed;
@@ -1074,7 +1109,9 @@ function update(dt) {
     if (keys['d'] || keys['arrowright']) rotateDir += 1;
     // Touch rotation (use touchDirX for rotation when parked)
     if (touchActive && Math.abs(touchDirX) > 0.1) rotateDir += touchDirX;
-    ship.angle += rotateDir * 3 * dt; // rotate speed
+    // Hold Shift for fine angle adjustment (1/6 speed)
+    const rotateSpeed = keys['shift'] ? 0.5 : 3;
+    ship.angle += rotateDir * rotateSpeed * dt; // rotate speed
     return;
   }
 
@@ -1163,7 +1200,7 @@ function update(dt) {
   for (const fs of ship.fuelStations) {
     if (fs.collected) continue;
     const fsDist = Math.sqrt((ship.x - fs.x) ** 2 + (ship.y - fs.y) ** 2);
-    if (fsDist < FUEL_STATION_RADIUS + SHIP_SIZE) {
+    if (fsDist < FUEL_STATION_RADIUS * scaleFactor + SHIP_SIZE * scaleFactor) {
       fs.collected = true;
       ship.fuel = ship.maxFuel;
       spawnFuelPickupParticles(fs.x, fs.y);
@@ -1172,8 +1209,9 @@ function update(dt) {
 
   // Goal check
   const gDist = Math.sqrt((ship.x - ship.goal.x) ** 2 + (ship.y - ship.goal.y) ** 2);
-  if (gDist < ship.goal.radius + SHIP_SIZE) {
+  if (gDist < ship.goal.radius + SHIP_SIZE * scaleFactor) {
     ship.won = true;
+    lastShipAngle = 0; // reset angle when advancing to next level
     spawnGoalParticles(ship.goal.x, ship.goal.y);
     setTimeout(() => {
       if (currentLevel < levels.length - 1) {
@@ -1214,7 +1252,7 @@ function draw() {
     ctx.globalAlpha = s.brightness * twinkle;
     ctx.fillStyle = '#cdf';
     ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, s.r * scaleFactor, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -1224,7 +1262,8 @@ function draw() {
   // Gravity field rings
   for (const p of ship.planets) {
     const influence = Math.sqrt(p.mass) * 3;
-    for (let r = p.radius + 15; r < influence; r += 18) {
+    const ringGap = 18 * scaleFactor;
+    for (let r = p.radius + 15 * scaleFactor; r < influence; r += Math.max(ringGap, 6)) {
       const alpha = 0.08 * (1 - (r - p.radius) / influence);
       ctx.strokeStyle = p.color;
       ctx.globalAlpha = alpha * (0.6 + 0.4 * Math.sin(time * 1.5 + r * 0.05));
@@ -1291,12 +1330,13 @@ function draw() {
     ctx.globalAlpha = 0.5;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(goal.x, goal.y, pulseR + 8, aOff, aOff + 0.8);
+    ctx.arc(goal.x, goal.y, pulseR + 8 * scaleFactor, aOff, aOff + 0.8);
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
 
   // Fuel stations
+  const scaledFSR = FUEL_STATION_RADIUS * scaleFactor;
   for (const fs of ship.fuelStations) {
     if (fs.collected) {
       // Draw dimmed empty shell
@@ -1304,12 +1344,12 @@ function draw() {
       ctx.strokeStyle = '#f80';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(fs.x, fs.y, FUEL_STATION_RADIUS, 0, Math.PI * 2);
+      ctx.arc(fs.x, fs.y, scaledFSR, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
       continue;
     }
-    const fsPulse = FUEL_STATION_RADIUS + 2 * Math.sin(time * 4);
+    const fsPulse = scaledFSR + 2 * Math.sin(time * 4);
 
     // Outer glow
     const fsGrad = ctx.createRadialGradient(fs.x, fs.y, fsPulse * 0.3, fs.x, fs.y, fsPulse * 2.5);
@@ -1335,10 +1375,11 @@ function draw() {
     ctx.translate(fs.x, fs.y);
     ctx.fillStyle = '#fff';
     ctx.globalAlpha = 0.85;
+    const fdi = scaleFactor; // fuel drop icon scale
     ctx.beginPath();
-    ctx.moveTo(0, -7);
-    ctx.quadraticCurveTo(6, 0, 0, 7);
-    ctx.quadraticCurveTo(-6, 0, 0, -7);
+    ctx.moveTo(0, -7 * fdi);
+    ctx.quadraticCurveTo(6 * fdi, 0, 0, 7 * fdi);
+    ctx.quadraticCurveTo(-6 * fdi, 0, 0, -7 * fdi);
     ctx.closePath();
     ctx.fill();
     ctx.globalAlpha = 1;
@@ -1351,7 +1392,7 @@ function draw() {
       ctx.globalAlpha = 0.4;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(fs.x, fs.y, fsPulse + 5, aOff, aOff + 0.7);
+      ctx.arc(fs.x, fs.y, fsPulse + 5 * scaleFactor, aOff, aOff + 0.7);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -1437,23 +1478,24 @@ function draw() {
     ctx.rotate(ship.angle);
 
     // Ship glow
-    const sGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 20);
+    const shipS = SHIP_SIZE * scaleFactor;
+    const sGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 20 * scaleFactor);
     sGrad.addColorStop(0, 'rgba(100,200,255,0.3)');
     sGrad.addColorStop(1, 'transparent');
     ctx.fillStyle = sGrad;
     ctx.beginPath();
-    ctx.arc(0, 0, 20, 0, Math.PI * 2);
+    ctx.arc(0, 0, 20 * scaleFactor, 0, Math.PI * 2);
     ctx.fill();
 
     // Ship body (triangle)
     ctx.fillStyle = '#fff';
     ctx.shadowColor = '#4af';
-    ctx.shadowBlur = 15;
+    ctx.shadowBlur = 15 * scaleFactor;
     ctx.beginPath();
-    ctx.moveTo(SHIP_SIZE + 2, 0);
-    ctx.lineTo(-SHIP_SIZE + 2, -SHIP_SIZE * 0.65);
-    ctx.lineTo(-SHIP_SIZE * 0.5 + 2, 0);
-    ctx.lineTo(-SHIP_SIZE + 2, SHIP_SIZE * 0.65);
+    ctx.moveTo(shipS + 2, 0);
+    ctx.lineTo(-shipS + 2, -shipS * 0.65);
+    ctx.lineTo(-shipS * 0.5 + 2, 0);
+    ctx.lineTo(-shipS + 2, shipS * 0.65);
     ctx.closePath();
     ctx.fill();
     ctx.shadowBlur = 0;
@@ -1469,7 +1511,7 @@ function draw() {
       ctx.setLineDash([6, 6]);
       ctx.beginPath();
       ctx.moveTo(ship.x, ship.y);
-      ctx.lineTo(ship.x + Math.cos(ship.angle) * 120, ship.y + Math.sin(ship.angle) * 120);
+      ctx.lineTo(ship.x + Math.cos(ship.angle) * 120 * scaleFactor, ship.y + Math.sin(ship.angle) * 120 * scaleFactor);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
@@ -1477,10 +1519,11 @@ function draw() {
       // "SPACE to launch" text
       ctx.globalAlpha = 0.5 + 0.3 * Math.sin(time * 3);
       ctx.fillStyle = '#4af';
-      ctx.font = '14px "Segoe UI", Arial, sans-serif';
+      const launchFontSize = Math.max(10, Math.round(14 * scaleFactor));
+      ctx.font = launchFontSize + 'px "Segoe UI", Arial, sans-serif';
       ctx.textAlign = 'center';
-      const launchText = isTouchDevice ? 'TAP TO LAUNCH' : 'SPACE TO LAUNCH  |  F — FIRE PROBE  |  T — TRAILS  |  SCROLL / +- — SPEED';
-      ctx.fillText(launchText, W / 2, H - 60);
+      const launchText = isTouchDevice ? 'TAP TO LAUNCH' : 'SPACE TO LAUNCH  |  SHIFT — FINE AIM  |  F — FIRE PROBE  |  T — TRAILS  |  SCROLL / +- — SPEED';
+      ctx.fillText(launchText, W / 2, H - 40 * scaleFactor);
       ctx.globalAlpha = 1;
     }
 
@@ -1498,14 +1541,14 @@ function draw() {
     const gMag = Math.sqrt(totalGx * totalGx + totalGy * totalGy);
     if (gMag > 10) {
       const gAngle = Math.atan2(totalGy, totalGx);
-      const indicatorDist = 22;
+      const indicatorDist = 22 * scaleFactor;
       const ix = ship.x + Math.cos(gAngle) * indicatorDist;
       const iy = ship.y + Math.sin(gAngle) * indicatorDist;
       ctx.globalAlpha = Math.min(0.5, gMag / 800);
       ctx.strokeStyle = '#f84';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(ship.x + Math.cos(gAngle) * 16, ship.y + Math.sin(gAngle) * 16);
+      ctx.moveTo(ship.x + Math.cos(gAngle) * 16 * scaleFactor, ship.y + Math.sin(gAngle) * 16 * scaleFactor);
       ctx.lineTo(ix, iy);
       ctx.stroke();
       // Arrow head
@@ -1560,13 +1603,13 @@ function draw() {
     ctx.globalAlpha = 0.4;
     ctx.fillStyle = '#4af';
     ctx.beginPath();
-    ctx.arc(knobX, knobY, 18, 0, Math.PI * 2);
+    ctx.arc(knobX, knobY, 18 * scaleFactor, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.globalAlpha = 0.6;
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(knobX, knobY, 8, 0, Math.PI * 2);
+    ctx.arc(knobX, knobY, 8 * scaleFactor, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.globalAlpha = 1;
@@ -1576,12 +1619,13 @@ function draw() {
   if (gameState === 'playing') {
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = showMissileTrails ? '#4f4' : '#f44';
-    ctx.font = '10px "Segoe UI", Arial, sans-serif';
+    const statusFontSize = Math.max(8, Math.round(10 * scaleFactor));
+    ctx.font = statusFontSize + 'px "Segoe UI", Arial, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText('TRAILS: ' + (showMissileTrails ? 'ON' : 'OFF'), W - 20, H - 20);
+    ctx.fillText('TRAILS: ' + (showMissileTrails ? 'ON' : 'OFF'), W - 12, H - 12);
     // Missile speed indicator
     ctx.fillStyle = '#fa0';
-    ctx.fillText('SPEED: ' + missileSpeed, W - 20, H - 36);
+    ctx.fillText('SPEED: ' + missileSpeed, W - 12, H - 26);
     ctx.globalAlpha = 1;
   }
 }
@@ -1629,6 +1673,7 @@ function buildLevelGrid() {
 function startGame() {
   hideMessage();
   gameState = 'playing';
+  lastShipAngle = 0; // reset angle for fresh game start
   loadLevel(selectedStartLevel);
 }
 
