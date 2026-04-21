@@ -302,6 +302,46 @@ header {
 .cabinet[data-game="pacman"] .game-title { color: #ffe600; text-shadow: 0 0 10px rgba(255,230,0,0.6); }
 .cabinet[data-game="pacman"] .play-btn { background: #ffe600; color: #000; box-shadow: 0 0 20px rgba(255,230,0,0.5); }
 
+.cabinet[data-game="antichess"] .screen-art { color: #4a9eff; }
+.cabinet[data-game="antichess"] .game-title { color: #4a9eff; text-shadow: 0 0 10px rgba(74,158,255,0.5); }
+.cabinet[data-game="antichess"] .play-btn { background: #4a9eff; color: #000; box-shadow: 0 0 20px rgba(74,158,255,0.4); }
+
+.cabinet[data-game="baseball"] .screen-art { color: #4caf50; }
+.cabinet[data-game="baseball"] .game-title { color: #4caf50; text-shadow: 0 0 10px rgba(76,175,80,0.5); }
+.cabinet[data-game="baseball"] .play-btn { background: #4caf50; color: #000; box-shadow: 0 0 20px rgba(76,175,80,0.4); }
+
+.cabinet[data-game="dirtbike"] .screen-art { color: #ff6b00; }
+.cabinet[data-game="dirtbike"] .game-title { color: #ff6b00; text-shadow: 0 0 10px rgba(255,107,0,0.5); }
+.cabinet[data-game="dirtbike"] .play-btn { background: #ff6b00; color: #fff; box-shadow: 0 0 20px rgba(255,107,0,0.4); }
+
+.cabinet[data-game="interstellar"] .screen-art { color: #3c8cff; }
+.cabinet[data-game="interstellar"] .game-title { color: #3c8cff; text-shadow: 0 0 10px rgba(60,140,255,0.5); }
+.cabinet[data-game="interstellar"] .play-btn { background: #3c8cff; color: #fff; box-shadow: 0 0 20px rgba(60,140,255,0.4); }
+
+.cabinet[data-game="neonmaze"] .screen-art { color: #00ffff; }
+.cabinet[data-game="neonmaze"] .game-title { color: #00ffff; text-shadow: 0 0 10px rgba(0,255,255,0.5); }
+.cabinet[data-game="neonmaze"] .play-btn { background: #00ffff; color: #000; box-shadow: 0 0 20px rgba(0,255,255,0.4); }
+
+.cabinet[data-game="nflguesswho"] .screen-art { color: #e94560; }
+.cabinet[data-game="nflguesswho"] .game-title { color: #e94560; text-shadow: 0 0 10px rgba(233,69,96,0.5); }
+.cabinet[data-game="nflguesswho"] .play-btn { background: #e94560; color: #fff; box-shadow: 0 0 20px rgba(233,69,96,0.4); }
+
+.cabinet[data-game="schoolgame"] .screen-art { color: #64b5f6; }
+.cabinet[data-game="schoolgame"] .game-title { color: #64b5f6; text-shadow: 0 0 10px rgba(100,181,246,0.5); }
+.cabinet[data-game="schoolgame"] .play-btn { background: #64b5f6; color: #000; box-shadow: 0 0 20px rgba(100,181,246,0.4); }
+
+.cabinet[data-game="sabotage"] .screen-art { color: #ce93d8; }
+.cabinet[data-game="sabotage"] .game-title { color: #ce93d8; text-shadow: 0 0 10px rgba(206,147,216,0.5); }
+.cabinet[data-game="sabotage"] .play-btn { background: #ce93d8; color: #000; box-shadow: 0 0 20px rgba(206,147,216,0.4); }
+
+.cabinet[data-game="swbounty"] .screen-art { color: #ffe600; }
+.cabinet[data-game="swbounty"] .game-title { color: #ffe600; text-shadow: 0 0 10px rgba(255,230,0,0.5); }
+.cabinet[data-game="swbounty"] .play-btn { background: #ffe600; color: #000; box-shadow: 0 0 20px rgba(255,230,0,0.4); }
+
+.cabinet[data-game="transport"] .screen-art { color: #00bcd4; }
+.cabinet[data-game="transport"] .game-title { color: #00bcd4; text-shadow: 0 0 10px rgba(0,188,212,0.5); }
+.cabinet[data-game="transport"] .play-btn { background: #00bcd4; color: #000; box-shadow: 0 0 20px rgba(0,188,212,0.4); }
+
 /* Slingshot level picker on card */
 .slingshot-level-picker { margin-bottom: 14px; }
 .slingshot-level-picker-label {
@@ -868,6 +908,213 @@ footer a:hover { color: var(--neon-pink); }
         <button class="play-btn" onclick="event.stopPropagation(); launchGame('games/hired.html', 'HIRED')">PLAY</button>
         <div class="game-stats">
           <button class="like-btn" data-like="hired" onclick="event.stopPropagation(); toggleLike('hired')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Anti-Chess -->
+    <div class="cabinet" data-game="antichess" onclick="launchGame('games/anti-chess.html', 'ANTI-CHESS')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x265F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Anti-Chess</div>
+        <div class="game-desc">The rules are flipped — you MUST capture when you can, and the first player to lose all their pieces wins. Chess like you've never played it.</div>
+        <div class="game-tags">
+          <span class="tag">Strategy</span>
+          <span class="tag">Board Game</span>
+          <span class="tag">Reversed</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="antichess" onclick="event.stopPropagation(); toggleLike('antichess')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="antichess"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Baseball -->
+    <div class="cabinet" data-game="baseball" onclick="launchGame('games/baseball.html', 'BASEBALL')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x26BE;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Baseball</div>
+        <div class="game-desc">Step up to the plate! Time your swing to crush fastballs, curveballs, and sliders. Hit dingers and battle through innings on the diamond.</div>
+        <div class="game-tags">
+          <span class="tag">Sports</span>
+          <span class="tag">Arcade</span>
+          <span class="tag">Baseball</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="baseball" onclick="event.stopPropagation(); toggleLike('baseball')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="baseball"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dirt Bike Tricks -->
+    <div class="cabinet" data-game="dirtbike" onclick="launchGame('games/dirt_bike_tricks.html', 'DIRT BIKE TRICKS')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3CD;&#xFE0F;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Dirt Bike Tricks</div>
+        <div class="game-desc">Launch off ramps, nail backflips and 360s, and stick your landings to rack up a massive trick score. Don't bail!</div>
+        <div class="game-tags">
+          <span class="tag">Tricks</span>
+          <span class="tag">Racing</span>
+          <span class="tag">Arcade</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="dirtbike" onclick="event.stopPropagation(); toggleLike('dirtbike')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="dirtbike"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interstellar -->
+    <div class="cabinet" data-game="interstellar" onclick="launchGame('games/interstellar.html', 'INTERSTELLAR')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1FA90;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Interstellar</div>
+        <div class="game-desc">An interactive solar system tour with stunning real video backdrops of every planet. Drag, zoom, and journey through the cosmos.</div>
+        <div class="game-tags">
+          <span class="tag">Space</span>
+          <span class="tag">Exploration</span>
+          <span class="tag">Interactive</span>
+        </div>
+        <button class="play-btn">EXPLORE</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="interstellar" onclick="event.stopPropagation(); toggleLike('interstellar')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Neon Perdition -->
+    <div class="cabinet" data-game="neonmaze" onclick="launchGame('games/neon-maze.html', 'NEON PERDITION')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F300;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Neon Perdition</div>
+        <div class="game-desc">Navigate a glowing first-person labyrinth with a minimap and neon atmosphere. Find the exit before the darkness swallows you whole.</div>
+        <div class="game-tags">
+          <span class="tag">First-Person</span>
+          <span class="tag">Maze</span>
+          <span class="tag">Neon</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="neonmaze" onclick="event.stopPropagation(); toggleLike('neonmaze')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="neonmaze"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- NFL Guess Who -->
+    <div class="cabinet" data-game="nflguesswho" onclick="launchGame('games/nfl-guess-who.html', 'NFL GUESS WHO?')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3C8;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">NFL Guess Who?</div>
+        <div class="game-desc">Guess the mystery NFL player from clues about their team, position, and career. How many tries will it take you to crack it?</div>
+        <div class="game-tags">
+          <span class="tag">NFL</span>
+          <span class="tag">Trivia</span>
+          <span class="tag">Quiz</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="nflguesswho" onclick="event.stopPropagation(); toggleLike('nflguesswho')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="nflguesswho"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- School Game -->
+    <div class="cabinet" data-game="schoolgame" onclick="launchGame('games/school_game.html', 'SCHOOL GAME')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F3EB;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">School Game</div>
+        <div class="game-desc">A fun school-themed adventure. Survive the school day, dodge trouble, and make it to the final bell in one piece!</div>
+        <div class="game-tags">
+          <span class="tag">Adventure</span>
+          <span class="tag">Fun</span>
+          <span class="tag">School</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="schoolgame" onclick="event.stopPropagation(); toggleLike('schoolgame')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Silicon Sabotage -->
+    <div class="cabinet" data-game="sabotage" onclick="launchGame('games/silicon-sabotage.html', 'SILICON SABOTAGE')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F50D;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Silicon Sabotage</div>
+        <div class="game-desc">A Clue-style murder mystery set in a tech company. Interrogate suspects, gather clues, and deduce who committed the Silicon Sabotage.</div>
+        <div class="game-tags">
+          <span class="tag">Mystery</span>
+          <span class="tag">Deduction</span>
+          <span class="tag">Clue</span>
+        </div>
+        <button class="play-btn">INVESTIGATE</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="sabotage" onclick="event.stopPropagation(); toggleLike('sabotage')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Star Wars: Galaxy Bounty (Alt) -->
+    <div class="cabinet" data-game="swbounty" onclick="launchGame('games/star-wars-bounty.html', 'STAR WARS: GALAXY BOUNTY')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F52B;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Galaxy Bounty II</div>
+        <div class="game-desc">The updated bounty hunter edition — choose your fighter and blast through waves of enemies across the Star Wars galaxy.</div>
+        <div class="game-tags">
+          <span class="tag">Action</span>
+          <span class="tag">Space</span>
+          <span class="tag">Star Wars</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="swbounty" onclick="event.stopPropagation(); toggleLike('swbounty')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="swbounty"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transportation: Island Tag -->
+    <div class="cabinet" data-game="transport" onclick="launchGame('games/transportation.html', 'TRANSPORTATION: ISLAND TAG')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F6A2;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Island Tag</div>
+        <div class="game-desc">Race across island terrain in this fast-paced vehicle tag game. Chase, dodge, and outlast your opponents to be the last one standing.</div>
+        <div class="game-tags">
+          <span class="tag">Racing</span>
+          <span class="tag">Tag</span>
+          <span class="tag">Island</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="transport" onclick="event.stopPropagation(); toggleLike('transport')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="transport"></span>
         </div>
       </div>
     </div>
