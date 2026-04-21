@@ -298,6 +298,10 @@ header {
 .cabinet[data-game="slingshot"] .game-title { color: #4af; text-shadow: 0 0 10px rgba(68,170,255,0.5); }
 .cabinet[data-game="slingshot"] .play-btn { background: #4af; color: #000; box-shadow: 0 0 20px rgba(68,170,255,0.4); }
 
+.cabinet[data-game="pacman"] .screen-art { color: #ffe600; }
+.cabinet[data-game="pacman"] .game-title { color: #ffe600; text-shadow: 0 0 10px rgba(255,230,0,0.6); }
+.cabinet[data-game="pacman"] .play-btn { background: #ffe600; color: #000; box-shadow: 0 0 20px rgba(255,230,0,0.5); }
+
 /* Slingshot level picker on card */
 .slingshot-level-picker { margin-bottom: 14px; }
 .slingshot-level-picker-label {
@@ -780,6 +784,27 @@ footer a:hover { color: var(--neon-pink); }
       </div>
     </div>
 
+    <!-- Pac-Man -->
+    <div class="cabinet" data-game="pacman" onclick="launchGame('games/pacman.html', 'PAC-MAN')">
+      <div class="cabinet-screen">
+        <div class="screen-art">&#x1F7E1;</div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">Pac-Man</div>
+        <div class="game-desc">The iconic arcade classic — eat all the dots, dodge Blinky, Pinky, Inky &amp; Clyde, and chomp power pellets to turn the tables.</div>
+        <div class="game-tags">
+          <span class="tag">Classic</span>
+          <span class="tag">Arcade</span>
+          <span class="tag">4 Ghosts</span>
+        </div>
+        <button class="play-btn">PLAY</button>
+        <div class="game-stats">
+          <button class="like-btn" data-like="pacman" onclick="event.stopPropagation(); toggleLike('pacman')"><span class="heart">&#9825;</span> <span class="like-count">0</span></button>
+          <span class="hs-badge" data-hs="pacman"></span>
+        </div>
+      </div>
+    </div>
+
     <div class="cabinet" data-game="sports" onclick="launchGame('games/sports-arcade.html', 'SPORTS ARCADE')">
       <div class="cabinet-screen">
         <div class="screen-art">&#x1F3C6;</div>
@@ -871,7 +896,7 @@ footer a:hover { color: var(--neon-pink); }
 </main>
 
 <footer>
-  SILICON GAMES &copy; 2026 &mdash; Built by Cooper, Eli and Lucas Armitage &nbsp;&mdash;&nbsp; Last updated March 21, 2026
+  SILICON GAMES &copy; 2026 &mdash; Built by Cooper, Eli and Lucas Armitage &nbsp;&mdash;&nbsp; Last updated April 20, 2026
 </footer>
 
 <!-- Game Overlay -->
