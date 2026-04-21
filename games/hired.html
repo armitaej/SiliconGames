@@ -135,6 +135,19 @@
   }
   #milestone { color: #fa0; font-size: 8px; }
 
+  .save-btn {
+    font-family: 'Press Start 2P', monospace; font-size: 7px;
+    background: #2a2a4a; color: #8af; border: 1px solid #445;
+    padding: 5px 10px; cursor: pointer; border-radius: 2px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .save-btn:hover { background: #3a3a6a; color: #adf; }
+  .save-btn:active { background: #4a4a8a; }
+  #save-status {
+    font-size: 7px; color: #4f4; opacity: 0;
+    transition: opacity 0.3s; margin: 0 8px;
+  }
+
   /* === NOTIFICATION === */
   #notification {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -150,6 +163,25 @@
     cursor: pointer; border-radius: 2px;
   }
   #notification button:hover { background: #ffea00; }
+
+  /* === CONFIRM DIALOG === */
+  #confirm-dialog {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.95); border: 3px solid #f44;
+    padding: 30px 40px; text-align: center; z-index: 110;
+    display: none; border-radius: 4px;
+  }
+  #confirm-dialog h2 { font-size: 12px; color: #f44; margin-bottom: 10px; }
+  #confirm-dialog p { font-size: 9px; color: #aaa; margin-bottom: 20px; line-height: 1.8; }
+  #confirm-dialog .confirm-buttons { display: flex; gap: 12px; justify-content: center; }
+  #confirm-dialog button {
+    font-family: 'Press Start 2P', monospace; font-size: 8px;
+    border: none; padding: 10px 20px; cursor: pointer; border-radius: 2px;
+  }
+  #confirm-yes { background: #f44; color: #fff; }
+  #confirm-yes:hover { background: #f66; }
+  #confirm-no { background: #333; color: #aaa; }
+  #confirm-no:hover { background: #444; }
 
   /* Employees walking area */
   .employee-sprite {
@@ -206,7 +238,14 @@
   <!-- Bottom Bar -->
   <div id="bottom-bar">
     <span id="milestone">Welcome to HIRED!</span>
-    <span id="playtime">0:00</span>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button class="save-btn" onclick="manualSave()">💾 Save</button>
+      <button class="save-btn" onclick="manualLoad()">📂 Load</button>
+      <button class="save-btn" onclick="saveAs()">📥 Save As</button>
+      <button class="save-btn" style="color:#f88;border-color:#633;" onclick="newGame()">🔄 New Game</button>
+      <span id="save-status"></span>
+      <span id="playtime">0:00</span>
+    </div>
   </div>
 </div>
 
@@ -215,6 +254,16 @@
   <h2 id="notif-title"></h2>
   <p id="notif-body"></p>
   <button onclick="closeNotification()">OK</button>
+</div>
+
+<!-- Confirm Dialog -->
+<div id="confirm-dialog">
+  <h2 id="confirm-title"></h2>
+  <p id="confirm-body"></p>
+  <div class="confirm-buttons">
+    <button id="confirm-yes">Yes</button>
+    <button id="confirm-no" onclick="closeConfirm()">Cancel</button>
+  </div>
 </div>
 
 <script>
@@ -502,6 +551,19 @@ function showNotification(title, body) {
 
 function closeNotification() {
   document.getElementById('notification').style.display = 'none';
+}
+
+let _confirmCallback = null;
+function showConfirm(title, body, onYes) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-body').textContent = body;
+  _confirmCallback = onYes;
+  document.getElementById('confirm-yes').onclick = () => { closeConfirm(); if (_confirmCallback) _confirmCallback(); };
+  document.getElementById('confirm-dialog').style.display = 'block';
+}
+function closeConfirm() {
+  document.getElementById('confirm-dialog').style.display = 'none';
+  _confirmCallback = null;
 }
 
 // ==================== UI UPDATE ====================
@@ -836,35 +898,134 @@ function gameLoop(timestamp) {
 
 function saveGame() {
   try {
-    const saveData = JSON.stringify(state);
-    // Use a cookie-like approach since localStorage may not be available
-    window._hiredSave = saveData;
-  } catch(e) {}
+    localStorage.setItem('hired_save', JSON.stringify(state));
+  } catch(e) {
+    console.warn('HIRED: Could not save game.', e);
+  }
 }
 
 function loadGame() {
   try {
-    if (window._hiredSave) {
-      const data = JSON.parse(window._hiredSave);
+    const raw = localStorage.getItem('hired_save');
+    if (raw) {
+      const data = JSON.parse(raw);
       Object.assign(state, data);
+      // Ensure any new employee types added after the save exist
+      EMPLOYEE_TYPES.forEach(e => {
+        if (state.employees[e.id] === undefined) state.employees[e.id] = 0;
+      });
       return true;
     }
-  } catch(e) {}
+  } catch(e) {
+    console.warn('HIRED: Could not load game.', e);
+  }
   return false;
+}
+
+function showSaveStatus(msg) {
+  const el = document.getElementById('save-status');
+  el.textContent = msg;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 1500);
+}
+
+function manualSave() {
+  saveGame();
+  showSaveStatus('✓ Saved!');
+}
+
+function saveAs() {
+  const saveData = JSON.stringify(state, null, 2);
+  const blob = new Blob([saveData], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'hired_save_' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showSaveStatus('✓ Exported!');
+}
+
+function newGame() {
+  showConfirm('Start a New Game?', 'All unsaved progress will be lost!', () => {
+    localStorage.removeItem('hired_save');
+    state.money = 0;
+    state.totalEarned = 0;
+    state.clickPower = 1;
+    state.employees = {};
+    state.buildingTier = 0;
+    state.clickUpgradesBought = {};
+    state.startTime = Date.now();
+    state.lastMilestone = -1;
+    EMPLOYEE_TYPES.forEach(e => state.employees[e.id] = 0);
+    // Clear sprites
+    employeeSprites.forEach(s => { if (s.el) s.el.remove(); });
+    employeeSprites.length = 0;
+    // Re-render
+    buildHireButtons();
+    buildUpgradeButtons();
+    buildClickUpgradeButtons();
+    drawBuilding();
+    updateUI();
+    document.getElementById('milestone').textContent = 'Welcome to HIRED!';
+    showSaveStatus('New game!');
+  });
+}
+
+function manualLoad() {
+  if (loadGame()) {
+    // Re-render everything
+    buildHireButtons();
+    buildUpgradeButtons();
+    buildClickUpgradeButtons();
+    drawBuilding();
+    updateUI();
+    // Re-spawn sprites
+    employeeSprites.forEach(s => { if (s.el) s.el.remove(); });
+    employeeSprites.length = 0;
+    EMPLOYEE_TYPES.forEach(emp => {
+      const count = state.employees[emp.id] || 0;
+      for (let i = 0; i < Math.min(count, 30); i++) {
+        spawnEmployeeSprite(emp);
+      }
+    });
+    showSaveStatus('✓ Loaded!');
+  } else {
+    showSaveStatus('No save found');
+  }
 }
 
 // Auto-save every 30s
 setInterval(saveGame, 30000);
 
+// Save when leaving the page so nothing is lost
+window.addEventListener('beforeunload', saveGame);
+
 // ==================== INIT ====================
 
 function init() {
   generateStars();
+
+  // Restore saved progress (if any)
+  const loaded = loadGame();
+
   buildHireButtons();
   buildUpgradeButtons();
   buildClickUpgradeButtons();
   drawBuilding();
   updateUI();
+
+  // Re-spawn employee sprites from saved state
+  if (loaded) {
+    EMPLOYEE_TYPES.forEach(emp => {
+      const count = state.employees[emp.id] || 0;
+      for (let i = 0; i < Math.min(count, 30); i++) {
+        spawnEmployeeSprite(emp);
+      }
+    });
+  }
 
   requestAnimationFrame(gameLoop);
 }

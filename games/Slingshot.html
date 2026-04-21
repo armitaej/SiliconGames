@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Slingshot — Gravitational Pull Game</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1109,8 +1112,8 @@ function update(dt) {
     if (keys['d'] || keys['arrowright']) rotateDir += 1;
     // Touch rotation (use touchDirX for rotation when parked)
     if (touchActive && Math.abs(touchDirX) > 0.1) rotateDir += touchDirX;
-    // Hold Shift for fine angle adjustment (1/6 speed)
-    const rotateSpeed = keys['shift'] ? 0.5 : 3;
+    // Hold Shift for fine angle adjustment (1/10 speed)
+    const rotateSpeed = keys['shift'] ? 0.3 : 3;
     ship.angle += rotateDir * rotateSpeed * dt; // rotate speed
     return;
   }
