@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dirt Bike Tricks</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Arial', sans-serif;
+    overflow: hidden;
+  }
+  canvas { border-radius: 12px; box-shadow: 0 0 60px rgba(255,120,0,0.25); display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ============================================================
+// SETUP
+// ============================================================
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const MAX_W  = 960, MAX_H = 540;
+function resize() {
+  const s = Math.min(window.innerWidth / MAX_W, window.innerHeight / MAX_H, 1);
+  canvas.width  = MAX_W; canvas.height = MAX_H;
+  canvas.style.width  = (MAX_W * s) + 'px';
+  canvas.style.height = (MAX_H * s) + 'px';
+}
+resize();
+window.addEventListener('resize', resize);
+const W = MAX_W, H = MAX_H;
+
+// ============================================================
+// INPUT
+// ============================================================
+const keys = {}, justPressed = {};
+window.addEventListener('keydown', e => {
+  if (!keys[e.code]) { justPressed[e.code] = true; initAudio(); }
+  keys[e.code] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.key)) e.preventDefault();
+  if (e.code === 'KeyM') { sfxMuted = !sfxMuted; engineMuted = !engineMuted; }
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// ============================================================
+// AUDIO ENGINE  (Web Audio API — all procedural, no files)
+// ============================================================
+let audioCtx   = null;
+let engOsc1    = null, engOsc2 = null, engGain = null, engFilter = null;
+let audioReady = false;
+let sfxMuted   = false, engineMuted = false;
+
+function initAudio() {
+  if (audioReady) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // ---- Engine: sawtooth + square → waveshaper → filter → gain ----
+  const distCurve = makeDistCurve(180);
+
+  engOsc1 = audioCtx.createOscillator();
+  engOsc1.type = 'sawtooth';
+  engOsc1.frequency.value = 85;
+
+  engOsc2 = audioCtx.createOscillator();
+  engOsc2.type = 'square';
+  engOsc2.frequency.value = 170;
+
+  const shaper = audioCtx.createWaveShaper();
+  shaper.curve = distCurve;
+  shaper.oversample = '4x';
+
+  engFilter = audioCtx.createBiquadFilter();
+  engFilter.type = 'lowpass';
+  engFilter.frequency.value = 350;
+  engFilter.Q.value = 1.2;
+
+  engGain = audioCtx.createGain();
+  engGain.gain.value = 0;
+
+  engOsc1.connect(shaper);
+  engOsc2.connect(shaper);
+  shaper.connect(engFilter);
+  engFilter.connect(engGain);
+  engGain.connect(audioCtx.destination);
+
+  engOsc1.start();
+  engOsc2.start();
+  audioReady = true;
+}
+
+function makeDistCurve(amount) {
+  const n = 512, c = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    c[i] = ((Math.PI + amount) * x) / (Math.PI + amount * Math.abs(x));
+  }
+  return c;
+}
+
+// Update engine sound every frame
+function updateEngineSound() {
+  if (!audioReady || engineMuted) {
+    if (audioReady && engGain) engGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+    return;
+  }
+  const spd      = Math.abs(bike.vx);
+  const throttle = !!(keys['ArrowRight'] || keys['KeyD']);
+  const onGnd    = bike.onGround;
+
+  const baseFreq  = crashed ? 40 : (55 + spd * 11 + (throttle ? 30 : 0));
+  const gainVal   = crashed ? 0 : (onGnd ? (throttle ? 0.11 : 0.04 + spd * 0.003) : 0.06 + spd * 0.002);
+  const filterHz  = 200 + spd * 30 + (throttle ? 150 : 0);
+
+  const t = audioCtx.currentTime;
+  engOsc1.frequency.setTargetAtTime(baseFreq,       t, 0.08);
+  engOsc2.frequency.setTargetAtTime(baseFreq * 2.05, t, 0.08);
+  engGain.gain.setTargetAtTime(gainVal,             t, 0.06);
+  engFilter.frequency.setTargetAtTime(filterHz,     t, 0.08);
+}
+
+// ---- One-shot helpers ----
+function noiseBuffer(dur) {
+  const sr  = audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, Math.ceil(sr * dur), sr);
+  const d   = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+function playOsc(freq, type, dur, gain, freqEnd) {
+  if (!audioReady || sfxMuted) return;
+  const osc = audioCtx.createOscillator();
+  const g   = audioCtx.createGain();
+  osc.type = type; osc.frequency.value = freq;
+  if (freqEnd !== undefined) osc.frequency.exponentialRampToValueAtTime(freqEnd, audioCtx.currentTime + dur);
+  g.gain.setValueAtTime(gain, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + dur + 0.01);
+}
+
+function playNoise(dur, gainVal, filterType, filterFreqStart, filterFreqEnd) {
+  if (!audioReady || sfxMuted) return;
+  const src = audioCtx.createBufferSource();
+  src.buffer = noiseBuffer(dur);
+  const filt = audioCtx.createBiquadFilter();
+  filt.type  = filterType || 'lowpass';
+  filt.frequency.value = filterFreqStart || 800;
+  if (filterFreqEnd) filt.frequency.exponentialRampToValueAtTime(filterFreqEnd, audioCtx.currentTime + dur);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  src.connect(filt); filt.connect(g); g.connect(audioCtx.destination);
+  src.start();
+}
+
+// ---- Game sound events ----
+function soundJump() {
+  // Whoosh up
+  playNoise(0.28, 0.18, 'bandpass', 250, 1400);
+  playOsc(120, 'sine', 0.25, 0.1, 55);
+}
+
+function soundTrick(pts) {
+  // Bright ascending ping, pitch = trick value
+  const freq = 380 + (pts / 500) * 800;
+  playOsc(freq,        'sine',     0.18, 0.25);
+  playOsc(freq * 1.5,  'triangle', 0.14, 0.12);
+  playOsc(freq * 2,    'sine',     0.10, 0.06);
+}
+
+function soundCleanLand() {
+  // Thud + triumphant arpeggio
+  playNoise(0.22, 0.5, 'lowpass', 320, 60);
+  playOsc(80, 'sine', 0.25, 0.35, 40);
+  [523, 659, 784, 1047].forEach((f, i) =>
+    setTimeout(() => playOsc(f, 'sine', 0.18, 0.22), 40 + i * 65)
+  );
+}
+
+function soundRoughLand() {
+  // Dull thud only
+  playNoise(0.18, 0.38, 'lowpass', 260, 80);
+  playOsc(70, 'sine', 0.2, 0.28, 35);
+}
+
+function soundCrash() {
+  // Explosion noise burst + engine stall
+  playNoise(0.6, 0.7, 'lowpass', 600, 80);
+  playOsc(200, 'sawtooth', 0.55, 0.45, 28);
+  playOsc(140, 'sine',     0.4,  0.3,  20);
+  setTimeout(() => playOsc(60, 'sine', 0.3, 0.15, 30), 120);
+}
+
+function soundCombo(mult) {
+  // Rising arpeggio, higher = more notes
+  const notes = [440, 554, 659, 880, 1109].slice(0, Math.min(Math.round(mult), 5));
+  notes.forEach((f, i) => setTimeout(() => playOsc(f, 'sine', 0.15, 0.2), i * 55));
+}
+
+// ============================================================
+// TERRAIN GENERATION
+// ============================================================
+const WORLD_W = 50000, BASE_Y = 400;
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function generateTerrain() {
+  const pts = [];
+  const push = (x, y) => pts.push({ x, y: clamp(y, 160, 460) });
+  push(0, BASE_Y); push(600, BASE_Y);    // long flat start to build speed
+  let x = 600, y = BASE_Y, seed = 1337;
+  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  const rR  = (lo, hi) => lo + rnd() * (hi - lo);
+
+  while (x < WORLD_W - 500) {
+    const r = rnd();
+
+    if (r < 0.30 && x > 900) {
+      // === BIG JUMP RAMP (more frequent, much taller) ===
+      const rW = rR(80, 160);          // ramp width
+      const rH = rR(100, 190);         // ramp height (was 55-110)
+      const gW = rR(220, 420);         // gap width   (was 80-200)
+      // Long approach flat so you can build speed
+      push(x, y);
+      push(x + rR(80,180), y);         // flat run-up
+      // Steep launch ramp
+      push(x + rR(80,180) + rW * 0.6, y - rH * 0.55);
+      push(x + rR(80,180) + rW,       y - rH);         // lip
+      push(x + rR(80,180) + rW + gW * 0.25, y - rH + 10); // just past the lip
+      // Landing slope
+      push(x + rR(80,180) + rW + gW,       y + 15);   // landing dip
+      push(x + rR(80,180) + rW + gW + 180, y);
+      x += rR(80,180) + rW + gW + 220;
+
+    } else if (r < 0.44) {
+      // === ROLLING HILL ===
+      const hw = rR(180, 340), hh = rR(35, 100);
+      for (let i=0; i<=12; i++) { const t=i/12; push(x+t*hw, y-Math.sin(t*Math.PI)*hh); }
+      x += hw;
+
+    } else if (r < 0.55) {
+      // === VALLEY ===
+      const vw = rR(140, 280), vh = rR(20, 65);
+      for (let i=0; i<=10; i++) { const t=i/10; push(x+t*vw, y+Math.sin(t*Math.PI)*vh); }
+      x += vw;
+
+    } else if (r < 0.68) {
+      // === DOUBLE JUMP (bigger) ===
+      const r1w=rR(60,110), r1h=rR(70,130), gap=rR(100,200), r2w=rR(60,100), r2h=rR(70,130);
+      push(x,y); push(x+r1w,y-r1h); push(x+r1w+gap,y);
+      push(x+r1w+gap+r2w,y-r2h); push(x+r1w+gap+r2w+180,y);
+      x += r1w+gap+r2w+220;
+
+    } else {
+      // === FLAT / SLIGHT GRADE ===
+      const fw = rR(100, 260);
+      y = clamp(y+(rnd()-0.5)*45, 270, 410);
+      push(x+fw, y); x += fw;
+    }
+  }
+  push(WORLD_W, y);
+  return pts;
+}
+
+const TERRAIN = generateTerrain();
+
+function getGroundY(wx) {
+  if (wx <= TERRAIN[0].x) return TERRAIN[0].y;
+  if (wx >= TERRAIN[TERRAIN.length-1].x) return TERRAIN[TERRAIN.length-1].y;
+  let lo=0, hi=TERRAIN.length-1;
+  while (hi-lo>1) { const m=(lo+hi)>>1; if (TERRAIN[m].x<=wx) lo=m; else hi=m; }
+  const t=(wx-TERRAIN[lo].x)/(TERRAIN[hi].x-TERRAIN[lo].x);
+  return lerp(TERRAIN[lo].y, TERRAIN[hi].y, t);
+}
+function getGroundAngle(wx) {
+  const d=12; return Math.atan2(getGroundY(wx+d)-getGroundY(wx-d), 2*d);
+}
+
+// ============================================================
+// TRICKS CATALOG
+// ============================================================
+const TRICKS = {
+  KeyB: { name:'BACKFLIP',     pts:500, color:'#FF4136' },
+  KeyF: { name:'FRONTFLIP',    pts:500, color:'#FF4136' },
+  KeyN: { name:'NO-HANDER',    pts:200, color:'#FF851B' },
+  KeyX: { name:'SUPERMAN',     pts:350, color:'#B10DC9' },
+  KeyC: { name:'CAN-CAN',      pts:150, color:'#39CCCC' },
+  KeyT: { name:'TAIL WHIP',    pts:300, color:'#2ECC40' },
+  KeyH: { name:'HEEL CLICKER', pts:250, color:'#FFDC00' },
+};
+const TRICK_KEYS = Object.keys(TRICKS);
+
+// ============================================================
+// PHYSICS CONSTANTS
+// ============================================================
+const WHEEL_RADIUS = 17, WHEELBASE = 58;
+const GRAVITY = 0.36, THROTTLE = 0.65, BRAKE_FORCE = 0.38;  // lower gravity, more throttle
+const GROUND_FRIC = 0.91, AIR_FRIC = 0.9996, LEAN_SPD = 0.058, ANG_DAMP = 0.87;
+
+// ============================================================
+// GAME STATE
+// ============================================================
+let bike, score, bestScore, distance, crashed, crashTimer;
+let pendingPts, tricksDone, airTime, wasGrounded;
+let comboMult, trickAnims, particles;
+let cameraX, cameraY, gameStart;
+
+function initGame() {
+  const sx = 250, sy = getGroundY(250) - WHEEL_RADIUS;
+  bike = {
+    cx:sx, cy:sy, vx:0, vy:0, angle:0, av:0,
+    onGround:false, rearContact:false, frontContact:false,
+    maxAirY:sy, speed:0,
+  };
+  score = 0; bestScore = bestScore||0; distance = 0;
+  crashed = false; crashTimer = 0;
+  pendingPts = 0; tricksDone = []; airTime = 0; wasGrounded = true;
+  comboMult = 1; trickAnims = []; particles = [];
+  cameraX = sx - W*0.3; cameraY = sy - H*0.55;
+  gameStart = Date.now();
+}
+initGame();
+
+// ============================================================
+// PARTICLES
+// ============================================================
+function spawnDust(x, y, vx) {
+  for (let i=0;i<3;i++) particles.push({
+    x, y, vx:-Math.abs(vx)*0.4+(Math.random()-0.5)*2,
+    vy:-(Math.random()*2+0.5), life:15+Math.random()*20, maxLife:35,
+    r:2+Math.random()*3, type:'dust',
+  });
+}
+function spawnLandingDust(x, y) {
+  for (let i=0;i<14;i++) {
+    const a=Math.PI+(Math.random()-0.5)*Math.PI*0.8, spd=1+Math.random()*5;
+    particles.push({ x, y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd-2,
+      life:30+Math.random()*20, maxLife:50, r:3+Math.random()*5, type:'dust' });
+  }
+}
+function updateParticles() {
+  for (let i=particles.length-1;i>=0;i--) {
+    const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.life--;
+    if (p.life<=0) particles.splice(i,1);
+  }
+}
+
+// ============================================================
+// PHYSICS UPDATE
+// ============================================================
+function getWheels(cx,cy,angle) {
+  const cos=Math.cos(angle), sin=Math.sin(angle);
+  return { rx:cx-cos*WHEELBASE/2, ry:cy-sin*WHEELBASE/2,
+           fx:cx+cos*WHEELBASE/2, fy:cy+sin*WHEELBASE/2 };
+}
+
+function update() {
+  if (crashed) {
+    crashTimer--; updateParticles();
+    updateEngineSound();
+    if (crashTimer<=0) initGame();
+    return;
+  }
+
+  // Controls
+  if (keys['ArrowRight']||keys['KeyD']) {
+    bike.vx += Math.cos(bike.angle)*THROTTLE;
+    if (bike.onGround) bike.vy += Math.sin(bike.angle)*THROTTLE*0.5;
+  }
+  if (keys['ArrowLeft']||keys['KeyA']) { bike.vx -= BRAKE_FORCE; if (bike.vx<-3) bike.vx=-3; }
+  if (keys['ArrowUp']  ||keys['KeyW']) bike.av -= LEAN_SPD;
+  if (keys['ArrowDown']||keys['KeyS']) bike.av += LEAN_SPD;
+
+  bike.vy += GRAVITY;
+  bike.vx  = clamp(bike.vx, -5, 26);   // higher top speed for bigger launches
+  bike.av  = clamp(bike.av, -0.22, 0.22);
+  bike.cx += bike.vx; bike.cy += bike.vy; bike.angle += bike.av;
+
+  if (bike.cx < 80) { bike.cx=80; bike.vx=Math.max(0,bike.vx); }
+
+  // Wheel collision
+  const w  = getWheels(bike.cx, bike.cy, bike.angle);
+  const rgY = getGroundY(w.rx), fgY = getGroundY(w.fx);
+  const rPen = (w.ry+WHEEL_RADIUS)-rgY, fPen = (w.fy+WHEEL_RADIUS)-fgY;
+
+  bike.rearContact  = rPen > -2;
+  bike.frontContact = fPen > -2;
+  bike.onGround     = bike.rearContact || bike.frontContact;
+
+  const wasAir = !wasGrounded;
+
+  if (bike.onGround) {
+    if (bike.rearContact && bike.frontContact) {
+      const gA = getGroundAngle(bike.cx);
+      bike.angle += (gA-bike.angle)*0.18; bike.av *= 0.45;
+      const pen = Math.max(rPen,fPen);
+      if (pen>0) { bike.cy -= pen; bike.vy = Math.min(bike.vy*0.1,0); }
+    } else if (bike.rearContact) {
+      if (rPen>0) { bike.cy -= rPen; bike.vy = Math.min(bike.vy*0.15,0); }
+      bike.av *= ANG_DAMP;
+    } else {
+      if (fPen>0) { bike.cy -= fPen; bike.vy = Math.min(bike.vy*0.15,0); }
+      bike.av *= ANG_DAMP;
+    }
+    bike.vx *= GROUND_FRIC;
+
+    if (wasAir && airTime > 12) {
+      const gA = getGroundAngle(bike.cx);
+      onLand(gA);
+      spawnLandingDust(bike.cx, getGroundY(bike.cx));
+    }
+    if (airTime > 0) { airTime=0; bike.maxAirY=bike.cy; }
+    wasGrounded = true;
+
+    if (Math.abs(bike.vx)>3 && Math.random()<0.25) spawnDust(w.rx, w.ry+WHEEL_RADIUS, bike.vx);
+
+  } else {
+    // Airborne
+    if (airTime === 0) soundJump();          // ← jump whoosh on first air frame
+    bike.vx *= AIR_FRIC; bike.av *= 0.99;
+    airTime++;
+    bike.maxAirY = Math.min(bike.maxAirY, bike.cy);
+    wasGrounded  = false;
+
+    if (airTime > 12) {
+      for (const k of TRICK_KEYS) {
+        if (justPressed[k] && !tricksDone.includes(k)) doTrick(k);
+      }
+    }
+  }
+
+  checkCrash();
+
+  distance  = Math.max(distance, Math.floor(bike.cx/10));
+  bike.speed = Math.abs(bike.vx*5.4).toFixed(0);
+
+  // Camera
+  cameraX += (bike.cx - W*0.32 - cameraX) * 0.11;
+  cameraY += (bike.cy - H*0.58 - cameraY) * 0.08;
+
+  for (let i=trickAnims.length-1;i>=0;i--) {
+    const a=trickAnims[i]; a.y -= 1.6; a.life--;
+    a.alpha=a.life/a.maxLife; if (a.life<=0) trickAnims.splice(i,1);
+  }
+  updateParticles();
+  updateEngineSound();                       // ← engine sound updated every frame
+
+  for (const k in justPressed) delete justPressed[k];
+}
+
+// ============================================================
+// TRICKS & SCORING
+// ============================================================
+function doTrick(key) {
+  const t = TRICKS[key];
+  tricksDone.push(key); pendingPts += t.pts;
+  pushAnim(bike.cx, bike.cy-55, t.name, t.color, 80);
+  soundTrick(t.pts);                         // ← trick ping
+  if (key==='KeyB') bike.av += 0.12;
+  if (key==='KeyF') bike.av -= 0.12;
+}
+
+function onLand(gAngle) {
+  let rel = Math.abs(bike.angle - gAngle) % (Math.PI*2);
+  if (rel > Math.PI) rel = Math.PI*2 - rel;
+
+  const airBonus    = Math.floor(airTime*1.5);
+  const heightBonus = Math.max(0, Math.floor((bike.cy-bike.maxAirY)*0.4));
+
+  if (rel < 0.42) {
+    if (pendingPts > 0) {
+      const total = Math.floor((pendingPts+airBonus+heightBonus)*comboMult);
+      score += total; bestScore = Math.max(bestScore,score);
+      comboMult = Math.min(comboMult+0.5, 6);
+      pushAnim(bike.cx, bike.cy-90, `CLEAN! +${total}`, '#2ECC40', 130);
+      soundCleanLand();                      // ← clean landing chime
+      soundCombo(comboMult);
+    } else {
+      soundCleanLand();
+    }
+  } else if (rel < 0.85) {
+    if (pendingPts > 0) {
+      const total = Math.floor(pendingPts*0.5*comboMult);
+      score += total; bestScore = Math.max(bestScore,score);
+      pushAnim(bike.cx, bike.cy-90, `ROUGH +${total}`, '#FF851B', 100);
+    }
+    comboMult = Math.max(1, comboMult-0.5);
+    soundRoughLand();                        // ← rough landing thud
+  } else {
+    doCrash(); return;
+  }
+  pendingPts=0; tricksDone=[];
+}
+
+function checkCrash() {
+  const norm = ((bike.angle%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+  if (norm>Math.PI*0.55 && norm<Math.PI*1.45 && bike.onGround) { doCrash(); return; }
+  if (bike.cy > H+300) doCrash();
+}
+
+function doCrash() {
+  if (crashed) return;
+  crashed=true; crashTimer=160; pendingPts=0; tricksDone=[]; comboMult=1;
+  pushAnim(bike.cx, bike.cy-70, '💥 CRASHED!', '#FF4136', 140);
+  soundCrash();                              // ← crash explosion
+  for (let i=0;i<20;i++) {
+    const a=Math.random()*Math.PI*2, spd=2+Math.random()*7;
+    particles.push({ x:bike.cx, y:bike.cy, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd-3,
+      life:40+Math.random()*30, maxLife:70, r:3+Math.random()*5, type:'crash' });
+  }
+}
+
+function pushAnim(x,y,text,color,life) {
+  trickAnims.push({x,y,text,color,life,maxLife:life,alpha:1});
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+const MOUNTAINS = Array.from({length:10},(_,i)=>({
+  x:i*900+Math.sin(i*2.1)*200, h:90+Math.sin(i*1.7)*50, w:250+Math.sin(i*1.3)*80
+}));
+const CLOUDS = Array.from({length:10},(_,i)=>({
+  x:i*800+100, y:60+Math.sin(i*1.9)*35, w:60+Math.sin(i*2.5)*35, h:22+Math.sin(i*1.1)*12
+}));
+
+function drawBackground() {
+  const sky = ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#0d1b3e'); sky.addColorStop(0.5,'#1a6fa8'); sky.addColorStop(1,'#d6883a');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+
+  const sunX=W*0.82, sunY=75;
+  const glow=ctx.createRadialGradient(sunX,sunY,10,sunX,sunY,90);
+  glow.addColorStop(0,'rgba(255,240,180,0.9)'); glow.addColorStop(0.4,'rgba(255,200,80,0.4)');
+  glow.addColorStop(1,'rgba(255,160,0,0)');
+  ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(sunX,sunY,90,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(sunX,sunY,36,0,Math.PI*2); ctx.fillStyle='#FFF9C4'; ctx.fill();
+
+  MOUNTAINS.forEach(m => {
+    const sx=(m.x-cameraX*0.12)%(WORLD_W*0.12+W*2)-100;
+    ctx.beginPath(); ctx.moveTo(sx-m.w,H); ctx.lineTo(sx,H-m.h-(cameraY*0.05)); ctx.lineTo(sx+m.w,H);
+    ctx.fillStyle='rgba(40,55,80,0.45)'; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(sx-m.w*0.22,H-m.h*0.78-(cameraY*0.05));
+    ctx.lineTo(sx,H-m.h-(cameraY*0.05)); ctx.lineTo(sx+m.w*0.22,H-m.h*0.78-(cameraY*0.05));
+    ctx.fillStyle='rgba(220,230,255,0.5)'; ctx.fill();
+  });
+
+  CLOUDS.forEach(c => {
+    const sx=((c.x-cameraX*0.28)%(WORLD_W*0.28+W*2)+W*2)%(WORLD_W*0.28+W*2)-200;
+    if (sx<-200||sx>W+200) return;
+    ctx.save(); ctx.translate(sx,c.y); ctx.globalAlpha=0.82; ctx.fillStyle='#e8f4ff';
+    ctx.beginPath(); ctx.ellipse(0,0,c.w,c.h,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-c.w*0.42,4,c.w*0.55,c.h*0.78,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(c.w*0.38,5,c.w*0.48,c.h*0.7,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawTerrain() {
+  const startX=cameraX-150, endX=cameraX+W+150;
+  let si=0;
+  for (let i=0;i<TERRAIN.length-1;i++) { if (TERRAIN[i+1].x>startX){si=i;break;} }
+
+  ctx.beginPath();
+  ctx.moveTo(TERRAIN[si].x-cameraX, TERRAIN[si].y-cameraY);
+  for (let i=si;i<TERRAIN.length;i++) {
+    const p=TERRAIN[i]; ctx.lineTo(p.x-cameraX, p.y-cameraY);
+    if (p.x-cameraX > endX+200) break;
+  }
+  ctx.lineTo(endX+200, H+100); ctx.lineTo(startX-100, H+100); ctx.closePath();
+  const dg=ctx.createLinearGradient(0,H*0.5,0,H);
+  dg.addColorStop(0,'#7A4724'); dg.addColorStop(0.4,'#5C3317'); dg.addColorStop(1,'#2E1608');
+  ctx.fillStyle=dg; ctx.fill();
+
+  // Grass
+  [['#4CAF50',5],['#81C784',2]].forEach(([col,lw],gi) => {
+    ctx.beginPath(); let first=true;
+    for (let i=si;i<TERRAIN.length;i++) {
+      const p=TERRAIN[i], sx=p.x-cameraX, sy=p.y-cameraY-(gi*2.5);
+      first?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy); first=false;
+      if (sx>endX+200) break;
+    }
+    ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.lineJoin='round'; ctx.stroke();
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    const a=p.life/p.maxLife;
+    ctx.save(); ctx.globalAlpha=a*0.75;
+    ctx.fillStyle = p.type==='crash' ? `hsl(${20+a*20},90%,${50+a*10}%)` : `rgba(160,100,50,${a})`;
+    ctx.beginPath(); ctx.arc(p.x-cameraX, p.y-cameraY, p.r, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawBike() {
+  const sx=bike.cx-cameraX, sy=bike.cy-cameraY;
+  ctx.save(); ctx.translate(sx,sy); ctx.rotate(bike.angle);
+
+  const WR=WHEEL_RADIUS, WB=WHEELBASE;
+  const spinAng=Date.now()*0.001*Math.sign(bike.vx||1)*Math.abs(bike.vx)*2;
+
+  function drawWheel(wx,wy) {
+    ctx.beginPath(); ctx.arc(wx,wy,WR,0,Math.PI*2); ctx.fillStyle='#222'; ctx.fill();
+    ctx.strokeStyle='#555'; ctx.lineWidth=3; ctx.stroke();
+    ctx.beginPath(); ctx.arc(wx,wy,WR*0.6,0,Math.PI*2); ctx.strokeStyle='#888'; ctx.lineWidth=2; ctx.stroke();
+    ctx.lineWidth=1.5;
+    for (let i=0;i<5;i++) {
+      const a=(i/5)*Math.PI*2+spinAng;
+      ctx.beginPath(); ctx.moveTo(wx,wy);
+      ctx.lineTo(wx+Math.cos(a)*WR*0.6, wy+Math.sin(a)*WR*0.6);
+      ctx.strokeStyle='#aaa'; ctx.stroke();
+    }
+  }
+  drawWheel(-WB/2, WR); drawWheel(WB/2, WR);
+
+  // Swingarm
+  ctx.beginPath(); ctx.moveTo(-WB/2+4,WR-4); ctx.lineTo(-5,2);
+  ctx.strokeStyle='#c0392b'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.stroke();
+  // Fork
+  ctx.beginPath(); ctx.moveTo(8,-8); ctx.lineTo(WB/2,WR-4);
+  ctx.strokeStyle='#bdc3c7'; ctx.lineWidth=4; ctx.stroke();
+  // Frame
+  ctx.beginPath(); ctx.moveTo(-WB/2+6,WR-5); ctx.lineTo(-2,-8); ctx.lineTo(8,-8);
+  ctx.strokeStyle='#e74c3c'; ctx.lineWidth=5; ctx.lineJoin='round'; ctx.stroke();
+  // Seat stay
+  ctx.beginPath(); ctx.moveTo(-8,-18); ctx.lineTo(-WB/2+8,WR-6);
+  ctx.strokeStyle='#c0392b'; ctx.lineWidth=3; ctx.stroke();
+  // Engine
+  ctx.beginPath(); ctx.roundRect(-15,-4,22,16,4); ctx.fillStyle='#e74c3c'; ctx.fill();
+  ctx.strokeStyle='#922b21'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(-10,0,12,8,2); ctx.fillStyle='#c0392b'; ctx.fill();
+  // Exhaust
+  ctx.beginPath(); ctx.moveTo(-12,8); ctx.lineTo(-WB/2+5,15);
+  ctx.strokeStyle='#7f8c8d'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(-WB/2+5,15,3,0,Math.PI*2); ctx.fillStyle='#555'; ctx.fill();
+  // Seat
+  ctx.beginPath(); ctx.roundRect(-18,-22,28,6,3); ctx.fillStyle='#1a1a1a'; ctx.fill();
+  ctx.strokeStyle='#444'; ctx.lineWidth=1; ctx.stroke();
+  // Handlebar
+  ctx.beginPath(); ctx.moveTo(8,-8); ctx.lineTo(14,-18); ctx.lineTo(22,-20);
+  ctx.strokeStyle='#95a5a6'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.stroke();
+  // Headlight
+  ctx.beginPath(); ctx.arc(WB/2-2,WR-10,5,0,Math.PI*2); ctx.fillStyle='#FFEB3B'; ctx.fill();
+  ctx.fillStyle='rgba(255,235,59,0.3)';
+  ctx.beginPath(); ctx.arc(WB/2-2,WR-10,10,0,Math.PI*2); ctx.fill();
+
+  // Exhaust smoke when throttling
+  if ((keys['ArrowRight']||keys['KeyD']) && bike.onGround && Math.random()<0.4) {
+    ctx.save();
+    ctx.globalAlpha = 0.25+Math.random()*0.2;
+    ctx.fillStyle = '#aaa';
+    const sr=2+Math.random()*3;
+    ctx.beginPath(); ctx.arc(-WB/2+5+((Math.random()-0.5)*4), 15+Math.random()*4, sr, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // Rider
+  if (!crashed) {
+    ctx.beginPath(); ctx.moveTo(-2,-18); ctx.lineTo(4,-6);
+    ctx.strokeStyle='#2c3e50'; ctx.lineWidth=6; ctx.lineCap='round'; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4,-6); ctx.lineTo(10,WR-6);
+    ctx.strokeStyle='#2c3e50'; ctx.lineWidth=5; ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(-10,-38,16,22,5); ctx.fillStyle='#2980b9'; ctx.fill();
+    ctx.strokeStyle='#1a5276'; ctx.lineWidth=1; ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(-7,-36,10,10,3); ctx.fillStyle='#3498db'; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(4,-32); ctx.lineTo(18,-20);
+    ctx.strokeStyle='#2980b9'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(-2,-45,11,0,Math.PI*2); ctx.fillStyle='#e67e22'; ctx.fill();
+    ctx.strokeStyle='#ca6f1e'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(3,-43,6,4,-0.3,0,Math.PI); ctx.fillStyle='rgba(100,200,255,0.4)'; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-12,-47); ctx.lineTo(-2,-56); ctx.lineTo(6,-47);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+  } else {
+    const t2=Date.now()*0.001;
+    ctx.save(); ctx.rotate(Date.now()*0.005);
+    ctx.beginPath(); ctx.arc(5,-30,11,0,Math.PI*2); ctx.fillStyle='#e67e22'; ctx.fill();
+    for (let i=0;i<6;i++) {
+      const a=(i/6)*Math.PI*2+t2*3;
+      ctx.beginPath(); ctx.arc(5+Math.cos(a)*22,-30+Math.sin(a)*22,3,0,Math.PI*2);
+      ctx.fillStyle='#FFD700'; ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawTrickAnims() {
+  trickAnims.forEach(a => {
+    const sx=a.x-cameraX, sy=a.y-cameraY;
+    if (sx<-200||sx>W+200) return;
+    ctx.save(); ctx.globalAlpha=a.alpha; ctx.textAlign='center';
+    ctx.font=`bold 20px Arial`; ctx.lineWidth=4;
+    ctx.strokeStyle='rgba(0,0,0,0.9)'; ctx.strokeText(a.text,sx,sy);
+    ctx.fillStyle=a.color;               ctx.fillText(a.text,sx,sy);
+    ctx.restore();
+  });
+}
+
+function drawHUD() {
+  ctx.textAlign='left';
+
+  // Score
+  ctx.save();
+  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.roundRect(12,12,220,95,10); ctx.fill();
+  ctx.fillStyle='#FFD700'; ctx.font='bold 34px Arial'; ctx.fillText(score.toLocaleString(),20,52);
+  ctx.fillStyle='#aaa'; ctx.font='13px Arial';
+  ctx.fillText(`BEST: ${bestScore.toLocaleString()}`,20,72);
+  ctx.fillText(`DIST: ${distance}m`,20,90);
+  ctx.fillText(`${bike.speed} km/h`,130,90);
+  ctx.restore();
+
+  // Combo
+  if (comboMult>1) {
+    ctx.save(); ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.roundRect(12,114,165,32,8); ctx.fill();
+    ctx.fillStyle='#FF851B'; ctx.font='bold 20px Arial';
+    ctx.fillText(`x${comboMult.toFixed(1)} COMBO!`,20,136); ctx.restore();
+  }
+
+  // Pending
+  if (pendingPts>0) {
+    ctx.save(); ctx.fillStyle='rgba(0,0,0,0.55)';
+    ctx.beginPath(); ctx.roundRect(W-230,12,218,40,8); ctx.fill();
+    ctx.fillStyle='#2ECC40'; ctx.font='bold 18px Arial'; ctx.textAlign='right';
+    ctx.fillText(`PENDING: +${pendingPts}`,W-16,38); ctx.restore();
+  }
+
+  // Airtime + trick panel
+  if (!bike.onGround && airTime>20) {
+    ctx.save(); ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.roundRect(W/2-70,12,140,36,8); ctx.fill();
+    ctx.fillStyle='#39CCCC'; ctx.font='bold 18px Arial'; ctx.textAlign='center';
+    ctx.fillText(`AIR ${(airTime/60).toFixed(1)}s`,W/2,36); ctx.restore();
+
+    const tList=Object.entries(TRICKS);
+    ctx.save(); ctx.fillStyle='rgba(0,0,0,0.6)';
+    ctx.beginPath(); ctx.roundRect(W-210,H-195,198,183,10); ctx.fill();
+    ctx.font='bold 12px Arial'; ctx.textAlign='left';
+    tList.forEach(([key,tr],i) => {
+      const done=tricksDone.includes(key), kC=key.replace('Key',''), yy=H-178+i*25;
+      ctx.fillStyle=done?tr.color:'#666'; ctx.fillText(`[${kC}]`,W-200,yy);
+      ctx.fillStyle=done?'#fff':'#555'; ctx.fillText(tr.name,W-178,yy);
+      ctx.fillStyle=done?'#FFD700':'#444'; ctx.textAlign='right';
+      ctx.fillText(`${tr.pts}`,W-16,yy); ctx.textAlign='left';
+      if (done) { ctx.fillStyle=tr.color; ctx.fillText('✓',W-13,yy); }
+    });
+    ctx.restore();
+  }
+
+  // Controls hint (first 9s)
+  if (Date.now()-gameStart < 9000) {
+    const al=Math.min(1,Math.max(0,(9000-(Date.now()-gameStart))/1500));
+    ctx.save(); ctx.globalAlpha=al;
+    ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.beginPath(); ctx.roundRect(W/2-310,H-75,620,64,10); ctx.fill();
+    ctx.fillStyle='#ddd'; ctx.font='bold 13px Arial'; ctx.textAlign='center';
+    ctx.fillText('→/D  Throttle     ←/A  Brake     ↑/W  Lean Back     ↓/S  Lean Forward',W/2,H-52);
+    ctx.fillStyle='#FFD700';
+    ctx.fillText('While airborne:  B=Backflip  F=Frontflip  N=No-Hander  X=Superman  C=Can-Can  T=Tail Whip  H=Heel Clicker',W/2,H-28);
+    ctx.restore();
+  }
+
+  // Speed lines
+  if (bike.vx>11) {
+    const intensity=clamp((bike.vx-11)/9,0,1);
+    ctx.save(); ctx.globalAlpha=intensity*0.2; ctx.fillStyle='white';
+    for (let i=0;i<10;i++) {
+      const yy=60+i*52, len=30+Math.random()*80;
+      ctx.fillRect(bike.cx-cameraX-50-len,yy,len,1.5);
+    }
+    ctx.restore();
+  }
+
+  // Mute indicator
+  if (sfxMuted || engineMuted) {
+    ctx.save();
+    ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.roundRect(W-80,H-38,70,28,6); ctx.fill();
+    ctx.fillStyle='#aaa'; ctx.font='bold 14px Arial'; ctx.textAlign='center';
+    ctx.fillText('🔇 M', W-45, H-19); ctx.restore();
+  }
+
+  // Crash overlay
+  if (crashed) {
+    ctx.save(); ctx.fillStyle='rgba(180,0,0,0.38)'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='white'; ctx.font='bold 72px Arial'; ctx.textAlign='center';
+    ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=6;
+    ctx.strokeText('CRASHED!',W/2,H/2-10); ctx.fillText('CRASHED!',W/2,H/2-10);
+    ctx.font='22px Arial'; ctx.fillStyle='#ccc';
+    ctx.fillText('Restarting in a moment…',W/2,H/2+40); ctx.restore();
+  }
+}
+
+// ============================================================
+// GAME LOOP
+// ============================================================
+function frame() {
+  update();
+  ctx.clearRect(0,0,W,H);
+  drawBackground(); drawTerrain(); drawParticles();
+  drawTrickAnims(); drawBike(); drawHUD();
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

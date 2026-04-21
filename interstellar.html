@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Interstellar</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace;cursor:grab}
+body.dragging{cursor:grabbing}
+canvas{display:block}
+#intro{
+  position:fixed;inset:0;z-index:100;
+  background:radial-gradient(ellipse at 50% 50%,#080820 0%,#020208 65%,#000 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;user-select:none;
+}
+#intro h1{
+  font-size:56px;color:#fff;letter-spacing:22px;font-weight:100;
+  text-shadow:0 0 60px rgba(60,140,255,.45),0 0 120px rgba(40,80,255,.15);
+  margin-bottom:6px;
+}
+#intro .sub{font-size:12px;color:rgba(100,180,255,.3);letter-spacing:8px;margin-bottom:50px}
+#intro .keys{
+  font-size:11px;color:rgba(100,180,255,.25);line-height:2.4;text-align:left;
+  padding:20px 28px;border:1px solid rgba(60,130,255,.08);border-radius:8px;
+  background:rgba(0,15,40,.3);margin-bottom:40px;max-width:480px;
+}
+#intro .keys span{color:rgba(100,180,255,.55)}
+#intro .go{font-size:14px;color:rgba(100,180,255,.35);letter-spacing:5px;animation:p 2s infinite}
+@keyframes p{0%,100%{opacity:.25}50%{opacity:.85}}
+</style>
+</head>
+<body>
+<div id="intro">
+  <h1>INTERSTELLAR</h1>
+  <div class="sub">EXPLORE THE UNIVERSE</div>
+  <div class="keys">
+    <span>Scroll</span> — Zoom in / out (galaxy to ground level)<br>
+    <span>Click</span> — Select &amp; center on any object<br>
+    <span>Drag</span> — Pan the view<br>
+    <span>Double-click</span> — Quick zoom into object<br>
+    <span>F</span> — Fit all planets on screen (overview toggle)<br>
+    <span>ESC</span> — Zoom all the way out to galaxy<br>
+    <span>0</span> — Sun &nbsp; <span>1–9</span> — Mercury → Pluto &nbsp; <span>J</span> — Jupiter &amp; moons<br>
+    <span>O</span> — Toggle orbit lines &nbsp; <span>I</span> — Toggle info panel
+  </div>
+  <div class="go">CLICK TO BEGIN</div>
+</div>
+<canvas id="c"></canvas>
+<div id="vid-container" style="display:none;position:fixed;inset:0;z-index:50;background:#000">
+<video id="planet-vid" style="width:100%;height:100%;object-fit:cover" playsinline></video>
+</div>
+<script>
+// =====================================================================
+//  INTERSTELLAR — Infinite-zoom universe explorer
+//  Galaxy → Solar system → Planet/Moons → Surface
+// =====================================================================
+const C=document.getElementById('c'), X=C.getContext('2d');
+const resize=()=>{C.width=innerWidth;C.height=innerHeight};
+resize(); addEventListener('resize',resize);
+
+const PI=Math.PI,TAU=PI*2,G=6.674e-11,AU_M=1.496e11;
+const LY=9.461e15;
+
+const MIN_ZOOM=2e-23, MAX_ZOOM=2;
+
+// ── Solar system data ────────────────────────────────────────────────
+// parent: index of parent body (null = orbits Sun at origin)
+// moonOf: index of parent planet for moons
+const BODIES=[
+  // 0 - Sun
+  {name:'Sun',mass:1.989e30,radius:6.96e8,dist:0,T:0,type:'star',
+   c1:'#fffbe8',c2:'#ffcc22',c3:'#ff8800',c4:'#cc4400',
+   fact:'The Sun contains 99.86% of all mass in the solar system. Every second it converts 4 million tons of matter into pure energy.',
+   surface:{sky:'#110800',ground:'#ff6600',accent:'#ffaa33',desc:'G-type main-sequence star — 5,778 K surface — 1.989×10³⁰ kg',features:'solar',gravity:274}},
+  // 1 - Mercury
+  {name:'Mercury',mass:3.3e23,radius:2.44e6,dist:5.79e10,T:7.6e6,type:'planet',
+   c1:'#ccc',c2:'#999',c3:'#666',c4:'#444',
+   fact:'Mercury is shrinking. As its iron core slowly cools, the planet has contracted by more than 14 km in diameter over billions of years.',
+   surface:{sky:'#000003',ground:'#888',accent:'#666',desc:'Smallest planet — no atmosphere — −173°C to 427°C',features:'craters',gravity:3.7}},
+  // 2 - Venus
+  {name:'Venus',mass:4.87e24,radius:6.05e6,dist:1.08e11,T:1.94e7,type:'planet',
+   c1:'#f0ddb0',c2:'#e0c890',c3:'#bb9955',c4:'#886633',
+   fact:'A day on Venus is longer than its year. It takes 243 Earth days to rotate once but only 225 days to orbit the Sun — and it spins backwards.',
+   surface:{sky:'#44331a',ground:'#cc9944',accent:'#aa7733',desc:'Hottest planet 462°C — crushing CO₂ atmosphere — retrograde rotation',features:'volcanoes',gravity:8.87}},
+  // 3 - Earth
+  {name:'Earth',mass:5.97e24,radius:6.37e6,dist:1.496e11,T:3.156e7,type:'planet',
+   c1:'#88ccff',c2:'#4499ff',c3:'#2266bb',c4:'#113366',
+   fact:'Earth is the only planet not named after a Greek or Roman god. Its name comes from Old English "ertha" meaning ground or soil.',
+   surface:{sky:'#1a3355',ground:'#44aa44',accent:'#338833',desc:'Home — liquid water, atmosphere, life — 5.97×10²⁴ kg',features:'trees',gravity:9.81}},
+  // 4 - Mars
+  {name:'Mars',mass:6.42e23,radius:3.39e6,dist:2.28e11,T:5.94e7,type:'planet',
+   c1:'#ee8855',c2:'#cc5533',c3:'#993322',c4:'#551100',
+   fact:'Mars has the tallest volcano in the solar system — Olympus Mons is 21.9 km tall, nearly 3× the height of Mt. Everest, with a base the size of France.',
+   surface:{sky:'#1a0e06',ground:'#cc6633',accent:'#aa4422',desc:'Thin CO₂ — Olympus Mons 21.9 km — target for colonization',features:'rocks',gravity:3.72}},
+  // 5 - Jupiter
+  {name:'Jupiter',mass:1.9e27,radius:6.99e7,dist:7.78e11,T:3.74e8,type:'planet',grs:true,
+   c1:'#eec899',c2:'#d4a574',c3:'#aa7744',c4:'#664422',
+   fact:'Jupiter\'s Great Red Spot is a storm larger than Earth that has been raging for at least 350 years. It rotates counterclockwise once every 6 days.',
+   surface:{sky:'#1a1008',ground:'#ddaa66',accent:'#cc8844',desc:'Gas giant — 318× Earth mass — Great Red Spot — 95 moons',features:'clouds',gravity:24.79}},
+  // 6 - Saturn
+  {name:'Saturn',mass:5.68e26,radius:5.82e7,dist:1.43e12,T:9.3e8,type:'planet',rings:true,
+   c1:'#f5e5c0',c2:'#ead6a6',c3:'#ccaa66',c4:'#886622',
+   fact:'Saturn is so light it would float in water — its density is only 0.687 g/cm³. Its rings are mostly ice and rock, some pieces as big as houses.',
+   surface:{sky:'#141008',ground:'#ddcc88',accent:'#bbaa55',desc:'Ringed giant — density less than water — 146 moons',features:'clouds',gravity:10.44}},
+  // 7 - Uranus
+  {name:'Uranus',mass:8.68e25,radius:2.54e7,dist:2.87e12,T:2.65e9,type:'planet',
+   c1:'#aaddee',c2:'#88ccdd',c3:'#559999',c4:'#335555',
+   fact:'Uranus rotates on its side at a 98° tilt, likely from being struck by an Earth-sized object billions of years ago. Its seasons last 21 years each.',
+   surface:{sky:'#081518',ground:'#77bbcc',accent:'#559999',desc:'Ice giant — 98° axial tilt — methane blue-green — −224°C',features:'ice',gravity:8.69}},
+  // 8 - Neptune
+  {name:'Neptune',mass:1.02e26,radius:2.46e7,dist:4.5e12,T:5.2e9,type:'planet',
+   c1:'#7799ff',c2:'#4466ee',c3:'#3344aa',c4:'#112266',
+   fact:'Neptune has the fastest winds in the solar system, reaching 2,100 km/h. It was the first planet found by mathematical prediction rather than observation.',
+   surface:{sky:'#060818',ground:'#4466cc',accent:'#3355aa',desc:'Farthest major planet — 2,100 km/h winds — deep blue',features:'ice',gravity:11.15}},
+  // 9 - Pluto
+  {name:'Pluto',mass:1.3e22,radius:1.19e6,dist:5.91e12,T:7.82e9,type:'dwarf',
+   c1:'#e8ddd0',c2:'#c8b8a8',c3:'#907868',c4:'#584838',
+   fact:'Pluto has a giant heart-shaped glacier called Tombaugh Regio made of frozen nitrogen. It is smaller than Earth\'s Moon and has a thin atmosphere that freezes and falls as snow.',
+   surface:{sky:'#020204',ground:'#bba898',accent:'#998878',desc:'Dwarf planet — heart-shaped Tombaugh Regio — −230°C',features:'ice',gravity:0.62}},
+  // 10 - Io (moon of Jupiter, idx 5)
+  {name:'Io',mass:8.93e22,radius:1.82e6,dist:4.22e8,T:1.53e5,type:'moon',moonOf:5,
+   c1:'#eeee88',c2:'#ddcc44',c3:'#bbaa22',c4:'#887700',
+   fact:'Io has over 400 active volcanoes — more than any other body in the solar system. Jupiter\'s gravity stretches and squeezes it, generating immense tidal heat.',
+   surface:{sky:'#000002',ground:'#ddcc44',accent:'#bbaa22',desc:'Most volcanically active body — tidal heating from Jupiter — sulfur surface',features:'volcanoes',gravity:1.80}},
+  // 11 - Europa (moon of Jupiter)
+  {name:'Europa',mass:4.8e22,radius:1.56e6,dist:6.71e8,T:3.07e5,type:'moon',moonOf:5,
+   c1:'#eeeeff',c2:'#ccccee',c3:'#9999bb',c4:'#666688',
+   fact:'Europa has a salty ocean beneath its ice shell that contains roughly 2–3× more water than all of Earth\'s oceans combined. It is NASA\'s top candidate for alien life.',
+   surface:{sky:'#000003',ground:'#ccccdd',accent:'#aaaacc',desc:'Subsurface ocean — smoothest surface — possible life beneath ice',features:'ice',gravity:1.31}},
+  // 12 - Ganymede (moon of Jupiter)
+  {name:'Ganymede',mass:1.48e23,radius:2.63e6,dist:1.07e9,T:6.18e5,type:'moon',moonOf:5,
+   c1:'#ccbbaa',c2:'#aa9988',c3:'#887766',c4:'#554433',
+   fact:'Ganymede is the largest moon in the solar system — bigger than Mercury. It is the only moon known to have its own magnetic field, creating faint auroras.',
+   surface:{sky:'#000002',ground:'#aa9988',accent:'#887766',desc:'Largest moon in solar system — own magnetic field — icy/rocky surface',features:'craters',gravity:1.43}},
+  // 13 - Callisto (moon of Jupiter)
+  {name:'Callisto',mass:1.08e23,radius:2.41e6,dist:1.88e9,T:1.44e6,type:'moon',moonOf:5,
+   c1:'#998877',c2:'#776655',c3:'#554433',c4:'#332211',
+   fact:'Callisto\'s surface is roughly 4 billion years old — the oldest landscape in the solar system. It may also hide a subsurface ocean 100 km beneath its cratered crust.',
+   surface:{sky:'#000002',ground:'#776655',accent:'#665544',desc:'Most heavily cratered body — ancient surface ~4 billion years old',features:'craters',gravity:1.24}},
+];
+
+// ── Mark our solar system position in galaxy ─────────────────────────
+const SOL_POS={x:26000*LY, y:0};
+
+// ── Body state ───────────────────────────────────────────────────────
+const bodyPos=BODIES.map(()=>({x:0,y:0}));
+// Spread planets around evenly for visibility instead of random
+BODIES.forEach((b,i)=>{
+  if(b.type==='moon') return;
+  if(b.dist===0) return;
+  // Spread planets in a fan so they're all visible
+  const planetIdx = BODIES.filter((bb,ii)=>ii<=i && bb.type!=='moon' && bb.dist>0).length;
+  const totalPlanets = BODIES.filter(bb=>bb.type!=='moon'&&bb.dist>0).length;
+  b._angle = -PI/3 + (planetIdx/(totalPlanets))*(PI*2/3);
+});
+// Moons get random angles
+BODIES.forEach(b=>{
+  if(b.type==='moon') b._angle=Math.random()*TAU;
+});
+
+function updatePositions(){
+  BODIES.forEach((b,i)=>{
+    if(b.dist===0){bodyPos[i].x=SOL_POS.x; bodyPos[i].y=SOL_POS.y; return;}
+    if(b.type==='moon'){
+      // Position relative to parent planet
+      const parent=bodyPos[b.moonOf];
+      bodyPos[i].x=parent.x+Math.cos(b._angle)*b.dist;
+      bodyPos[i].y=parent.y+Math.sin(b._angle)*b.dist;
+    } else {
+      bodyPos[i].x=SOL_POS.x+Math.cos(b._angle)*b.dist;
+      bodyPos[i].y=SOL_POS.y+Math.sin(b._angle)*b.dist;
+    }
+  });
+}
+
+// ── State ────────────────────────────────────────────────────────────
+const cam={x:0,y:0,zoom:3e-13,targetZoom:3e-13,targetX:0,targetY:0};
+let selected=null, selectedStar=null, showOrbits=true, showInfo=true, started=false;
+// Video system: map planet names to video files in interstellar/ folder
+const planetVideos={
+  'Sun':['interstellar/sun.mp4','interstellar/sun2.mp4'],
+  'Mercury':['interstellar/mercury.mp4'],
+  'Venus':['interstellar/venus.mp4'],
+  'Earth':['interstellar/earth.mp4'],
+  'Mars':['interstellar/mars.mp4'],
+  'Jupiter':['interstellar/jupiter_storms1.mp4','interstellar/jupiter_storms2.mp4'],
+  'Saturn':['interstellar/saturn.mp4'],
+  'Neptune':['interstellar/neptune.mp4'],
+};
+let activeVideoName=null;
+const vidContainer=document.getElementById('vid-container');
+const vidEl=document.getElementById('planet-vid');
+function showVideo(name){
+  if(activeVideoName===name)return;
+  hideVideo();
+  const vids=planetVideos[name];
+  if(!vids||!vids.length)return;
+  const src=vids[Math.floor(Math.random()*vids.length)];
+  vidEl.src=src;
+  vidContainer.style.display='block';
+  vidEl.currentTime=0;
+  vidEl.play().catch(()=>{});
+  activeVideoName=name;
+}
+function hideVideo(){
+  if(activeVideoName){vidEl.pause();vidContainer.style.display='none';activeVideoName=null;vidEl.src='';}
+}
+vidEl.addEventListener('ended',()=>{hideVideo();});
+vidContainer.addEventListener('click',()=>{hideVideo();});
+let overviewMode=false;
+
+// ── Terrain cache ────────────────────────────────────────────────────
+const terrainCache={};
+function getTerrain(idx){
+  if(terrainCache[idx])return terrainCache[idx];
+  const seed=idx*7919, terrain=[], features=[];
+  for(let i=0;i<=500;i++){
+    let h=0;
+    h+=Math.sin(i*.02+seed)*30; h+=Math.sin(i*.07+seed*2)*18;
+    h+=Math.sin(i*.19+seed*3)*8; h+=Math.cos(i*.04+seed*4)*22;
+    if(BODIES[idx].surface.features==='craters'&&Math.sin(i*.3+seed*5)>.7) h-=30;
+    terrain.push(h);
+  }
+  for(let i=0;i<60;i++) features.push({x:(Math.random()-.5)*10000,size:3+Math.random()*10,variant:Math.random()});
+  terrainCache[idx]={terrain,features};
+  return terrainCache[idx];
+}
+
+// ── Stars ────────────────────────────────────────────────────────────
+const bgStars=[];
+for(let i=0;i<600;i++) bgStars.push({x:Math.random(),y:Math.random(),s:.3+Math.random()*1.3,b:.12+Math.random()*.45,rate:.6+Math.random()*3,color:Math.random()<.1?'#aaccff':Math.random()<.3?'#ffeedd':'#dde8ff'});
+
+// ── Constellations — WORLD-SPACE real stars ──────────────────────────
+// Stars placed at real distances (in light-years from Sol) so you can zoom in
+// Each star: [name, distance_ly, angle_from_sol (rad), radius_solar, color, brightness]
+const CONSTELLATIONS=[
+  {name:'Orion',desc:'The Hunter — one of the most recognizable constellations',
+   stars:[
+    ['Betelgeuse',700,.22,887,'#ffaa55',1.0],
+    ['Bellatrix',250,.19,5.75,'#aaccff',0.7],
+    ['Rigel',860,.30,78.9,'#bbddff',0.95],
+    ['Saiph',720,.31,22.2,'#aaccff',0.6],
+    ['Mintaka',1200,.255,16.5,'#bbddff',0.65],
+    ['Alnilam',2000,.26,42,'#ccddff',0.75],
+    ['Alnitak',1200,.265,20,'#aaccff',0.7],
+    ['Meissa',1100,.205,10,'#bbccff',0.5],
+   ],
+   lines:[[0,1],[0,3],[1,2],[2,3],[4,5],[5,6],[0,7],[2,4],[3,6]]},
+
+  {name:'Ursa Major',desc:'The Great Bear — contains the Big Dipper asterism',
+   stars:[
+    ['Dubhe',124,2.2,30,'#ffcc88',0.7],
+    ['Merak',80,2.15,2.4,'#ddeeff',0.6],
+    ['Phecda',84,2.08,2.6,'#ddeeff',0.55],
+    ['Megrez',81,2.05,1.4,'#eeeeff',0.45],
+    ['Alioth',83,1.98,3.7,'#ddeeff',0.65],
+    ['Mizar',78,1.92,2.4,'#ddeeff',0.6],
+    ['Alkaid',104,1.85,3.4,'#aaccff',0.65],
+   ],
+   lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[3,0]]},
+
+  {name:'Cassiopeia',desc:'The Queen — distinctive W shape in the northern sky',
+   stars:[
+    ['Schedar',230,2.8,42,'#ffbb77',0.7],
+    ['Caph',55,2.85,3.5,'#eeeeff',0.55],
+    ['Gamma Cas',550,2.75,10,'#aaccff',0.65],
+    ['Ruchbah',100,2.7,3.9,'#ddeeff',0.5],
+    ['Segin',440,2.65,4.1,'#aaccff',0.55],
+   ],
+   lines:[[0,1],[1,2],[2,3],[3,4]]},
+
+  {name:'Scorpius',desc:'The Scorpion — Antares marks the red heart',
+   stars:[
+    ['Antares',550,4.0,680,'#ff6633',1.0],
+    ['Shaula',570,4.2,6.3,'#aaccff',0.65],
+    ['Sargas',270,4.17,22,'#eeddcc',0.55],
+    ['Dschubba',400,3.9,6.7,'#bbccff',0.6],
+    ['Acrab',530,3.85,6.1,'#bbccff',0.55],
+    ['Lesath',580,4.21,4.5,'#bbccff',0.5],
+    ['Larawag',65,4.1,12,'#ffcc88',0.45],
+   ],
+   lines:[[4,3],[3,0],[0,6],[6,2],[2,1],[1,5]]},
+
+  {name:'Leo',desc:'The Lion — Regulus is the heart of the lion',
+   stars:[
+    ['Regulus',79,1.2,3.1,'#aaccff',0.8],
+    ['Denebola',36,1.05,1.7,'#ddeeff',0.55],
+    ['Algieba',130,1.25,23,'#ffcc77',0.6],
+    ['Zosma',58,1.1,2.1,'#eeeeff',0.5],
+    ['Chertan',165,1.08,6,'#ddeeff',0.45],
+    ['Adhafera',260,1.28,12,'#eeddcc',0.45],
+   ],
+   lines:[[0,2],[2,5],[5,3],[3,1],[1,4],[0,3]]},
+
+  {name:'Cygnus',desc:'The Swan — Deneb marks the tail, flies along the Milky Way',
+   stars:[
+    ['Deneb',2600,1.55,203,'#ddeeff',0.95],
+    ['Sadr',1800,1.6,150,'#eeddcc',0.7],
+    ['Gienah',72,1.65,3,'#ffcc88',0.5],
+    ['Albireo',430,1.68,60,'#ffbb66',0.6],
+    ['Fawaris',170,1.57,2.4,'#ddeeff',0.45],
+    ['Rukh',220,1.63,3.5,'#ddeeff',0.45],
+   ],
+   lines:[[0,1],[1,2],[2,3],[4,1],[1,5]]},
+
+  {name:'Canis Major',desc:'The Great Dog — Sirius is the brightest star in the night sky',
+   stars:[
+    ['Sirius',8.6,3.5,1.7,'#ddeeff',1.0],
+    ['Adhara',430,3.58,14,'#aaccff',0.7],
+    ['Wezen',1800,3.55,237,'#eeddcc',0.65],
+    ['Mirzam',500,3.45,9.7,'#aaccff',0.6],
+    ['Aludra',2000,3.6,54,'#aaccff',0.55],
+    ['Furud',340,3.52,3.2,'#ddeeff',0.45],
+   ],
+   lines:[[0,3],[0,1],[1,5],[1,2],[2,4],[3,0]]},
+
+  {name:'Lyra',desc:'The Lyre — Vega is the 5th brightest star, 25 ly away',
+   stars:[
+    ['Vega',25,1.45,2.4,'#ddeeff',0.95],
+    ['Sheliak',960,1.48,6,'#aaccff',0.5],
+    ['Sulafat',620,1.47,15,'#aaccff',0.5],
+    ['Delta1 Lyr',1100,1.5,175,'#ffaa55',0.45],
+    ['Delta2 Lyr',740,1.49,2.5,'#ddeeff',0.4],
+   ],
+   lines:[[0,1],[0,2],[1,3],[2,4],[3,4]]},
+
+  {name:'Taurus',desc:'The Bull — Aldebaran is the fiery eye, Pleiades cluster nearby',
+   stars:[
+    ['Aldebaran',65,.85,44,'#ff8844',0.9],
+    ['Elnath',134,.78,5,'#aaccff',0.6],
+    ['Alcyone',440,.9,10,'#aaccff',0.55],
+    ['Tianguan',490,.81,5,'#aaccff',0.5],
+    ['Ain',155,.88,13,'#ffcc88',0.45],
+    ['Hyadum I',155,.87,12,'#ffcc88',0.4],
+   ],
+   lines:[[0,4],[4,5],[0,1],[1,3],[0,2]]},
+
+  {name:'Gemini',desc:'The Twins — Castor and Pollux, the twin bright stars',
+   stars:[
+    ['Castor',51,.6,2.4,'#ddeeff',0.75],
+    ['Pollux',34,.58,8.8,'#ffcc88',0.8],
+    ['Alhena',109,.68,4.7,'#ddeeff',0.55],
+    ['Tejat',230,.63,126,'#ffaa55',0.5],
+    ['Mebsuta',840,.55,140,'#eeddcc',0.5],
+    ['Propus',350,.66,100,'#ffaa55',0.4],
+   ],
+   lines:[[0,3],[3,5],[5,2],[1,4],[4,0],[0,1]]},
+
+  {name:'Aquila',desc:'The Eagle — Altair is one of the closest bright stars at 17 ly',
+   stars:[
+    ['Altair',17,1.75,1.8,'#eeeeff',0.9],
+    ['Tarazed',460,1.72,95,'#ffbb66',0.6],
+    ['Alshain',45,1.78,2,'#eeddcc',0.5],
+    ['Deneb el Okab',300,1.82,3.5,'#aaccff',0.4],
+    ['Al Thalimain',280,1.7,50,'#eeddcc',0.4],
+   ],
+   lines:[[1,0],[0,2],[2,3],[0,4]]},
+
+  {name:'Sagittarius',desc:'The Archer — points toward the center of the Milky Way',
+   stars:[
+    ['Kaus Australis',143,4.4,6.8,'#aaccff',0.7],
+    ['Nunki',228,4.35,5,'#aaccff',0.6],
+    ['Ascella',88,4.42,4,'#ddeeff',0.5],
+    ['Kaus Media',306,4.38,11,'#ffcc88',0.55],
+    ['Kaus Borealis',78,4.33,11,'#ffcc88',0.5],
+    ['Rukbat',170,4.48,2.2,'#ddeeff',0.4],
+    ['Alnasl',96,4.3,3.5,'#ffcc88',0.45],
+   ],
+   lines:[[0,2],[2,1],[1,4],[4,3],[3,0],[4,6],[0,5]]},
+];
+
+// Place constellation stars in world coordinates around Sol
+const constellationStars=[]; // flat array of all constellation star world objects
+CONSTELLATIONS.forEach((c,ci)=>{
+  c.worldStars=[];
+  c.stars.forEach((s,si)=>{
+    const [name,distLY,angle,radiusSolar,color,brightness]=s;
+    const distM=distLY*LY;
+    // Spread stars a bit perpendicular to their angle to form recognizable shapes
+    // Use index to offset within constellation
+    const spreadAngle=angle + (si-c.stars.length/2)*0.008;
+    const spreadDist=distM * (0.9+si*0.02);
+    const wx=SOL_POS.x+Math.cos(spreadAngle)*spreadDist;
+    const wy=SOL_POS.y+Math.sin(spreadAngle)*spreadDist;
+    const radiusM=radiusSolar*6.96e8; // solar radii to meters
+    const STAR_FACTS={
+      'Sirius':'Sirius is the brightest star in the night sky and is actually a binary system — Sirius B is a white dwarf the size of Earth.',
+      'Mirzam':'Mirzam is a Beta Cephei variable star whose brightness pulses every 6 hours due to internal pressure waves.',
+      'Wezen':'Wezen is a supergiant 17× the Sun\'s mass that will likely explode as a supernova within the next 100,000 years.',
+      'Rigel':'Rigel shines 120,000× brighter than the Sun and is one of the most luminous stars visible to the naked eye.',
+      'Betelgeuse':'Betelgeuse is a red supergiant so large that if placed at our Sun, its surface would extend past Jupiter\'s orbit.',
+      'Bellatrix':'Bellatrix means "the female warrior" in Latin and is one of the hottest stars visible without a telescope.',
+      'Polaris':'Polaris is actually a triple star system and has been used for celestial navigation for over 2,000 years.',
+      'Kochab':'Kochab was the pole star around 1500 BC, before axial precession shifted that honor to Polaris.',
+      'Vega':'Vega was the first star (other than the Sun) to be photographed and the first to have its spectrum recorded.',
+      'Deneb':'Deneb is so luminous (200,000× the Sun) that it\'s visible from 2,600 light-years away — most visible stars are under 1,000 ly.',
+      'Altair':'Altair rotates so fast (once every 9 hours) that it\'s visibly flattened — 22% wider at the equator than pole to pole.',
+      'Antares':'Antares is a red supergiant so large it would engulf the orbit of Mars if placed at our Sun\'s position.',
+      'Arcturus':'Arcturus is the brightest star in the northern hemisphere and is approaching us at 5 km/s — a rare "runaway" star.',
+      'Spica':'Spica is actually two stars orbiting so closely (4 days) they distort each other into egg shapes.',
+      'Regulus':'Regulus spins so fast it\'s nearly tearing itself apart — just 16% faster and it would fly to pieces.',
+      'Algieba':'Algieba is a gorgeous double star — through a telescope the pair gleam gold and green.',
+      'Pollux':'Pollux has a confirmed exoplanet (Pollux b) about 2× Jupiter\'s mass, making it one of the nearest stars with a known planet.',
+      'Castor':'Castor is actually a system of six stars — three binary pairs all gravitationally bound together.',
+      'Dubhe':'Dubhe is a spectroscopic binary whose companion was discovered only by the wobble in its spectrum.',
+      'Merak':'Merak\'s "pointer" line with Dubhe leads directly to Polaris — the most famous celestial direction hack.',
+      'Kaus Australis':'Kaus Australis marks the base of the Archer\'s bow and is the brightest star in Sagittarius.',
+      'Nunki':'Nunki is one of the oldest named stars — its name comes from ancient Babylonian star catalogues.',
+      'Alshain':'Alshain is a subgiant star transitioning off the main sequence, giving us a rare glimpse of stellar evolution in action.',
+      'Tarazed':'Tarazed is a bright orange giant 100× the Sun\'s luminosity despite appearing modest to the eye.',
+    };
+    const star={
+      name,wx,wy,radiusM,color,brightness,distLY,
+      conIdx:ci, starIdx:si,
+      type:'constar',
+      desc:`${name} — ${distLY} ly — ${radiusSolar.toFixed(1)} solar radii`,
+      surface:{sky:'#020205',ground:color,accent:color,desc:`${name} — stellar surface — ${distLY} light-years from Sol`,features:'solar',gravity:274*(radiusSolar>50?0.5:radiusSolar>5?2:5)},
+      radius:radiusM,
+      fact:STAR_FACTS[name]||`${name} shines at ${distLY} light-years away with a radius of ${radiusSolar.toFixed(1)} solar radii.`,
+    };
+    c.worldStars.push(star);
+    constellationStars.push(star);
+  });
+});
+
+const galaxyStars=[];
+for(let i=0;i<2000;i++){
+  const arm=Math.floor(Math.random()*4),armA=arm*PI/2;
+  const r=Math.random()*50000*LY,a=armA+r/(15000*LY)*2+(Math.random()-.5)*.8,sp=r*.12;
+  galaxyStars.push({x:Math.cos(a)*r+(Math.random()-.5)*sp,y:Math.sin(a)*r+(Math.random()-.5)*sp,s:.3+Math.random()*1.5,b:.2+Math.random()*.6,color:Math.random()<.15?'#ffaa66':Math.random()<.4?'#aaccff':'#eeeeff'});
+}
+for(let i=0;i<500;i++){const r=Math.random()*8000*LY,a=Math.random()*TAU;galaxyStars.push({x:Math.cos(a)*r,y:Math.sin(a)*r,s:.5+Math.random()*2,b:.3+Math.random()*.5,color:'#ffeedd'});}
+
+const nebulae=[];
+for(let i=0;i<12;i++){const arm=Math.floor(Math.random()*4),armA=arm*PI/2,r=5000*LY+Math.random()*40000*LY,a=armA+r/(15000*LY)*2+(Math.random()-.5)*.6;
+  nebulae.push({x:Math.cos(a)*r,y:Math.sin(a)*r,radius:1000*LY+Math.random()*4000*LY,r:Math.random()*.3,g:Math.random()*.2,b:.3+Math.random()*.4,a:.06+Math.random()*.08});}
+
+// ── Input ────────────────────────────────────────────────────────────
+let dragging=false,dragStartX=0,dragStartY=0,camStartX=0,camStartY=0,mouseX=0,mouseY=0;
+
+addEventListener('keydown',e=>{
+  if(!started)return;
+  const k=e.key.toLowerCase();
+  if(k==='escape'){cam.targetX=0;cam.targetY=0;cam.targetZoom=2e-18;selected=null;selectedStar=null;overviewMode=false;overviewPositions=null;}
+  if(k==='o') showOrbits=!showOrbits;
+  if(k==='i') showInfo=!showInfo;
+  if(k==='f') toggleOverview();
+  if(k==='j') jumpToJupiterSystem();
+  const n=parseInt(e.key);
+  if(n>=0&&n<=9) jumpTo(n);
+});
+
+C.addEventListener('mousedown',e=>{
+  if(!started)return;
+  dragging=true;document.body.classList.add('dragging');
+  dragStartX=e.clientX;dragStartY=e.clientY;
+  camStartX=cam.targetX;camStartY=cam.targetY;
+});
+addEventListener('mousemove',e=>{
+  mouseX=e.clientX;mouseY=e.clientY;
+  if(!dragging)return;
+  cam.targetX=camStartX-(e.clientX-dragStartX)/cam.zoom;
+  cam.targetY=camStartY-(e.clientY-dragStartY)/cam.zoom;
+  overviewMode=false;overviewPositions=null;
+});
+addEventListener('mouseup',e=>{
+  const moved=Math.hypot(e.clientX-dragStartX,e.clientY-dragStartY);
+  dragging=false;document.body.classList.remove('dragging');
+  if(moved<5&&started) handleClick(e.clientX,e.clientY);
+});
+C.addEventListener('dblclick',e=>{
+  if(!started)return;
+  handleClick(e.clientX,e.clientY);
+  cam.targetZoom=Math.min(MAX_ZOOM,cam.targetZoom*30);
+  overviewMode=false;overviewPositions=null;
+});
+C.addEventListener('wheel',e=>{
+  if(!started)return;
+  e.preventDefault();
+  if(overviewMode){
+    // Exit overview into solar system view, then start zooming from there
+    overviewMode=false;overviewPositions=null;
+    cam.x=SOL_POS.x;cam.y=SOL_POS.y;
+    cam.targetX=SOL_POS.x;cam.targetY=SOL_POS.y;
+    cam.zoom=8e-13;cam.targetZoom=8e-13;
+  }
+  const factor=e.deltaY>0?.82:1.22;
+  const newZoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,cam.targetZoom*factor));
+  const wx=cam.x+(mouseX-C.width/2)/cam.zoom;
+  const wy=cam.y+(mouseY-C.height/2)/cam.zoom;
+  const ratio=newZoom/cam.targetZoom;
+  cam.targetX=wx-(wx-cam.targetX)/ratio;
+  cam.targetY=wy-(wy-cam.targetY)/ratio;
+  cam.targetZoom=newZoom;
+},{passive:false});
+
+function handleClick(cx,cy){
+  // Overview mode: use screen-space hit areas
+  if(overviewMode&&ovHitAreas.length){
+    let bestD=Infinity,bestIdx=-1;
+    ovHitAreas.forEach(h=>{
+      const d=Math.hypot(cx-h.x,cy-h.y);
+      if(d<h.r*1.5&&d<bestD){bestD=d;bestIdx=h.idx;}
+    });
+    if(bestIdx>=0){
+      selected=bestIdx;selectedStar=null;
+      overviewMode=false;overviewPositions=null;
+      cam.targetX=bodyPos[bestIdx].x;cam.targetY=bodyPos[bestIdx].y;
+      cam.targetZoom=5e-8;
+    }
+    return;
+  }
+  const wx=cam.x+(cx-C.width/2)/cam.zoom;
+  const wy=cam.y+(cy-C.height/2)/cam.zoom;
+  let bestD=Infinity,bestI=-1,bestStar=null;
+
+  // Check solar system bodies
+  BODIES.forEach((p,i)=>{
+    const screenDist=Math.hypot((bodyPos[i].x-wx)*cam.zoom,(bodyPos[i].y-wy)*cam.zoom);
+    const hitR=Math.max(20,p.radius*cam.zoom*1.5);
+    if(screenDist<hitR&&screenDist<bestD){bestD=screenDist;bestI=i;bestStar=null;}
+  });
+
+  // Check constellation stars
+  constellationStars.forEach(s=>{
+    const screenDist=Math.hypot((s.wx-wx)*cam.zoom,(s.wy-wy)*cam.zoom);
+    const hitR=Math.max(18, s.radiusM*cam.zoom*2);
+    if(screenDist<hitR&&screenDist<bestD){bestD=screenDist;bestI=-1;bestStar=s;}
+  });
+
+  if(bestStar){
+    selectedStar=bestStar; selected=null;
+    cam.targetX=bestStar.wx; cam.targetY=bestStar.wy;
+    cam.targetZoom=Math.min(MAX_ZOOM,cam.targetZoom*5);
+  } else if(bestI>=0){
+    selected=bestI; selectedStar=null;
+    cam.targetX=bodyPos[bestI].x; cam.targetY=bodyPos[bestI].y;
+    cam.targetZoom=Math.min(MAX_ZOOM,cam.targetZoom*5);
+  }
+}
+
+function jumpTo(n){
+  if(n>=0&&n<BODIES.length&&BODIES[n].type!=='moon'){
+    selected=n; selectedStar=null;
+    cam.targetX=bodyPos[n].x; cam.targetY=bodyPos[n].y;
+    cam.targetZoom=5e-8;
+    overviewMode=false;overviewPositions=null;
+  }
+}
+
+function jumpToJupiterSystem(){
+  selected=5; selectedStar=null;
+  cam.targetX=bodyPos[5].x; cam.targetY=bodyPos[5].y;
+  cam.targetZoom=8e-11;
+  overviewMode=false;overviewPositions=null;
+}
+
+let overviewPositions=null;
+function toggleOverview(){
+  overviewMode=!overviewMode;
+  if(overviewMode){selected=null;selectedStar=null;}
+}
+// Store overview hit areas for click detection
+let ovHitAreas=[];
+function drawOverview(){
+  const W=C.width,H=C.height;
+  // Reset all canvas state
+  X.save();
+  X.globalAlpha=1;
+  X.setTransform(1,0,0,1,0,0);
+  X.clearRect(0,0,W,H);
+  // Dark background
+  X.fillStyle='#060612';
+  X.fillRect(0,0,W,H);
+  // Non-moon bodies in order
+  const names=['Sun','Mercury','Venus','Earth','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'];
+  const bodies=[];
+  names.forEach(n=>{
+    const idx=BODIES.findIndex(b=>b.name===n);
+    if(idx>=0) bodies.push({idx,b:BODIES[idx]});
+  });
+  const jupI=bodies.findIndex(b=>b.b.name==='Jupiter');
+  const jupR=bodies[jupI].b.radius;
+  // Jupiter = 10% of screen height
+  const jupPx=Math.round(H*0.10);
+  const pxPerM=jupPx/jupR;
+  // Screen radii: all to scale, Sun capped, tiny planets get min 4px
+  const sr=bodies.map(b=>{
+    let r=Math.round(b.b.radius*pxPerM);
+    if(b.b.name==='Sun') r=Math.min(r, Math.round(H*0.18));
+    return Math.max(4,r);
+  });
+  const cy=Math.round(H/2);
+  // Calculate spacing: spread bodies evenly across the screen width
+  // Sum all diameters, then distribute remaining space as gaps
+  let totalDiam=0;
+  sr.forEach(r=>{totalDiam+=r*2;});
+  const availGap=W-totalDiam-40; // 20px margin each side
+  const gapSize=Math.max(12, availGap/(bodies.length-1));
+  // X positions: lay out left to right, then shift so Jupiter is centered
+  const xp=new Array(bodies.length).fill(0);
+  let cx2=20+sr[0]; // start: left margin + first body radius
+  for(let i=0;i<bodies.length;i++){
+    xp[i]=cx2;
+    if(i<bodies.length-1) cx2+=sr[i]+gapSize+sr[i+1];
+  }
+  // Shift everything so Jupiter is at W/2
+  const shift=Math.round(W/2)-xp[jupI];
+  for(let i=0;i<bodies.length;i++) xp[i]+=shift;
+  // Draw bodies
+  ovHitAreas=[];
+  for(let i=0;i<bodies.length;i++){
+    const p=bodies[i].b, x=xp[i], r=sr[i];
+    X.globalAlpha=1;
+    // Simple solid filled circle with color gradient
+    if(p.type==='star'){
+      // Sun: yellow-orange gradient
+      const g=X.createRadialGradient(x,cy,0,x,cy,r);
+      g.addColorStop(0,'#fffbe8');g.addColorStop(.4,'#ffcc22');g.addColorStop(.8,'#ff8800');g.addColorStop(1,'#cc4400');
+      X.fillStyle=g;
+    } else {
+      // Planet: simple gradient using body colors
+      const g=X.createRadialGradient(x-r*.25,cy-r*.25,0,x,cy,r);
+      g.addColorStop(0,p.c1);g.addColorStop(.5,p.c2);g.addColorStop(1,p.c3);
+      X.fillStyle=g;
+    }
+    X.beginPath();X.arc(x,cy,r,0,TAU);X.fill();
+    // Saturn rings
+    if(p.rings&&r>4){
+      X.save();X.translate(x,cy);X.scale(1,.35);
+      X.strokeStyle='rgba(210,190,155,.35)';X.lineWidth=Math.max(1,r*.1);
+      X.beginPath();X.arc(0,0,r*1.5,0,TAU);X.stroke();
+      X.beginPath();X.arc(0,0,r*1.75,0,TAU);X.stroke();
+      X.restore();
+    }
+    // Jupiter Great Red Spot
+    if(p.grs&&r>6){
+      X.save();X.beginPath();X.arc(x,cy,r,0,TAU);X.clip();
+      for(let bi=0;bi<6;bi++){
+        X.fillStyle=bi%2===0?'rgba(180,140,90,.18)':'rgba(140,100,60,.14)';
+        X.fillRect(x-r,cy-r+bi*(r*2/6),r*2,r*2/6);
+      }
+      X.fillStyle='rgba(200,80,40,.4)';
+      X.beginPath();X.ellipse(x+r*.3,cy+r*.15,r*.2,r*.12,0,0,TAU);X.fill();
+      X.restore();
+    }
+    // Label below
+    X.globalAlpha=1;
+    X.fillStyle='#78d7ff';X.font='bold 13px Courier New';X.textAlign='center';
+    X.fillText(p.name,x,cy+r+20);
+    // Hit area for clicking
+    ovHitAreas.push({x,y:cy,r:Math.max(20,r),idx:bodies[i].idx});
+  }
+  // Moons below Jupiter
+  const jupX=xp[jupI],jupSR=sr[jupI];
+  let moonI=0;
+  BODIES.forEach((b,i)=>{
+    if(b.type!=='moon'||b.moonOf!==bodies[jupI].idx)return;
+    const mr=Math.max(3,Math.round(b.radius*pxPerM));
+    const mx=jupX+(moonI-1.5)*(mr*3+10);
+    const my=cy+jupSR+45+mr;
+    X.globalAlpha=1;
+    const g=X.createRadialGradient(mx,my,0,mx,my,mr);
+    g.addColorStop(0,b.c1);g.addColorStop(1,b.c3);
+    X.fillStyle=g;X.beginPath();X.arc(mx,my,mr,0,TAU);X.fill();
+    X.fillStyle='rgba(160,210,240,.5)';X.font='10px Courier New';X.textAlign='center';
+    X.fillText(b.name,mx,my+mr+12);
+    ovHitAreas.push({x:mx,y:my,r:Math.max(15,mr),idx:i});
+    moonI++;
+  });
+  // HUD text
+  X.globalAlpha=1;
+  X.fillStyle='rgba(80,255,180,.4)';X.font='13px Courier New';X.textAlign='left';
+  X.fillText('OVERVIEW — F: toggle  click: zoom in  ESC: galaxy',20,H-18);
+  X.fillStyle='rgba(100,180,240,.25)';X.font='11px Courier New';X.textAlign='center';
+  X.fillText('planet sizes to scale',W/2,H-18);
+  X.restore();
+}
+
+document.getElementById('intro').onclick=()=>{
+  document.getElementById('intro').style.display='none';
+  started=true;
+  // Start in overview mode!
+  updatePositions();
+  overviewMode=true;
+};
+
+// ── Drawing helpers ──────────────────────────────────────────────────
+function w2s(wx,wy){return{x:(wx-cam.x)*cam.zoom+C.width/2,y:(wy-cam.y)*cam.zoom+C.height/2};}
+function hexRGB(h){h=h.replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];return[parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+function lighten(hex,a){const c=hexRGB(hex);return`rgb(${Math.min(255,c[0]+a)},${Math.min(255,c[1]+a)},${Math.min(255,c[2]+a)})`;}
+function darken(hex,a){const c=hexRGB(hex);return`rgb(${Math.max(0,c[0]-a)},${Math.max(0,c[1]-a)},${Math.max(0,c[2]-a)})`;}
+
+function getScaleLabel(){
+  const z=cam.zoom;
+  if(z<1e-20)return'GALACTIC';if(z<1e-15)return'INTERSTELLAR';
+  if(z<5e-11)return'SOLAR SYSTEM';if(z<1e-7)return'PLANETARY';
+  if(z<1e-3)return'ATMOSPHERIC';return'SURFACE';
+}
+function getScaleBar(){
+  const pxT=120,mPx=1/cam.zoom,barM=mPx*pxT;
+  const mag=Math.pow(10,Math.floor(Math.log10(barM)));
+  const nice=[1,2,5,10,20,50].find(n=>n*mag>=barM*.5)*mag||mag;
+  const barPx=nice*cam.zoom;
+  let label;
+  if(nice>=LY)label=(nice/LY).toFixed(nice/LY>=100?0:1)+' ly';
+  else if(nice>=AU_M*.5)label=(nice/AU_M).toFixed(2)+' AU';
+  else if(nice>=1e6)label=(nice/1e6).toFixed(nice/1e6>=100?0:1)+' Mm';
+  else if(nice>=1e3)label=(nice/1e3).toFixed(nice/1e3>=100?0:1)+' km';
+  else label=nice.toFixed(0)+' m';
+  return{px:barPx,label};
+}
+
+// ── Main draw ────────────────────────────────────────────────────────
+const t0=performance.now();
+
+function draw(){
+  const W=C.width,H=C.height,z=cam.zoom;
+  const t=(performance.now()-t0)*.001;
+  X.clearRect(0,0,W,H);
+
+  // Background
+  const bg=X.createRadialGradient(W/2,H/2,0,W/2,H/2,W*.7);
+  const activeSurface = (selected!==null&&BODIES[selected]&&BODIES[selected].surface) ? BODIES[selected].surface :
+                        (selectedStar&&selectedStar.surface) ? selectedStar.surface : null;
+  if(z>1e-3&&activeSurface){
+    const sky=activeSurface.sky,c=hexRGB(sky);
+    bg.addColorStop(0,`rgb(${c[0]+15},${c[1]+15},${c[2]+25})`);bg.addColorStop(1,sky);
+  } else {bg.addColorStop(0,'#08080f');bg.addColorStop(1,'#010103');}
+  X.fillStyle=bg;X.fillRect(0,0,W,H);
+
+  // Screen-space stars
+  if(z<1e-1){
+    const sa=z>1e-3?Math.max(0,1-(Math.log10(z)+3)/2):1;
+    bgStars.forEach(s=>{const f=.5+.5*Math.sin(t*s.rate+s.x*80);
+      X.globalAlpha=s.b*f*sa;X.fillStyle=s.color;
+      X.beginPath();X.arc(s.x*W,s.y*H,s.s,0,TAU);X.fill();});
+    X.globalAlpha=1;
+
+  }
+
+  // ── World-space constellation stars, lines, labels ──────────────
+  if(z>5e-18 && z<1e-6){
+    const conAlpha = z>1e-14 ? Math.min(1, (Math.log10(z)+14)/2) :
+                     z>5e-18 ? Math.min(1, (Math.log10(z)+17.3)/2) : 0;
+    if(conAlpha>.02){
+      // Lines
+      CONSTELLATIONS.forEach(c=>{
+        if(!c.worldStars||!c.worldStars.length)return;
+        c.lines.forEach(l=>{
+          const a=c.worldStars[l[0]],b2=c.worldStars[l[1]];
+          if(!a||!b2)return;
+          const sa2=w2s(a.wx,a.wy),sb=w2s(b2.wx,b2.wy);
+          // Don't draw if both off screen
+          if((sa2.x<-50||sa2.x>W+50)&&(sb.x<-50||sb.x>W+50))return;
+          X.strokeStyle=`rgba(60,120,200,${.13*conAlpha})`;X.lineWidth=.8;
+          X.beginPath();X.moveTo(sa2.x,sa2.y);X.lineTo(sb.x,sb.y);X.stroke();
+        });
+        // Constellation label
+        let cx2=0,cy2=0;
+        c.worldStars.forEach(ws=>{cx2+=ws.wx;cy2+=ws.wy;});
+        cx2/=c.worldStars.length;cy2/=c.worldStars.length;
+        const lbl=w2s(cx2,cy2);
+        if(lbl.x>-100&&lbl.x<W+100&&lbl.y>-100&&lbl.y<H+100){
+          X.fillStyle=`rgba(80,160,220,${.2*conAlpha})`;
+          X.font='10px Courier New';X.textAlign='center';
+          X.fillText(c.name,lbl.x,lbl.y-15);
+          X.fillStyle=`rgba(80,160,220,${.1*conAlpha})`;
+          X.font='8px Courier New';
+          X.fillText(c.desc,lbl.x,lbl.y-4);
+        }
+      });
+
+      // Stars
+      constellationStars.forEach(s=>{
+        const sc=w2s(s.wx,s.wy);
+        if(sc.x<-30||sc.x>W+30||sc.y<-30||sc.y>H+30)return;
+        let sr=s.radiusM*z;
+        const minSr=1.5+s.brightness*2;
+        const drawR=Math.max(minSr,sr);
+
+        // Glow
+        const glowR=drawR*(sr>5?4:3);
+        if(glowR>1){
+          const gg=X.createRadialGradient(sc.x,sc.y,drawR*.15,sc.x,sc.y,glowR);
+          const rgb=hexRGB(s.color);
+          gg.addColorStop(0,`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.35*conAlpha*s.brightness})`);
+          gg.addColorStop(.5,`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.1*conAlpha*s.brightness})`);
+          gg.addColorStop(1,`rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
+          X.fillStyle=gg;X.beginPath();X.arc(sc.x,sc.y,glowR,0,TAU);X.fill();
+        }
+
+        // Star body
+        if(sr>3){
+          // Big enough to see as a sphere
+          const sg=X.createRadialGradient(sc.x-drawR*.2,sc.y-drawR*.2,drawR*.05,sc.x,sc.y,drawR);
+          sg.addColorStop(0,'#fffef8');sg.addColorStop(.3,s.color);
+          sg.addColorStop(.8,darken(s.color,40));sg.addColorStop(1,darken(s.color,80)+'aa');
+          X.globalAlpha=conAlpha;
+          X.fillStyle=sg;X.beginPath();X.arc(sc.x,sc.y,drawR,0,TAU);X.fill();
+          X.globalAlpha=1;
+        } else {
+          // Point star
+          X.globalAlpha=conAlpha*s.brightness;
+          X.fillStyle=s.color;
+          X.beginPath();X.arc(sc.x,sc.y,drawR,0,TAU);X.fill();
+          X.globalAlpha=1;
+        }
+
+        // Selection ring
+        if(selectedStar===s){
+          const pulse2=.3+.3*Math.sin(t*3);
+          X.strokeStyle=`rgba(80,220,255,${pulse2})`;X.lineWidth=1.2;X.setLineDash([4,4]);
+          X.beginPath();X.arc(sc.x,sc.y,drawR+8,0,TAU);X.stroke();X.setLineDash([]);
+        }
+
+        // Label
+        if(drawR>1&&drawR<W*.3){
+          X.fillStyle=`rgba(160,220,255,${.45*conAlpha})`;
+          X.font=`${drawR>15?'11':'9'}px Courier New`;X.textAlign='center';
+          X.fillText(s.name,sc.x,sc.y-drawR-8);
+          if(drawR>4&&drawR<200){
+            X.fillStyle=`rgba(140,200,255,${.25*conAlpha})`;X.font='8px Courier New';
+            X.fillText(s.distLY+' ly',sc.x,sc.y-drawR+2);
+          }
+        }
+      });
+    }
+  }
+
+  // Galaxy layer
+  if(z<5e-14){
+    const ga=z<1e-15?1:Math.max(0,1-(Math.log10(z)+15));
+    nebulae.forEach(n=>{const s=w2s(n.x,n.y),sr=n.radius*z;
+      if(sr<1||s.x<-sr||s.x>W+sr||s.y<-sr||s.y>H+sr)return;
+      const ng=X.createRadialGradient(s.x,s.y,0,s.x,s.y,sr);
+      ng.addColorStop(0,`rgba(${n.r*255|0},${n.g*255|0},${n.b*255|0},${n.a*ga})`);
+      ng.addColorStop(.6,`rgba(${n.r*200|0},${n.g*200|0},${n.b*255|0},${n.a*.3*ga})`);
+      ng.addColorStop(1,'rgba(0,0,0,0)');
+      X.fillStyle=ng;X.beginPath();X.arc(s.x,s.y,sr,0,TAU);X.fill();});
+    galaxyStars.forEach(gs=>{const s=w2s(gs.x,gs.y);
+      if(s.x<-5||s.x>W+5||s.y<-5||s.y>H+5)return;
+      X.fillStyle=gs.color;X.globalAlpha=gs.b*ga;
+      X.beginPath();X.arc(s.x,s.y,Math.max(.5,Math.min(3,gs.s*z*5e16)),0,TAU);X.fill();});
+    X.globalAlpha=1;
+    if(z<1e-15){const ss=w2s(SOL_POS.x,SOL_POS.y),pulse=.4+.4*Math.sin(t*2);
+      X.strokeStyle=`rgba(80,255,120,${pulse*.6*ga})`;X.lineWidth=1;
+      X.beginPath();X.arc(ss.x,ss.y,12,0,TAU);X.stroke();
+      X.beginPath();X.arc(ss.x,ss.y,20,0,TAU);X.setLineDash([3,4]);X.stroke();X.setLineDash([]);
+      X.fillStyle=`rgba(80,255,120,${.5*ga})`;X.font='9px Courier New';X.textAlign='center';X.fillText('SOL',ss.x,ss.y-24);}
+  }
+
+  // Solar system layer
+  if(z>1e-17){
+    const solA=z>1e-14?1:Math.max(0,(Math.log10(z)+17)/3);
+
+    // Orbit lines
+    if(showOrbits&&solA>.05){
+      BODIES.forEach((p,i)=>{
+        if(p.dist===0)return;
+        if(p.type==='moon'){
+          // Moon orbit around parent
+          const pc=w2s(bodyPos[p.moonOf].x,bodyPos[p.moonOf].y);
+          const sr=p.dist*z;
+          if(sr<2||sr>W*5)return;
+          X.beginPath();X.arc(pc.x,pc.y,sr,0,TAU);
+          X.strokeStyle=`rgba(60,120,180,${.1*solA})`;X.lineWidth=.5;X.stroke();
+        } else {
+          const center=w2s(SOL_POS.x,SOL_POS.y);
+          const sr=p.dist*z;
+          if(sr<3||sr>W*8)return;
+          X.beginPath();X.arc(center.x,center.y,sr,0,TAU);
+          X.strokeStyle=`rgba(30,80,160,${.13*solA})`;X.lineWidth=.8;X.stroke();
+        }
+      });
+    }
+
+    // Draw bodies
+    BODIES.forEach((p,i)=>{
+      const bx=bodyPos[i].x,by=bodyPos[i].y;
+      const s=w2s(bx,by);
+      let sr=p.radius*z;
+
+      // Minimum visible size: bigger dots in solar system view so everything is easy to see
+      let minSr=1;
+      if(z>5e-14&&z<1e-7){
+        if(p.type==='star') minSr=6;
+        else if(p.type==='moon') minSr=2;
+        else minSr=3.5;
+      }
+      const drawR=Math.max(minSr,sr);
+
+      if(s.x<-drawR*3-60||s.x>W+drawR*3+60||s.y<-drawR*3-60||s.y>H+drawR*3+60)return;
+      if(drawR<.3&&z>5e-14)return;
+
+      const bA=Math.min(1,solA);
+      if(bA<.02)return;
+      X.globalAlpha=bA;
+
+      // Glow
+      const glowR=drawR*(p.type==='star'?6:p.type==='moon'?1.8:2.8);
+      if(glowR>1.5){
+        const gg=X.createRadialGradient(s.x,s.y,drawR*.2,s.x,s.y,glowR);
+        gg.addColorStop(0,p.c3+'55');gg.addColorStop(.4,p.c3+'18');gg.addColorStop(1,p.c4+'00');
+        X.fillStyle=gg;X.beginPath();X.arc(s.x,s.y,glowR,0,TAU);X.fill();
+      }
+
+      if(p.type==='star'){
+        const pulse=1+Math.sin(t*1.8)*.06,corona=drawR*3*pulse;
+        if(corona>2){const cg=X.createRadialGradient(s.x,s.y,drawR*.3,s.x,s.y,corona);
+          cg.addColorStop(0,'rgba(255,200,80,.12)');cg.addColorStop(.5,'rgba(255,120,20,.04)');cg.addColorStop(1,'rgba(200,60,0,0)');
+          X.fillStyle=cg;X.beginPath();X.arc(s.x,s.y,corona,0,TAU);X.fill();}
+        const sg=X.createRadialGradient(s.x-drawR*.2,s.y-drawR*.2,drawR*.05,s.x,s.y,drawR);
+        sg.addColorStop(0,p.c1);sg.addColorStop(.3,p.c2);sg.addColorStop(.7,p.c3);sg.addColorStop(1,p.c4+'cc');
+        X.fillStyle=sg;X.beginPath();X.arc(s.x,s.y,drawR,0,TAU);X.fill();
+      } else {
+        // Lit sphere
+        const sunS=w2s(SOL_POS.x,SOL_POS.y);
+        const lightA=Math.atan2(s.y-sunS.y,s.x-sunS.x);
+        const lx=s.x-Math.cos(lightA)*drawR*.35,ly=s.y-Math.sin(lightA)*drawR*.35;
+        const pg=X.createRadialGradient(lx,ly,drawR*.03,s.x,s.y,drawR*1.05);
+        pg.addColorStop(0,p.c1);pg.addColorStop(.35,p.c2);pg.addColorStop(.7,p.c3);pg.addColorStop(1,p.c4);
+        X.fillStyle=pg;X.beginPath();X.arc(s.x,s.y,drawR,0,TAU);X.fill();
+
+        // Jupiter bands + Great Red Spot
+        if(p.grs&&drawR>8){
+          X.save();X.beginPath();X.arc(s.x,s.y,drawR,0,TAU);X.clip();
+          // Horizontal bands
+          for(let b=0;b<12;b++){
+            const by2=s.y-drawR+b*(drawR*2/12);
+            const bh=drawR*2/12;
+            const shade=b%2===0?'rgba(180,140,90,.15)':'rgba(140,100,60,.12)';
+            X.fillStyle=shade;X.fillRect(s.x-drawR,by2,drawR*2,bh);
+          }
+          // Great Red Spot
+          const grsX=s.x+drawR*.2, grsY=s.y+drawR*.25;
+          const grsW=drawR*.35,grsH=drawR*.2;
+          const grsG=X.createRadialGradient(grsX,grsY,0,grsX,grsY,grsW);
+          grsG.addColorStop(0,'rgba(200,80,40,.55)');
+          grsG.addColorStop(.5,'rgba(180,70,30,.35)');
+          grsG.addColorStop(1,'rgba(160,60,20,0)');
+          X.fillStyle=grsG;
+          X.beginPath();X.ellipse(grsX,grsY,grsW,grsH,-.1,0,TAU);X.fill();
+          // Inner swirl
+          X.strokeStyle='rgba(220,100,50,.25)';X.lineWidth=Math.max(.5,drawR*.02);
+          X.beginPath();X.ellipse(grsX,grsY,grsW*.6,grsH*.5,.2,0,TAU);X.stroke();
+          X.restore();
+        }
+
+        // Rim
+        if(drawR>3){X.beginPath();X.arc(s.x,s.y,drawR,0,TAU);
+          X.strokeStyle=p.c1+'22';X.lineWidth=Math.max(.4,drawR*.04);X.stroke();}
+
+        // Saturn rings
+        if(p.rings&&drawR>2){
+          X.save();X.translate(s.x,s.y);X.scale(1,.32);
+          for(let r=0;r<4;r++){const rr=drawR*(1.4+r*.28);
+            X.beginPath();X.arc(0,0,rr,0,TAU);
+            X.strokeStyle=`rgba(210,190,155,${(.25-r*.05)*bA})`;
+            X.lineWidth=Math.max(.8,drawR*.1);X.stroke();}
+          X.restore();
+        }
+      }
+
+      // Selection ring
+      if(selected===i){
+        const pulse2=.3+.3*Math.sin(t*3);
+        X.strokeStyle=`rgba(80,220,255,${pulse2})`;X.lineWidth=1.2;X.setLineDash([4,4]);
+        X.beginPath();X.arc(s.x,s.y,drawR+8,0,TAU);X.stroke();X.setLineDash([]);
+      }
+
+      // Labels — always show when dots are visible
+      if(drawR>=minSr&&drawR<W*.4){
+        X.fillStyle=`rgba(140,210,255,${.55*bA})`;
+        X.font=`${drawR>30?'12':drawR>10?'10':'9'}px Courier New`;X.textAlign='center';
+        const labelY=s.y-drawR-(drawR>5?12:8);
+        X.fillText(p.name,s.x,labelY);
+        // Type label for small view
+        if(p.type==='dwarf'&&drawR<50){
+          X.fillStyle=`rgba(140,210,255,${.25*bA})`;X.font='8px Courier New';
+          X.fillText('dwarf planet',s.x,labelY+10+drawR*2+4);
+        }
+      }
+
+      X.globalAlpha=1;
+    });
+  }
+
+  // Surface — solar system bodies
+  if(z>5e-5&&selected!==null&&BODIES[selected].surface){
+    drawSurface(selected,z,t);
+  }
+  // Surface — constellation stars (use same renderer with a shim)
+  if(z>5e-5&&selectedStar!==null&&selectedStar.surface){
+    drawStarSurface(selectedStar,z,t);
+  }
+
+  drawHUD(t);
+}
+
+// ── Surface rendering ────────────────────────────────────────────────
+function drawSurface(idx,z,t){
+  const W=C.width,H=C.height;
+  const p=BODIES[idx],sf=p.surface;
+  const bx=bodyPos[idx].x,by=bodyPos[idx].y;
+  const surfAlpha=Math.min(1,Math.max(0,(Math.log10(z)+4)/2));
+  if(surfAlpha<.01)return;
+  const groundLine=H*.62,mPx=1/z;
+  const surfX=cam.x-bx;
+
+  X.globalAlpha=surfAlpha;
+  const sky=X.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,sf.sky);sky.addColorStop(.55,lighten(sf.sky,12));sky.addColorStop(.85,lighten(sf.ground,-40));
+  X.fillStyle=sky;X.fillRect(0,0,W,H);
+
+  const haze=X.createLinearGradient(0,groundLine-80,0,groundLine+20);
+  haze.addColorStop(0,'rgba(0,0,0,0)');haze.addColorStop(1,sf.ground+'33');
+  X.fillStyle=haze;X.fillRect(0,groundLine-80,W,100);
+
+  if(sf.sky.charAt(1)<='2'){
+    bgStars.forEach(s=>{if(s.y>.55)return;const f=.5+.5*Math.sin(t*s.rate+s.x*80);
+      X.fillStyle=s.color;X.globalAlpha=s.b*f*.5*surfAlpha;
+      X.beginPath();X.arc(s.x*W,s.y*H*.55,s.s*.7,0,TAU);X.fill();});
+    X.globalAlpha=surfAlpha;
+  }
+
+  if(idx!==0){const sunX=W*.7,sunY=H*.12;
+    const sng=X.createRadialGradient(sunX,sunY,1,sunX,sunY,40);
+    sng.addColorStop(0,'rgba(255,245,220,.7)');sng.addColorStop(.15,'rgba(255,200,100,.3)');
+    sng.addColorStop(.5,'rgba(255,150,50,.08)');sng.addColorStop(1,'rgba(0,0,0,0)');
+    X.fillStyle=sng;X.beginPath();X.arc(sunX,sunY,40,0,TAU);X.fill();
+    X.fillStyle='#fffae0';X.beginPath();X.arc(sunX,sunY,3,0,TAU);X.fill();}
+
+  const td=getTerrain(idx),segW=20,segC=td.terrain.length;
+  function getH(worldMX){const tI=worldMX/segW+segC/2,i0=Math.floor(tI),fr=tI-i0;
+    return(td.terrain[((i0%segC)+segC)%segC]||0)+((td.terrain[(((i0+1)%segC)+segC)%segC]||0)-(td.terrain[((i0%segC)+segC)%segC]||0))*fr;}
+
+  X.beginPath();let first=true;
+  for(let sx=0;sx<=W;sx+=3){const h=getH(surfX+(sx-W/2)*mPx);
+    const sy=groundLine-h*Math.min(1,z*100);first?(X.moveTo(sx,sy),first=false):X.lineTo(sx,sy);}
+  X.lineTo(W,H);X.lineTo(0,H);X.closePath();
+  const gg=X.createLinearGradient(0,groundLine-50,0,H);
+  gg.addColorStop(0,sf.ground);gg.addColorStop(.25,sf.accent);gg.addColorStop(1,darken(sf.ground,60));
+  X.fillStyle=gg;X.fill();
+
+  X.beginPath();first=true;
+  for(let sx=0;sx<=W;sx+=3){const h=getH(surfX+(sx-W/2)*mPx);
+    const sy=groundLine-h*Math.min(1,z*100);first?(X.moveTo(sx,sy),first=false):X.lineTo(sx,sy);}
+  X.strokeStyle=lighten(sf.ground,30)+'66';X.lineWidth=1.5;X.stroke();
+
+  if(z>5e-3){
+    const fA=Math.min(1,(Math.log10(z)+2.3));
+    if(fA>.01){X.globalAlpha=surfAlpha*fA;
+      td.features.forEach(f=>{
+        const screenFX=W/2+(f.x-surfX)*z;
+        if(screenFX<-30||screenFX>W+30)return;
+        const h=getH(f.x),baseY=groundLine-h*Math.min(1,z*100);
+        const sz=f.size*Math.min(1,z*300);if(sz<.5)return;
+
+        if(sf.features==='trees'){
+          X.fillStyle='#2a6630';X.beginPath();X.moveTo(screenFX,baseY-sz*3);X.lineTo(screenFX-sz,baseY);X.lineTo(screenFX+sz,baseY);X.fill();
+          X.fillStyle='#2a5528';X.beginPath();X.moveTo(screenFX,baseY-sz*4.5);X.lineTo(screenFX-sz*.7,baseY-sz*1.5);X.lineTo(screenFX+sz*.7,baseY-sz*1.5);X.fill();
+          X.fillStyle='#5a3a20';X.fillRect(screenFX-.8,baseY,1.6,sz*.5);
+        }else if(sf.features==='rocks'){
+          X.fillStyle=sf.accent;X.beginPath();X.moveTo(screenFX-sz,baseY);X.lineTo(screenFX-sz*.6,baseY-sz*1.2);X.lineTo(screenFX+sz*.3,baseY-sz*1.6);X.lineTo(screenFX+sz,baseY-sz*.4);X.lineTo(screenFX+sz,baseY);X.fill();
+        }else if(sf.features==='craters'){
+          X.beginPath();X.ellipse(screenFX,baseY+1,sz*1.5,sz*.35,0,0,TAU);X.fillStyle=darken(sf.ground,25);X.fill();
+          X.strokeStyle=lighten(sf.ground,15)+'55';X.lineWidth=.4;X.stroke();
+        }else if(sf.features==='volcanoes'){
+          X.fillStyle=darken(sf.ground,15);X.beginPath();X.moveTo(screenFX-sz*2,baseY);X.lineTo(screenFX-sz*.3,baseY-sz*3);X.lineTo(screenFX+sz*.3,baseY-sz*3);X.lineTo(screenFX+sz*2,baseY);X.fill();
+          const lg=X.createRadialGradient(screenFX,baseY-sz*3,0,screenFX,baseY-sz*3,sz);lg.addColorStop(0,'rgba(255,100,20,.35)');lg.addColorStop(1,'rgba(255,50,0,0)');X.fillStyle=lg;X.beginPath();X.arc(screenFX,baseY-sz*3,sz,0,TAU);X.fill();
+        }else if(sf.features==='ice'){
+          X.fillStyle='rgba(180,225,245,.35)';X.beginPath();X.moveTo(screenFX,baseY-sz*2.5);X.lineTo(screenFX-sz*.5,baseY);X.lineTo(screenFX+sz*.5,baseY);X.fill();
+          X.fillStyle='rgba(200,240,255,.2)';X.beginPath();X.moveTo(screenFX+sz,baseY-sz*1.8);X.lineTo(screenFX+sz*.4,baseY);X.lineTo(screenFX+sz*1.5,baseY);X.fill();
+        }else if(sf.features==='clouds'){
+          X.fillStyle='rgba(255,255,255,.06)';X.beginPath();X.ellipse(screenFX,baseY-sz*2.5,sz*3,sz*.8,f.variant,0,TAU);X.fill();
+        }else if(sf.features==='solar'){
+          const flicker=.5+.5*Math.sin(t*3+f.x*.1);X.fillStyle=`rgba(255,${150+f.variant*100|0},20,${.15*flicker})`;
+          X.beginPath();X.ellipse(screenFX,baseY-sz*2,sz*2,sz*3,f.variant*PI,0,TAU);X.fill();
+        }
+      });
+    }
+  }
+
+  if(z>1e-2){
+    X.globalAlpha=surfAlpha*Math.min(1,(Math.log10(z)+2));
+    X.fillStyle='rgba(200,230,255,.4)';X.font='11px Courier New';X.textAlign='center';
+    X.fillText(`${p.name} — Surface`,W/2,28);
+    X.fillStyle='rgba(200,230,255,.25)';X.font='10px Courier New';
+    X.fillText(sf.desc,W/2,44);
+    X.fillText(`Surface gravity: ${sf.gravity} m/s²`,W/2,58);
+  }
+  X.globalAlpha=1;
+}
+
+// ── Star surface rendering ────────────────────────────────────────────
+function drawStarSurface(star,z,t){
+  const W=C.width,H=C.height;
+  const sf=star.surface;
+  const surfAlpha=Math.min(1,Math.max(0,(Math.log10(z)+4)/2));
+  if(surfAlpha<.01)return;
+  const groundLine=H*.62,mPx=1/z;
+  const surfX=cam.x-star.wx;
+
+  X.globalAlpha=surfAlpha;
+  const sky=X.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,sf.sky);sky.addColorStop(.55,lighten(sf.sky,12));sky.addColorStop(.85,lighten(sf.ground,-40));
+  X.fillStyle=sky;X.fillRect(0,0,W,H);
+
+  // Stars in dark sky
+  bgStars.forEach(s=>{if(s.y>.55)return;const f=.5+.5*Math.sin(t*s.rate+s.x*80);
+    X.fillStyle=s.color;X.globalAlpha=s.b*f*.4*surfAlpha;
+    X.beginPath();X.arc(s.x*W,s.y*H*.55,s.s*.7,0,TAU);X.fill();});
+  X.globalAlpha=surfAlpha;
+
+  // Stellar plasma surface — glowing, turbulent
+  const td=getTerrain(star.conIdx*10+star.starIdx);
+  const segW=20,segC=td.terrain.length;
+  function getH(worldMX){const tI=worldMX/segW+segC/2,i0=Math.floor(tI),fr=tI-i0;
+    return(td.terrain[((i0%segC)+segC)%segC]||0)+((td.terrain[(((i0+1)%segC)+segC)%segC]||0)-(td.terrain[((i0%segC)+segC)%segC]||0))*fr;}
+
+  X.beginPath();let first=true;
+  for(let sx=0;sx<=W;sx+=3){const h=getH(surfX+(sx-W/2)*mPx);
+    const sy=groundLine-h*Math.min(1,z*100);first?(X.moveTo(sx,sy),first=false):X.lineTo(sx,sy);}
+  X.lineTo(W,H);X.lineTo(0,H);X.closePath();
+  const gg=X.createLinearGradient(0,groundLine-50,0,H);
+  gg.addColorStop(0,star.color);gg.addColorStop(.25,darken(star.color,30));gg.addColorStop(1,darken(star.color,80));
+  X.fillStyle=gg;X.fill();
+
+  // Plasma glow on surface
+  for(let sx=0;sx<W;sx+=60){
+    const flicker=.3+.3*Math.sin(t*2+sx*.05);
+    const h=getH(surfX+(sx-W/2)*mPx);
+    const sy=groundLine-h*Math.min(1,z*100);
+    const pg=X.createRadialGradient(sx,sy,0,sx,sy,30);
+    const rgb=hexRGB(star.color);
+    pg.addColorStop(0,`rgba(${Math.min(255,rgb[0]+80)},${Math.min(255,rgb[1]+40)},${rgb[2]},${flicker*.2})`);
+    pg.addColorStop(1,`rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
+    X.fillStyle=pg;X.beginPath();X.arc(sx,sy-15,30,0,TAU);X.fill();
+  }
+
+  X.beginPath();first=true;
+  for(let sx=0;sx<=W;sx+=3){const h=getH(surfX+(sx-W/2)*mPx);
+    const sy=groundLine-h*Math.min(1,z*100);first?(X.moveTo(sx,sy),first=false):X.lineTo(sx,sy);}
+  X.strokeStyle=lighten(star.color,50)+'66';X.lineWidth=1.5;X.stroke();
+
+  if(z>1e-2){
+    X.globalAlpha=surfAlpha*Math.min(1,(Math.log10(z)+2));
+    X.fillStyle='rgba(200,230,255,.4)';X.font='11px Courier New';X.textAlign='center';
+    X.fillText(`${star.name} — Stellar Surface`,W/2,28);
+    X.fillStyle='rgba(200,230,255,.25)';X.font='10px Courier New';
+    X.fillText(sf.desc,W/2,44);
+  }
+  X.globalAlpha=1;
+}
+
+// ── HUD ──────────────────────────────────────────────────────────────
+function drawHUD(t){
+  const W=C.width,H=C.height;
+
+  X.fillStyle='rgba(80,160,220,.3)';X.font='10px Courier New';X.textAlign='left';
+  X.fillText(getScaleLabel(),20,H-50);
+  if(overviewMode){X.fillStyle='rgba(80,255,180,.35)';X.fillText('OVERVIEW — press F to toggle',20,H-65);}
+
+  const bar=getScaleBar(),barY=H-30;
+  X.strokeStyle='rgba(120,200,255,.35)';X.lineWidth=1.5;
+  X.beginPath();X.moveTo(20,barY);X.lineTo(20+bar.px,barY);X.stroke();
+  X.beginPath();X.moveTo(20,barY-4);X.lineTo(20,barY+4);X.stroke();
+  X.beginPath();X.moveTo(20+bar.px,barY-4);X.lineTo(20+bar.px,barY+4);X.stroke();
+  X.fillStyle='rgba(120,200,255,.4)';X.font='9px Courier New';
+  X.fillText(bar.label,25+bar.px,barY-5);
+
+  if(showInfo&&selected!==null){
+    const p=BODIES[selected],dist=Math.hypot(cam.x-bodyPos[selected].x,cam.y-bodyPos[selected].y);
+    X.fillStyle='rgba(0,12,30,.6)';X.strokeStyle='rgba(60,130,255,.2)';X.lineWidth=1;
+    const hasSub=p.type==='moon'||p.type==='dwarf';
+    const factLines=p.fact?Math.ceil(p.fact.length/28):0;
+    const panelH=hasSub?180+factLines*18:160+factLines*18;
+    const pw=320;
+    roundRect(W-pw-16,16,pw,panelH,8);
+    X.textAlign='right';X.font='bold 20px Courier New';
+    X.fillStyle='rgba(120,215,255,.9)';X.fillText(p.name,W-28,44);
+    if(p.type==='moon'){X.fillStyle='rgba(120,215,255,.5)';X.font='13px Courier New';X.fillText(`Moon of ${BODIES[p.moonOf].name}`,W-28,62);}
+    if(p.type==='dwarf'){X.fillStyle='rgba(120,215,255,.5)';X.font='13px Courier New';X.fillText('Dwarf Planet',W-28,62);}
+    let y=hasSub?80:68;
+    infoLine(W-28,y,'Radius',formatDist(p.radius),14);y+=22;
+    infoLine(W-28,y,'Mass',p.mass.toExponential(2)+' kg',14);y+=22;
+    if(p.dist>0){infoLine(W-28,y,'Orbit',formatDist(p.dist)+(p.type==='moon'?' from '+BODIES[p.moonOf].name:' from Sun'),14);y+=22;}
+    if(p.surface){infoLine(W-28,y,'Gravity',p.surface.gravity+' m/s²',14);y+=22;}
+    infoLine(W-28,y,'View dist',formatDist(dist),14);y+=22;
+    if(p.fact){X.textAlign='left';wrapText(W-pw-16+14,y,p.fact,pw-28,18);}
+  }
+
+  // Constellation star info panel
+  if(showInfo&&selectedStar!==null){
+    const s=selectedStar,dist=Math.hypot(cam.x-s.wx,cam.y-s.wy);
+    const conName=CONSTELLATIONS[s.conIdx].name;
+    const pw=320;
+    const factLines=s.fact?Math.ceil(s.fact.length/28):0;
+    const panelH=160+factLines*18;
+    X.fillStyle='rgba(0,12,30,.6)';X.strokeStyle='rgba(60,130,255,.2)';X.lineWidth=1;
+    roundRect(W-pw-16,16,pw,panelH,8);
+    X.textAlign='right';X.font='bold 20px Courier New';
+    X.fillStyle='rgba(120,215,255,.9)';X.fillText(s.name,W-28,44);
+    X.fillStyle='rgba(120,215,255,.5)';X.font='13px Courier New';
+    X.fillText(`${conName} constellation`,W-28,62);
+    let y=80;
+    infoLine(W-28,y,'Distance',s.distLY+' light-years',14);y+=22;
+    infoLine(W-28,y,'Radius',formatDist(s.radiusM),14);y+=22;
+    infoLine(W-28,y,'Color',s.color,14);y+=22;
+    infoLine(W-28,y,'View dist',formatDist(dist),14);y+=22;
+    if(s.fact){X.textAlign='left';wrapText(W-pw-16+14,y,s.fact,pw-28,18);}
+  }
+
+  if(selected!==null&&cam.zoom<1e-6){
+    const p=BODIES[selected],sr=p.radius*cam.zoom;
+    if(sr>15&&sr<300){const s=w2s(bodyPos[selected].x,bodyPos[selected].y);
+      X.fillStyle='rgba(80,255,180,.25)';X.font='9px Courier New';X.textAlign='center';
+      X.fillText('scroll to zoom to surface',s.x,s.y+sr+28);}
+  }
+
+  X.fillStyle='rgba(80,160,220,.2)';X.font='9px Courier New';X.textAlign='right';
+  X.fillText('scroll:zoom  drag:pan  click:select  F:overview  esc:galaxy',W-16,H-12);
+}
+
+function infoLine(x,y,label,val,fontSize){
+  fontSize=fontSize||14;
+  X.font=fontSize+'px Courier New';
+  X.fillStyle='rgba(120,215,255,.7)';X.fillText(val,x,y);
+  const vw=X.measureText(val).width;
+  X.fillStyle='rgba(70,150,210,.35)';X.fillText(label,x-vw-10,y);
+}
+function wrapText(x,y,text,maxW,lineH){
+  const words=text.split(' ');let line='',ly=y;
+  X.font='13px Courier New';X.fillStyle='rgba(160,210,240,.6)';
+  for(let i=0;i<words.length;i++){
+    const test=line+words[i]+' ';
+    if(X.measureText(test).width>maxW&&line!==''){X.fillText(line.trim(),x,ly);ly+=lineH;line=words[i]+' ';}
+    else line=test;
+  }
+  if(line.trim())X.fillText(line.trim(),x,ly);
+  return ly+lineH;
+}
+function formatDist(m){
+  if(m>=LY)return(m/LY).toFixed(m/LY>=100?0:1)+' ly';
+  if(m>=AU_M*.1)return(m/AU_M).toFixed(2)+' AU';
+  if(m>=1e6)return(m/1e6).toFixed(1)+' Mm';
+  if(m>=1e3)return(m/1e3).toFixed(1)+' km';
+  return m.toFixed(0)+' m';
+}
+function roundRect(x,y,w,h,r){
+  X.beginPath();X.moveTo(x+r,y);X.lineTo(x+w-r,y);X.quadraticCurveTo(x+w,y,x+w,y+r);
+  X.lineTo(x+w,y+h-r);X.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  X.lineTo(x+r,y+h);X.quadraticCurveTo(x,y+h,x,y+h-r);
+  X.lineTo(x,y+r);X.quadraticCurveTo(x,y,x+r,y);X.closePath();X.fill();X.stroke();
+}
+
+// ── Offscreen indicators ─────────────────────────────────────────────
+function drawOffscreen(){
+  const M=30;
+  BODIES.forEach((p,i)=>{
+    if(cam.zoom<1e-16&&p.dist>0)return;
+    // Hide moons unless zoomed enough
+    if(p.type==='moon'&&cam.zoom<1e-11)return;
+    const s=w2s(bodyPos[i].x,bodyPos[i].y);
+    if(s.x>M&&s.x<C.width-M&&s.y>M&&s.y<C.height-M)return;
+    const sr=p.radius*cam.zoom;
+    if(sr<.3&&cam.zoom>5e-14)return;
+    const cx=C.width/2,cy=C.height/2;
+    const ang=Math.atan2(s.y-cy,s.x-cx);
+    const ex=Math.max(M,Math.min(C.width-M,cx+Math.cos(ang)*C.width*.44));
+    const ey=Math.max(M,Math.min(C.height-M,cy+Math.sin(ang)*C.height*.44));
+    X.save();X.translate(ex,ey);X.rotate(ang);
+    X.beginPath();X.moveTo(6,0);X.lineTo(-3,-3);X.lineTo(-3,3);X.closePath();
+    X.fillStyle=p.c2;X.globalAlpha=.45;X.fill();
+    X.restore();X.globalAlpha=1;
+    X.fillStyle=p.c2+'77';X.font='8px Courier New';X.textAlign='center';
+    X.fillText(p.name,ex,ey-8);
+  });
+}
+
+// ── Game loop ────────────────────────────────────────────────────────
+let lastT=performance.now();
+function loop(){
+  requestAnimationFrame(loop);
+  const now=performance.now(),dt=Math.min((now-lastT)/1000,.05);
+  lastT=now;
+
+  updatePositions();
+
+  // Smooth camera
+  cam.x+=(cam.targetX-cam.x)*Math.min(1,4*dt);
+  cam.y+=(cam.targetY-cam.y)*Math.min(1,4*dt);
+  const lC=Math.log(cam.zoom),lT=Math.log(cam.targetZoom);
+  cam.zoom=Math.exp(lC+(lT-lC)*Math.min(1,5*dt));
+
+  // Soft-follow selected body or star
+  if(selected!==null&&!dragging&&!overviewMode){
+    cam.targetX+=(bodyPos[selected].x-cam.targetX)*.5*dt;
+    cam.targetY+=(bodyPos[selected].y-cam.targetY)*.5*dt;
+  }
+  if(selectedStar!==null&&!dragging&&!overviewMode){
+    cam.targetX+=(selectedStar.wx-cam.targetX)*.5*dt;
+    cam.targetY+=(selectedStar.wy-cam.targetY)*.5*dt;
+  }
+
+  // Video playback: show video when zoomed into any planet's surface
+  if(!overviewMode&&selected!==null){
+    const selBody=BODIES[selected];
+    const selZ=selBody.radius*cam.zoom;
+    if(selZ>0.05&&planetVideos[selBody.name]){showVideo(selBody.name);}
+    else{hideVideo();}
+  } else {hideVideo();}
+
+  if(overviewMode){
+    drawOverview();
+  } else {
+    draw();
+    drawOffscreen();
+  }
+}
+
+updatePositions();
+cam.x=SOL_POS.x;cam.y=SOL_POS.y;
+cam.targetX=SOL_POS.x;cam.targetY=SOL_POS.y;
+loop();
+</script>
+</body>
+</html>

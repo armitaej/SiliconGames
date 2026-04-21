@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Silicon Sabotage — A Clue Mystery</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0a0e17;
+    color: #e0e0e0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Title Bar ── */
+  .title-bar {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    text-align: center;
+    padding: 18px;
+    border-bottom: 2px solid #00d4ff33;
+  }
+  .title-bar h1 {
+    font-size: 2rem;
+    background: linear-gradient(90deg, #00d4ff, #7b2ff7, #ff006e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 2px;
+  }
+  .title-bar p { color: #8899aa; font-size: 0.85rem; margin-top: 4px; }
+
+  /* ── Layout ── */
+  .game-container {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+    max-width: 1400px;
+    margin: 16px auto;
+    padding: 0 16px;
+  }
+
+  /* ── Board ── */
+  .board-wrapper {
+    background: #111827;
+    border-radius: 14px;
+    padding: 20px;
+    border: 1px solid #1e293b;
+  }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 10px;
+    aspect-ratio: 1;
+    max-height: 560px;
+    margin: 0 auto;
+  }
+  .room {
+    background: #1e293b;
+    border: 2px solid #334155;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    padding: 10px;
+  }
+  .room:hover { border-color: #00d4ff; background: #1e293bcc; transform: scale(1.03); }
+  .room.current { border-color: #00d4ff; box-shadow: 0 0 20px #00d4ff44; }
+  .room.reachable { border-color: #7b2ff7; box-shadow: 0 0 12px #7b2ff744; animation: pulse 1.5s infinite; }
+  .room.reachable:hover { border-color: #a855f7; box-shadow: 0 0 20px #a855f766; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.75; } }
+  .room .icon { font-size: 2rem; margin-bottom: 6px; }
+  .room .name { font-size: 0.85rem; font-weight: 600; text-align: center; }
+  .room .occupants {
+    position: absolute; bottom: 6px; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 4px;
+  }
+  .room .dot {
+    width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0005;
+  }
+  .hallway {
+    background: #0f172a;
+    border: 1px dashed #334155;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    color: #475569;
+  }
+
+  /* ── Right Panel ── */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel-section {
+    background: #111827;
+    border-radius: 14px;
+    padding: 16px;
+    border: 1px solid #1e293b;
+  }
+  .panel-section h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #00d4ff;
+    margin-bottom: 10px;
+  }
+
+  /* ── Cards ── */
+  .cards { display: flex; gap: 6px; flex-wrap: wrap; }
+  .card {
+    background: linear-gradient(135deg, #1e293b, #334155);
+    border: 1px solid #475569;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+  .card.suspect { border-color: #ff006e55; color: #ff7eb3; }
+  .card.weapon { border-color: #7b2ff755; color: #b388ff; }
+  .card.room-card { border-color: #00d4ff55; color: #80e5ff; }
+
+  /* ── Notepad ── */
+  .notepad table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .notepad th { text-align: left; color: #64748b; padding: 4px 6px; font-weight: 500; }
+  .notepad td { padding: 4px 6px; cursor: pointer; user-select: none; }
+  .notepad tr:hover td { background: #1e293b; }
+  .notepad .mark { width: 20px; text-align: center; font-size: 0.9rem; }
+  .notepad .cat-header {
+    background: #0f172a; color: #00d4ff; font-weight: 700;
+    padding: 6px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
+  }
+
+  /* ── Log ── */
+  .log {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.78rem;
+    line-height: 1.6;
+  }
+  .log p { padding: 2px 0; border-bottom: 1px solid #1e293b; }
+  .log .you { color: #00d4ff; }
+  .log .ai { color: #ff7eb3; }
+  .log .system { color: #fbbf24; }
+
+  /* ── Buttons ── */
+  .btn {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #00d4ff, #7b2ff7);
+    color: #fff;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 15px #00d4ff44; }
+  .btn-danger {
+    background: linear-gradient(135deg, #ff006e, #ff4444);
+    color: #fff;
+  }
+  .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 4px 15px #ff006e44; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: #000a; z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: #1a1a2e;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 440px;
+    width: 90%;
+  }
+  .modal h2 { color: #00d4ff; margin-bottom: 16px; font-size: 1.2rem; }
+  .modal label { display: block; color: #94a3b8; font-size: 0.85rem; margin-bottom: 4px; }
+  .modal select {
+    width: 100%; padding: 8px 12px; background: #0f172a; color: #e0e0e0;
+    border: 1px solid #334155; border-radius: 8px; margin-bottom: 14px; font-size: 0.9rem;
+  }
+  .modal .btn { margin-top: 6px; width: 100%; }
+
+  /* ── Win / Lose ── */
+  .result-banner {
+    display: none;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: #000c; z-index: 200;
+    align-items: center; justify-content: center;
+    flex-direction: column; text-align: center;
+  }
+  .result-banner.active { display: flex; }
+  .result-banner h1 { font-size: 3rem; margin-bottom: 12px; }
+  .result-banner p { font-size: 1.1rem; color: #94a3b8; margin-bottom: 24px; max-width: 400px; }
+
+  /* ── Status Bar ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #111827;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    border: 1px solid #1e293b;
+    font-size: 0.85rem;
+  }
+  .status-bar .turn-info { color: #fbbf24; font-weight: 600; }
+  .status-bar .location { color: #00d4ff; }
+
+  /* ── Intro Screen ── */
+  .intro-screen {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: #0a0e17;
+    z-index: 300;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; text-align: center; padding: 20px;
+  }
+  .intro-screen.hidden { display: none; }
+  .intro-screen h1 {
+    font-size: 3rem;
+    background: linear-gradient(90deg, #00d4ff, #7b2ff7, #ff006e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 16px;
+  }
+  .intro-screen .story {
+    max-width: 520px; color: #94a3b8; line-height: 1.7; margin-bottom: 30px; font-size: 1rem;
+  }
+  .intro-screen .btn { font-size: 1.1rem; padding: 14px 40px; }
+
+  .player-colors { display: flex; gap: 12px; margin-top: 10px; justify-content: center; flex-wrap: wrap; }
+  .player-colors .pc {
+    display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #94a3b8;
+  }
+  .player-colors .pc .dot { width: 12px; height: 12px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<!-- Intro -->
+<div class="intro-screen" id="intro">
+  <h1>Silicon Sabotage</h1>
+  <p class="story">
+    It's midnight at NexGen Labs. The secret source code for Project Chimera has been stolen.
+    Six suspects remain in the building. Your mission: determine <strong>who</strong> stole the code,
+    <strong>what device</strong> they used, and <strong>which room</strong> they did it in — before
+    the AI opponents crack the case first.
+  </p>
+  <div class="player-colors">
+    <div class="pc"><span class="dot" style="background:#00d4ff"></span> You (The Detective)</div>
+    <div class="pc"><span class="dot" style="background:#ff006e"></span> Agent Alpha</div>
+    <div class="pc"><span class="dot" style="background:#fbbf24"></span> Agent Beta</div>
+    <div class="pc"><span class="dot" style="background:#34d399"></span> Agent Gamma</div>
+  </div>
+  <br>
+  <button class="btn btn-primary" onclick="startGame()">Start Investigation</button>
+</div>
+
+<!-- Result Banner -->
+<div class="result-banner" id="resultBanner">
+  <h1 id="resultTitle"></h1>
+  <p id="resultText"></p>
+  <button class="btn btn-primary" onclick="location.reload()">Play Again</button>
+</div>
+
+<!-- Suggestion Modal -->
+<div class="modal-overlay" id="suggestModal">
+  <div class="modal">
+    <h2 id="modalTitle">Make a Suggestion</h2>
+    <label>Suspect</label>
+    <select id="selSuspect"></select>
+    <label>Weapon</label>
+    <select id="selWeapon"></select>
+    <label id="roomLabel">Room (current room)</label>
+    <select id="selRoom" disabled></select>
+    <button class="btn btn-primary" id="modalConfirm" onclick="confirmModal()">Suggest</button>
+  </div>
+</div>
+
+<!-- Game -->
+<div class="title-bar">
+  <h1>SILICON SABOTAGE</h1>
+  <p>Who stole the source code? — A Clue Mystery</p>
+</div>
+
+<div class="game-container">
+  <!-- Left: Board -->
+  <div>
+    <div class="status-bar">
+      <span class="turn-info" id="turnInfo">Your Turn</span>
+      <span class="location" id="locationInfo">Location: Lobby</span>
+    </div>
+    <div class="board-wrapper">
+      <div class="board" id="board"></div>
+    </div>
+    <div style="margin-top: 12px;">
+      <div class="actions">
+        <button class="btn btn-primary" id="btnSuggest" onclick="openSuggest()" disabled>💡 Suggest</button>
+        <button class="btn btn-danger" id="btnAccuse" onclick="openAccuse()">⚡ Accuse</button>
+        <button class="btn" style="background:#334155;color:#e0e0e0" id="btnEndTurn" onclick="endTurn()" disabled>⏭ End Turn</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Panel -->
+  <div class="panel">
+    <div class="panel-section">
+      <h3>Your Cards</h3>
+      <div class="cards" id="yourCards"></div>
+    </div>
+
+    <div class="panel-section notepad" id="notepad">
+      <h3>Detective Notepad</h3>
+      <p style="font-size:0.7rem;color:#475569;margin-bottom:8px">Click cells to cycle: ✓ ✗ ?</p>
+      <table id="noteTable"></table>
+    </div>
+
+    <div class="panel-section">
+      <h3>Investigation Log</h3>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  GAME DATA
+// ══════════════════════════════════════════
+const SUSPECTS = ['The CEO', 'The Intern', 'The Hacker', 'The Investor', 'The Designer', 'The Engineer'];
+const WEAPONS = ['USB Drive', 'Server Cable', 'Coffee Mug', 'Mech Keyboard', 'Drone', 'VR Headset'];
+const ROOMS = ['Server Room', 'Board Room', 'Break Room', 'Lab', 'Rooftop Garden', 'Parking Garage', 'Reception', 'Cafeteria', "CEO's Office"];
+const ROOM_ICONS = ['🖥️', '📊', '☕', '🔬', '🌿', '🅿️', '🛎️', '🍕', '👔'];
+// 5x5 grid: rooms at corners, edges, and center — hallways in between
+// Layout:
+//   0(Server)  .  1(Board)   .  2(Break)
+//      .       .     .       .     .
+//   3(Lab)     .  4(Rooftop) .  5(Parking)
+//      .       .     .       .     .
+//   6(Recept)  .  7(Cafe)    .  8(CEO)
+const ROOM_GRID = [
+  0, -1, 1, -1, 2,
+  -1, -1, -1, -1, -1,
+  3, -1, 4, -1, 5,
+  -1, -1, -1, -1, -1,
+  6, -1, 7, -1, 8
+];
+
+const BOARD_COLS = 5;
+const PLAYER_COLORS = ['#00d4ff', '#ff006e', '#fbbf24', '#34d399'];
+const PLAYER_NAMES = ['You', 'Agent Alpha', 'Agent Beta', 'Agent Gamma'];
+
+// ══════════════════════════════════════════
+//  ADJACENCY — matches the visual 3x3 grid
+//  Orthogonal + diagonal neighbors
+// ══════════════════════════════════════════
+const ADJ = {
+  0: [1, 3, 4],          // Server Room → Board, Lab, Rooftop
+  1: [0, 2, 3, 4, 5],    // Board Room → Server, Break, Lab, Rooftop, Parking
+  2: [1, 4, 5],           // Break Room → Board, Rooftop, Parking
+  3: [0, 1, 4, 6, 7],    // Lab → Server, Board, Rooftop, Reception, Cafe
+  4: [0, 1, 2, 3, 5, 6, 7, 8], // Rooftop (center) → all neighbors
+  5: [1, 2, 4, 7, 8],    // Parking → Board, Break, Rooftop, Cafe, CEO
+  6: [3, 4, 7],           // Reception → Lab, Rooftop, Cafe
+  7: [3, 4, 5, 6, 8],    // Cafeteria → Lab, Rooftop, Parking, Reception, CEO
+  8: [4, 5, 7],           // CEO's Office → Rooftop, Parking, Cafe
+};
+
+// ══════════════════════════════════════════
+//  GAME STATE
+// ══════════════════════════════════════════
+let solution = {};
+let playerHands = [[], [], [], []];
+let playerRooms = [0, 2, 5, 8]; // starting rooms
+let currentPlayer = 0;
+let hasMoved = false;
+let gameOver = false;
+let modalMode = ''; // 'suggest' or 'accuse'
+
+// AI knowledge tracking
+let aiKnown = [new Set(), new Set(), new Set()]; // cards each AI has seen
+let aiNotInSolution = [new Set(), new Set(), new Set()]; // cards each AI knows aren't solution
+
+// Notepad marks: key = item name, value = '' | '✓' | '✗' | '?'
+let noteMarks = {};
+
+// ══════════════════════════════════════════
+//  SETUP
+// ══════════════════════════════════════════
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function setupGame() {
+  // Pick solution
+  solution = {
+    suspect: SUSPECTS[Math.floor(Math.random() * SUSPECTS.length)],
+    weapon: WEAPONS[Math.floor(Math.random() * WEAPONS.length)],
+    room: ROOMS[Math.floor(Math.random() * ROOMS.length)]
+  };
+
+  // Remaining cards
+  const deck = [
+    ...SUSPECTS.filter(s => s !== solution.suspect),
+    ...WEAPONS.filter(w => w !== solution.weapon),
+    ...ROOMS.filter(r => r !== solution.room)
+  ];
+  const shuffled = shuffle(deck);
+
+  // Deal
+  playerHands = [[], [], [], []];
+  shuffled.forEach((card, i) => {
+    playerHands[i % 4].push(card);
+  });
+
+  // AI knowledge init — each AI knows their own cards
+  for (let ai = 0; ai < 3; ai++) {
+    aiKnown[ai] = new Set(playerHands[ai + 1]);
+    aiNotInSolution[ai] = new Set(playerHands[ai + 1]);
+  }
+
+  // Init notepad
+  [...SUSPECTS, ...WEAPONS, ...ROOMS].forEach(item => { noteMarks[item] = ''; });
+  // Auto-mark player's own cards
+  playerHands[0].forEach(card => { noteMarks[card] = '✗'; });
+
+  currentPlayer = 0;
+  hasMoved = false;
+  gameOver = false;
+
+  renderBoard();
+  renderCards();
+  renderNotepad();
+  updateStatus();
+  addLog('system', 'The investigation begins. Move to a room and make a suggestion!');
+}
+
+// ══════════════════════════════════════════
+//  RENDERING
+// ══════════════════════════════════════════
+function renderBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  // We'll use a 5x5 grid for visual layout
+  board.style.gridTemplateColumns = 'repeat(5, 1fr)';
+  board.style.gridTemplateRows = 'repeat(5, 1fr)';
+
+  for (let i = 0; i < 25; i++) {
+    const roomIdx = ROOM_GRID[i];
+    if (roomIdx !== undefined && roomIdx >= 0) {
+      const div = document.createElement('div');
+      const isCurrent = playerRooms[0] === roomIdx;
+      const canMove = currentPlayer === 0 && !hasMoved && !gameOver;
+      const isReachable = canMove && (isCurrent || ADJ[playerRooms[0]].includes(roomIdx));
+      div.className = 'room' + (isCurrent ? ' current' : '') + (isReachable && !isCurrent ? ' reachable' : '');
+      div.innerHTML = `
+        <div class="icon">${ROOM_ICONS[roomIdx]}</div>
+        <div class="name">${ROOMS[roomIdx]}</div>
+        <div class="occupants">${renderOccupants(roomIdx)}</div>
+      `;
+      div.onclick = () => moveToRoom(roomIdx);
+      board.appendChild(div);
+    } else {
+      const div = document.createElement('div');
+      div.className = 'hallway';
+      div.textContent = '···';
+      board.appendChild(div);
+    }
+  }
+}
+
+function renderOccupants(roomIdx) {
+  return playerRooms.map((r, pi) =>
+    r === roomIdx ? `<span class="dot" style="background:${PLAYER_COLORS[pi]}" title="${PLAYER_NAMES[pi]}"></span>` : ''
+  ).join('');
+}
+
+function renderCards() {
+  const container = document.getElementById('yourCards');
+  container.innerHTML = playerHands[0].map(card => {
+    let cls = 'card';
+    if (SUSPECTS.includes(card)) cls += ' suspect';
+    else if (WEAPONS.includes(card)) cls += ' weapon';
+    else cls += ' room-card';
+    return `<span class="${cls}">${card}</span>`;
+  }).join('');
+}
+
+function renderNotepad() {
+  const table = document.getElementById('noteTable');
+  let html = '';
+
+  const sections = [
+    { label: '🕵️ Suspects', items: SUSPECTS },
+    { label: '🔧 Weapons', items: WEAPONS },
+    { label: '🚪 Rooms', items: ROOMS }
+  ];
+
+  sections.forEach(sec => {
+    html += `<tr><td colspan="2" class="cat-header">${sec.label}</td></tr>`;
+    sec.items.forEach(item => {
+      const mark = noteMarks[item] || '';
+      html += `<tr>
+        <td class="mark" onclick="cycleMark('${item.replace(/'/g, "\\'")}')">${mark || '·'}</td>
+        <td>${item}</td>
+      </tr>`;
+    });
+  });
+
+  table.innerHTML = html;
+}
+
+function cycleMark(item) {
+  const cycle = ['', '✗', '✓', '?'];
+  const idx = cycle.indexOf(noteMarks[item] || '');
+  noteMarks[item] = cycle[(idx + 1) % cycle.length];
+  renderNotepad();
+}
+
+function updateStatus() {
+  let turnText = '';
+  if (currentPlayer === 0) {
+    if (!hasMoved) {
+      turnText = '🎯 Your Turn — Click a room to move (or click current room to stay)';
+    } else {
+      turnText = '🎯 Your Turn — Make a Suggestion, Accuse, or End Turn';
+    }
+  } else {
+    turnText = `⏳ ${PLAYER_NAMES[currentPlayer]}'s Turn...`;
+  }
+  document.getElementById('turnInfo').textContent = turnText;
+  document.getElementById('locationInfo').textContent =
+    `📍 ${ROOMS[playerRooms[0]]}`;
+
+  document.getElementById('btnSuggest').disabled = currentPlayer !== 0 || !hasMoved;
+  document.getElementById('btnEndTurn').disabled = currentPlayer !== 0 || !hasMoved;
+  document.getElementById('btnAccuse').disabled = currentPlayer !== 0;
+}
+
+function addLog(type, msg) {
+  const log = document.getElementById('log');
+  const p = document.createElement('p');
+  p.className = type;
+  p.textContent = msg;
+  log.prepend(p);
+}
+
+// ══════════════════════════════════════════
+//  PLAYER ACTIONS
+// ══════════════════════════════════════════
+function moveToRoom(roomIdx) {
+  if (currentPlayer !== 0 || gameOver) return;
+  if (hasMoved) { addLog('system', 'You already moved this turn. Make a suggestion or end your turn.'); return; }
+
+  // Allow staying in the current room
+  if (roomIdx === playerRooms[0]) {
+    hasMoved = true;
+    addLog('you', `You stay in the ${ROOMS[roomIdx]}.`);
+    renderBoard();
+    updateStatus();
+    return;
+  }
+
+  if (!ADJ[playerRooms[0]].includes(roomIdx)) {
+    addLog('system', `You can't reach ${ROOMS[roomIdx]} from here. Click an adjacent room (glowing purple) or click your current room to stay.`);
+    return;
+  }
+
+  playerRooms[0] = roomIdx;
+  hasMoved = true;
+  addLog('you', `You moved to the ${ROOMS[roomIdx]}.`);
+  renderBoard();
+  updateStatus();
+}
+
+function openSuggest() {
+  if (currentPlayer !== 0 || !hasMoved || gameOver) return;
+  modalMode = 'suggest';
+  document.getElementById('modalTitle').textContent = '💡 Make a Suggestion';
+  document.getElementById('modalConfirm').textContent = 'Suggest';
+  document.getElementById('modalConfirm').className = 'btn btn-primary';
+  populateSelects(false);
+  document.getElementById('suggestModal').classList.add('active');
+}
+
+function openAccuse() {
+  if (currentPlayer !== 0 || gameOver) return;
+  modalMode = 'accuse';
+  document.getElementById('modalTitle').textContent = '⚡ Make an Accusation';
+  document.getElementById('modalConfirm').textContent = 'Accuse!';
+  document.getElementById('modalConfirm').className = 'btn btn-danger';
+  populateSelects(true);
+  document.getElementById('suggestModal').classList.add('active');
+}
+
+function populateSelects(allowRoomChoice) {
+  const ss = document.getElementById('selSuspect');
+  const sw = document.getElementById('selWeapon');
+  const sr = document.getElementById('selRoom');
+
+  ss.innerHTML = SUSPECTS.map(s => `<option value="${s}">${s}</option>`).join('');
+  sw.innerHTML = WEAPONS.map(w => `<option value="${w}">${w}</option>`).join('');
+
+  if (allowRoomChoice) {
+    sr.disabled = false;
+    sr.innerHTML = ROOMS.map(r => `<option value="${r}">${r}</option>`).join('');
+    document.getElementById('roomLabel').textContent = 'Room';
+  } else {
+    sr.disabled = true;
+    const currentRoom = ROOMS[playerRooms[0]];
+    sr.innerHTML = `<option value="${currentRoom}">${currentRoom}</option>`;
+    document.getElementById('roomLabel').textContent = `Room (you're in ${currentRoom})`;
+  }
+}
+
+function confirmModal() {
+  const suspect = document.getElementById('selSuspect').value;
+  const weapon = document.getElementById('selWeapon').value;
+  const room = document.getElementById('selRoom').value;
+
+  document.getElementById('suggestModal').classList.remove('active');
+
+  if (modalMode === 'suggest') {
+    handleSuggestion(0, suspect, weapon, room);
+  } else {
+    handleAccusation(0, suspect, weapon, room);
+  }
+}
+
+function handleSuggestion(playerIdx, suspect, weapon, room) {
+  const name = PLAYER_NAMES[playerIdx];
+  addLog(playerIdx === 0 ? 'you' : 'ai', `${name} suggests: ${suspect}, ${weapon}, in ${room}`);
+
+  // Check other players' hands in order for a disproof
+  let disproved = false;
+  for (let i = 1; i <= 3; i++) {
+    const checkIdx = (playerIdx + i) % 4;
+    const hand = playerHands[checkIdx];
+    const matching = hand.filter(c => c === suspect || c === weapon || c === room);
+
+    if (matching.length > 0) {
+      const shown = matching[Math.floor(Math.random() * matching.length)];
+
+      if (playerIdx === 0) {
+        // Player sees the card
+        addLog('system', `${PLAYER_NAMES[checkIdx]} shows you: ${shown}`);
+        noteMarks[shown] = '✗';
+        renderNotepad();
+      } else if (checkIdx === 0) {
+        // AI asked you — they see a card from your hand
+        addLog('system', `You show ${PLAYER_NAMES[playerIdx]} a card.`);
+        aiNotInSolution[playerIdx - 1].add(shown);
+      } else {
+        // AI shows to another AI
+        addLog('ai', `${PLAYER_NAMES[checkIdx]} shows a card to ${name}.`);
+        if (playerIdx > 0) aiNotInSolution[playerIdx - 1].add(shown);
+      }
+
+      disproved = true;
+      break;
+    }
+  }
+
+  if (!disproved) {
+    if (playerIdx === 0) {
+      addLog('system', '⚠️ No one could disprove your suggestion!');
+    } else {
+      addLog('ai', `No one could disprove ${name}'s suggestion.`);
+    }
+  }
+
+  // Auto-end the player's turn after a suggestion
+  if (playerIdx === 0 && !gameOver) {
+    setTimeout(() => { endTurn(); }, 1000);
+  }
+}
+
+function handleAccusation(playerIdx, suspect, weapon, room) {
+  const name = PLAYER_NAMES[playerIdx];
+  addLog(playerIdx === 0 ? 'you' : 'ai', `${name} makes an ACCUSATION: ${suspect}, ${weapon}, in ${room}!`);
+
+  const correct = suspect === solution.suspect && weapon === solution.weapon && room === solution.room;
+
+  if (correct) {
+    gameOver = true;
+    setTimeout(() => {
+      const banner = document.getElementById('resultBanner');
+      const title = document.getElementById('resultTitle');
+      const text = document.getElementById('resultText');
+      if (playerIdx === 0) {
+        title.textContent = '🎉 Case Solved!';
+        title.style.color = '#34d399';
+        text.textContent = `Brilliant detective work! It was ${solution.suspect} with the ${solution.weapon} in the ${solution.room}!`;
+      } else {
+        title.textContent = '😞 Case Lost';
+        title.style.color = '#ff006e';
+        text.textContent = `${name} cracked it first! It was ${solution.suspect} with the ${solution.weapon} in the ${solution.room}.`;
+      }
+      banner.classList.add('active');
+    }, 600);
+  } else {
+    if (playerIdx === 0) {
+      addLog('system', '❌ Wrong accusation! You are eliminated from the investigation.');
+      gameOver = true;
+      setTimeout(() => {
+        const banner = document.getElementById('resultBanner');
+        document.getElementById('resultTitle').textContent = '😞 Wrong Accusation!';
+        document.getElementById('resultTitle').style.color = '#ff006e';
+        document.getElementById('resultText').textContent =
+          `That was incorrect. The real answer was: ${solution.suspect} with the ${solution.weapon} in the ${solution.room}.`;
+        banner.classList.add('active');
+      }, 600);
+    } else {
+      addLog('ai', `${name}'s accusation was WRONG! They're out of the investigation.`);
+    }
+  }
+}
+
+// ══════════════════════════════════════════
+//  TURN MANAGEMENT
+// ══════════════════════════════════════════
+function endTurn() {
+  if (currentPlayer !== 0 || gameOver) return;
+  hasMoved = false;
+  currentPlayer = 1;
+  updateStatus();
+  renderBoard();
+  setTimeout(runAITurns, 700);
+}
+
+function runAITurns() {
+  if (gameOver) return;
+  aiTurn(1, () => {
+    if (gameOver) return;
+    aiTurn(2, () => {
+      if (gameOver) return;
+      aiTurn(3, () => {
+        if (gameOver) return;
+        currentPlayer = 0;
+        hasMoved = false;
+        updateStatus();
+        renderBoard();
+        addLog('system', '── Your turn! Move to a room. ──');
+      });
+    });
+  });
+}
+
+function aiTurn(playerIdx, callback) {
+  if (gameOver) return;
+  currentPlayer = playerIdx;
+  updateStatus();
+
+  const aiIdx = playerIdx - 1;
+
+  // AI moves to a random adjacent room
+  const adj = ADJ[playerRooms[playerIdx]];
+  const target = adj[Math.floor(Math.random() * adj.length)];
+  playerRooms[playerIdx] = target;
+  renderBoard();
+
+  addLog('ai', `${PLAYER_NAMES[playerIdx]} moves to ${ROOMS[target]}.`);
+
+  // AI makes a suggestion in their current room
+  setTimeout(() => {
+    if (gameOver) return;
+
+    // Smart AI: pick suspects/weapons they haven't ruled out
+    const possibleSuspects = SUSPECTS.filter(s => !aiNotInSolution[aiIdx].has(s));
+    const possibleWeapons = WEAPONS.filter(w => !aiNotInSolution[aiIdx].has(w));
+    const possibleRooms = ROOMS.filter(r => !aiNotInSolution[aiIdx].has(r));
+
+    const suspect = possibleSuspects[Math.floor(Math.random() * possibleSuspects.length)] || SUSPECTS[0];
+    const weapon = possibleWeapons[Math.floor(Math.random() * possibleWeapons.length)] || WEAPONS[0];
+    const room = ROOMS[target];
+
+    // Chance to accuse if AI is confident
+    if (possibleSuspects.length === 1 && possibleWeapons.length === 1 && possibleRooms.length === 1 && Math.random() > 0.3) {
+      handleAccusation(playerIdx, possibleSuspects[0], possibleWeapons[0], possibleRooms[0]);
+      setTimeout(callback, 800);
+      return;
+    }
+
+    handleSuggestion(playerIdx, suspect, weapon, room);
+    setTimeout(callback, 800);
+  }, 600);
+}
+
+// ══════════════════════════════════════════
+//  START
+// ══════════════════════════════════════════
+function startGame() {
+  document.getElementById('intro').classList.add('hidden');
+  setupGame();
+}
+</script>
+
+</body>
+</html>

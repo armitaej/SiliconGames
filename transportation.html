@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Transportation — Island Tag</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0b1220;
+    color: #e6eefc;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    height: 100%;
+  }
+  #wrap {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    background: #1a2e4a;
+    display: block;
+    border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    cursor: crosshair;
+  }
+  #hud {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    font-size: 14px;
+    background: rgba(11,18,32,0.7);
+    padding: 10px 14px;
+    border-radius: 6px;
+    line-height: 1.6;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  #hud .big {
+    font-size: 18px;
+    font-weight: 600;
+  }
+  #hud .you-it { color: #ff6b6b; }
+  #hud .you-runner { color: #6bdc88; }
+  #legend {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    font-size: 12px;
+    background: rgba(11,18,32,0.7);
+    padding: 10px 14px;
+    border-radius: 6px;
+    line-height: 1.5;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.08);
+    text-align: right;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    z-index: 10;
+  }
+  #overlay.hidden { display: none; }
+  #panel {
+    background: #101a2e;
+    padding: 28px 32px;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 420px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  #panel h1 {
+    margin: 0 0 8px 0;
+    font-size: 28px;
+    letter-spacing: 0.5px;
+  }
+  #panel p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #b6c2d9;
+    line-height: 1.5;
+  }
+  #panel button {
+    margin-top: 14px;
+    background: #4a90e2;
+    color: white;
+    border: none;
+    padding: 10px 22px;
+    font-size: 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+  #panel button:hover { background: #5ba0f2; }
+  .kbd {
+    display: inline-block;
+    background: rgba(255,255,255,0.1);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 12px;
+    margin: 0 2px;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="900" height="650"></canvas>
+</div>
+
+<div id="hud">
+  <div class="big" id="status">Loading…</div>
+  <div>Score — You: <span id="scoreYou">0</span> &nbsp; AI: <span id="scoreAI">0</span></div>
+  <div>Time: <span id="timer">0.0</span>s</div>
+</div>
+
+<div id="legend">
+  <div><span class="kbd">WASD</span> / <span class="kbd">Arrows</span> move</div>
+  <div><span class="kbd">Click</span> teleport anywhere</div>
+  <div><span class="kbd">R</span> restart round</div>
+</div>
+
+<div id="overlay">
+  <div id="panel">
+    <h1>Transportation</h1>
+    <p>You're on a big island playing tag — but you can <b>teleport anywhere</b> by clicking.</p>
+    <p>If you're <span style="color:#ff6b6b">red (it)</span>, catch the runners. If you're <span style="color:#6bdc88">green (runner)</span>, don't get caught. Tag someone and you swap roles!</p>
+    <p style="font-size:12px;opacity:0.7">Move with WASD / arrows. Click anywhere on the island to warp.</p>
+    <button id="startBtn">Start game</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const W = canvas.width, H = canvas.height;
+
+// ----- Island shape (a blobby irregular polygon) -----
+const ISLAND = (() => {
+  const cx = W / 2, cy = H / 2;
+  const pts = [];
+  const n = 28;
+  // deterministic pseudo-random but chunky perimeter
+  const seeds = [0.9,1.1,1.0,1.15,0.95,1.2,1.05,0.88,1.0,1.18,1.08,0.92,1.12,1.0,0.9,1.17,1.05,0.93,1.08,1.02,0.87,1.15,1.0,1.1,0.95,1.18,1.04,0.97];
+  const rx = 380, ry = 270;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const r = seeds[i];
+    pts.push({
+      x: cx + Math.cos(a) * rx * r,
+      y: cy + Math.sin(a) * ry * r
+    });
+  }
+  return pts;
+})();
+
+function pointInIsland(x, y, pad=0) {
+  // Point-in-polygon (ray cast), with optional inward padding via shrinking test
+  const pts = ISLAND;
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y;
+    const xj = pts[j].x, yj = pts[j].y;
+    const intersect = ((yi > y) !== (yj > y)) &&
+      (x < (xj - xi) * (y - yi) / (yj - yi + 0.0001) + xi);
+    if (intersect) inside = !inside;
+  }
+  if (!inside) return false;
+  if (pad > 0) {
+    // ensure point is at least `pad` away from any edge
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const d = distToSegment({x,y}, pts[j], pts[i]);
+      if (d < pad) return false;
+    }
+  }
+  return true;
+}
+
+function distToSegment(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx*dx + dy*dy;
+  if (len2 === 0) return Math.hypot(p.x-a.x, p.y-a.y);
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const px = a.x + t*dx, py = a.y + t*dy;
+  return Math.hypot(p.x - px, p.y - py);
+}
+
+function clampToIsland(x, y, pad=14) {
+  if (pointInIsland(x, y, pad)) return {x, y};
+  // find nearest point on perimeter, then step inward
+  const pts = ISLAND;
+  let best = {x: pts[0].x, y: pts[0].y, d: Infinity};
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[j], b = pts[i];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx*dx + dy*dy;
+    let t = ((x - a.x) * dx + (y - a.y) * dy) / (len2 || 1);
+    t = Math.max(0, Math.min(1, t));
+    const px = a.x + t*dx, py = a.y + t*dy;
+    const d = Math.hypot(x - px, y - py);
+    if (d < best.d) best = {x: px, y: py, d};
+  }
+  // step inward toward center
+  const cx = W/2, cy = H/2;
+  const vx = cx - best.x, vy = cy - best.y;
+  const vl = Math.hypot(vx, vy) || 1;
+  return { x: best.x + (vx/vl) * (pad + 2), y: best.y + (vy/vl) * (pad + 2) };
+}
+
+// ----- Landmarks / scenery (trees, rocks, lake) -----
+const SCENERY = [];
+(function buildScenery(){
+  // A lake
+  SCENERY.push({type:"lake", x: W/2 - 120, y: H/2 + 40, rx: 70, ry: 42});
+  // Trees (deterministic positions inside island)
+  const treePoses = [
+    [-220,-120],[-170,-50],[-260,20],[-190,90],[-140,160],[-80,-180],[10,-220],[90,-170],
+    [170,-110],[240,-40],[280,60],[220,140],[130,190],[40,210],[-50,200],[-280,-40],
+    [-100,-100],[60,-80],[200,-180],[-30,-30],[180,0],[-210,180],[-170,-210]
+  ];
+  for (const [dx, dy] of treePoses) {
+    const x = W/2 + dx, y = H/2 + dy;
+    if (pointInIsland(x, y, 10)) {
+      // skip trees in lake
+      const lake = SCENERY[0];
+      if (((x-lake.x)/lake.rx)**2 + ((y-lake.y)/lake.ry)**2 < 1.2) continue;
+      SCENERY.push({type:"tree", x, y, r: 9 + ((x*y) % 4)});
+    }
+  }
+  // Rocks
+  const rocks = [[-300,100],[250,-150],[310,20],[-200,-170],[-40,230],[150,220]];
+  for (const [dx, dy] of rocks) {
+    const x = W/2 + dx, y = H/2 + dy;
+    if (pointInIsland(x, y, 15)) SCENERY.push({type:"rock", x, y, r: 10});
+  }
+})();
+
+// ----- Entities -----
+function makeEntity(opts) {
+  return Object.assign({
+    x: 0, y: 0, r: 14, speed: 140, vx: 0, vy: 0,
+    isPlayer: false, isIt: false, color: "#6bdc88",
+    teleportCooldown: 0, flashUntil: 0,
+    wanderTimer: 0, wanderDir: {x:0,y:0},
+  }, opts);
+}
+
+let player, ais, scoreYou, scoreAI, roundTime, tagCooldown, lastTagPair, running;
+
+function spawnInsideIsland() {
+  for (let i = 0; i < 200; i++) {
+    const x = 60 + Math.random() * (W - 120);
+    const y = 60 + Math.random() * (H - 120);
+    if (pointInIsland(x, y, 25)) return {x, y};
+  }
+  return {x: W/2, y: H/2};
+}
+
+function newRound(keepScores=true) {
+  const s = spawnInsideIsland();
+  player = makeEntity({
+    x: s.x, y: s.y, r: 14, speed: 190,
+    isPlayer: true, isIt: Math.random() < 0.5,
+  });
+  ais = [];
+  const n = 3 + Math.floor(Math.random() * 2); // 3 or 4
+  for (let i = 0; i < n; i++) {
+    const p = spawnInsideIsland();
+    ais.push(makeEntity({
+      x: p.x, y: p.y, r: 14,
+      speed: 135 + Math.random() * 30,
+      isIt: false,
+    }));
+  }
+  // If player isn't it, pick one AI to be it
+  if (!player.isIt) {
+    ais[Math.floor(Math.random() * ais.length)].isIt = true;
+  }
+  roundTime = 0;
+  tagCooldown = 1.0; // grace period at start
+  lastTagPair = null;
+  running = true;
+  if (!keepScores) { scoreYou = 0; scoreAI = 0; }
+}
+
+scoreYou = 0; scoreAI = 0;
+
+// ----- Input -----
+const keys = {};
+window.addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === "r") newRound(true);
+});
+window.addEventListener("keyup", e => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+canvas.addEventListener("mousedown", e => {
+  if (!running) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+  teleport(player, mx, my);
+});
+
+function teleport(entity, x, y) {
+  const clamped = clampToIsland(x, y, 16);
+  entity.x = clamped.x;
+  entity.y = clamped.y;
+  entity.flashUntil = performance.now() + 300;
+}
+
+// AI occasional teleport
+function maybeAITeleport(ai, dt) {
+  ai.teleportCooldown -= dt;
+  if (ai.teleportCooldown > 0) return;
+  // base chance per second
+  const baseChance = ai.isIt ? 0.25 : 0.35;
+  if (Math.random() < baseChance * dt * 4) {
+    // if it: teleport near closest target
+    // if runner: teleport away from chaser
+    let tx, ty;
+    if (ai.isIt) {
+      const targets = [player, ...ais.filter(a => a !== ai && !a.isIt)];
+      // pick nearest runner
+      let best = null, bd = Infinity;
+      for (const t of targets) {
+        const d = Math.hypot(t.x - ai.x, t.y - ai.y);
+        if (d < bd) { bd = d; best = t; }
+      }
+      if (best) {
+        const angle = Math.random() * Math.PI * 2;
+        tx = best.x + Math.cos(angle) * (80 + Math.random() * 80);
+        ty = best.y + Math.sin(angle) * (80 + Math.random() * 80);
+      }
+    } else {
+      // runner: teleport away from "it"
+      const chaser = [player, ...ais].find(e => e.isIt);
+      if (chaser) {
+        const dx = ai.x - chaser.x, dy = ai.y - chaser.y;
+        const dl = Math.hypot(dx, dy) || 1;
+        tx = chaser.x + (dx/dl) * 280 + (Math.random()-0.5) * 100;
+        ty = chaser.y + (dy/dl) * 280 + (Math.random()-0.5) * 100;
+      }
+    }
+    if (tx !== undefined) {
+      teleport(ai, tx, ty);
+      ai.teleportCooldown = 2.5 + Math.random() * 2.0;
+    }
+  }
+}
+
+// ----- Game loop -----
+let lastT = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+  if (running) update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function update(dt) {
+  roundTime += dt;
+  tagCooldown = Math.max(0, tagCooldown - dt);
+
+  // Player movement
+  let dx = 0, dy = 0;
+  if (keys["w"] || keys["arrowup"]) dy -= 1;
+  if (keys["s"] || keys["arrowdown"]) dy += 1;
+  if (keys["a"] || keys["arrowleft"]) dx -= 1;
+  if (keys["d"] || keys["arrowright"]) dx += 1;
+  if (dx || dy) {
+    const l = Math.hypot(dx, dy);
+    dx /= l; dy /= l;
+    const nx = player.x + dx * player.speed * dt;
+    const ny = player.y + dy * player.speed * dt;
+    const c = clampToIsland(nx, ny, 14);
+    player.x = c.x; player.y = c.y;
+  }
+
+  // AI behavior
+  for (const ai of ais) {
+    maybeAITeleport(ai, dt);
+    let tx = 0, ty = 0;
+    if (ai.isIt) {
+      // chase nearest runner
+      const targets = [player, ...ais.filter(a => a !== ai)];
+      let best = null, bd = Infinity;
+      for (const t of targets) {
+        const d = Math.hypot(t.x - ai.x, t.y - ai.y);
+        if (d < bd) { bd = d; best = t; }
+      }
+      if (best) {
+        tx = best.x - ai.x;
+        ty = best.y - ai.y;
+      }
+    } else {
+      // flee from "it"
+      const chaser = [player, ...ais].find(e => e.isIt);
+      if (chaser) {
+        tx = ai.x - chaser.x;
+        ty = ai.y - chaser.y;
+        // add a wander component
+        ai.wanderTimer -= dt;
+        if (ai.wanderTimer <= 0) {
+          const a = Math.random() * Math.PI * 2;
+          ai.wanderDir = {x: Math.cos(a), y: Math.sin(a)};
+          ai.wanderTimer = 0.7 + Math.random() * 1.2;
+        }
+        tx += ai.wanderDir.x * 60;
+        ty += ai.wanderDir.y * 60;
+      }
+    }
+    const l = Math.hypot(tx, ty) || 1;
+    const nx = ai.x + (tx/l) * ai.speed * dt;
+    const ny = ai.y + (ty/l) * ai.speed * dt;
+    const c = clampToIsland(nx, ny, 14);
+    ai.x = c.x; ai.y = c.y;
+  }
+
+  // Tag detection
+  if (tagCooldown <= 0) {
+    const all = [player, ...ais];
+    const it = all.find(e => e.isIt);
+    if (it) {
+      for (const e of all) {
+        if (e === it) continue;
+        const d = Math.hypot(e.x - it.x, e.y - it.y);
+        if (d < e.r + it.r - 2) {
+          // tag!
+          if (it.isPlayer) {
+            scoreYou++;
+          } else if (e.isPlayer) {
+            scoreAI++;
+          }
+          it.isIt = false;
+          e.isIt = true;
+          e.flashUntil = performance.now() + 400;
+          tagCooldown = 1.2;
+          // bump apart so they don't instantly re-tag
+          const bx = e.x - it.x, by = e.y - it.y;
+          const bl = Math.hypot(bx, by) || 1;
+          const pushed = clampToIsland(e.x + (bx/bl) * 40, e.y + (by/bl) * 40, 14);
+          e.x = pushed.x; e.y = pushed.y;
+          break;
+        }
+      }
+    }
+  }
+}
+
+// ----- Drawing -----
+function draw() {
+  // water
+  ctx.fillStyle = "#1a2e4a";
+  ctx.fillRect(0, 0, W, H);
+
+  // subtle water ripples
+  ctx.strokeStyle = "rgba(255,255,255,0.04)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath();
+    const y = ((performance.now() / 50 + i * 110) % (H + 40)) - 20;
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y + 6);
+    ctx.stroke();
+  }
+
+  // Island outline (sand rim)
+  ctx.beginPath();
+  const pts = ISLAND;
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+  ctx.fillStyle = "#d9c997"; // sand
+  ctx.fill();
+
+  // Inner grass (slightly shrunk polygon)
+  ctx.save();
+  ctx.translate(W/2, H/2);
+  ctx.scale(0.93, 0.93);
+  ctx.translate(-W/2, -H/2);
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+  ctx.fillStyle = "#7ab66a";
+  ctx.fill();
+  ctx.restore();
+
+  // scenery
+  for (const s of SCENERY) {
+    if (s.type === "lake") {
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, s.rx, s.ry, 0, 0, Math.PI*2);
+      ctx.fillStyle = "#4aa3d9";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.25)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    } else if (s.type === "tree") {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y + 2, s.r, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(0,0,0,0.15)";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = "#3e7a3a";
+      ctx.fill();
+    } else if (s.type === "rock") {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = "#7c8594";
+      ctx.fill();
+    }
+  }
+
+  // Entities
+  drawEntity(player, true);
+  for (const ai of ais) drawEntity(ai, false);
+
+  // "IT" indicator above whoever's it
+  const it = [player, ...ais].find(e => e.isIt);
+  if (it) {
+    ctx.fillStyle = "#ff6b6b";
+    ctx.font = "bold 12px -apple-system, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("IT", it.x, it.y - it.r - 8);
+  }
+
+  // HUD updates
+  document.getElementById("scoreYou").textContent = scoreYou;
+  document.getElementById("scoreAI").textContent = scoreAI;
+  document.getElementById("timer").textContent = roundTime.toFixed(1);
+  const st = document.getElementById("status");
+  if (player.isIt) {
+    st.textContent = "You're IT — catch them!";
+    st.className = "big you-it";
+  } else {
+    st.textContent = "Run! Don't get tagged.";
+    st.className = "big you-runner";
+  }
+}
+
+function drawEntity(e, isPlayer) {
+  // Flash (recently teleported or tagged)
+  const flashing = performance.now() < e.flashUntil;
+  if (flashing) {
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.r + 8, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.fill();
+  }
+
+  // shadow
+  ctx.beginPath();
+  ctx.ellipse(e.x, e.y + e.r - 2, e.r * 0.9, e.r * 0.35, 0, 0, Math.PI*2);
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.fill();
+
+  // body
+  ctx.beginPath();
+  ctx.arc(e.x, e.y, e.r, 0, Math.PI*2);
+  if (e.isIt) {
+    ctx.fillStyle = "#ff6b6b";
+  } else if (isPlayer) {
+    ctx.fillStyle = "#6bdc88";
+  } else {
+    ctx.fillStyle = "#e6d36b";
+  }
+  ctx.fill();
+
+  // outline (player gets thicker)
+  ctx.lineWidth = isPlayer ? 2.5 : 1.5;
+  ctx.strokeStyle = isPlayer ? "#ffffff" : "rgba(0,0,0,0.35)";
+  ctx.stroke();
+
+  // player ring
+  if (isPlayer) {
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.r + 4, 0, Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+// ----- Start / overlay -----
+document.getElementById("startBtn").addEventListener("click", () => {
+  document.getElementById("overlay").classList.add("hidden");
+  newRound(false);
+  lastT = performance.now();
+  requestAnimationFrame(loop);
+});
+
+// Initialize but don't start until button press
+newRound(false);
+running = false;
+draw();
+</script>
+</body>
+</html>

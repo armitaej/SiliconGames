@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏫 School Game!</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Comic Sans MS', 'Chalkboard SE', 'Arial Rounded MT Bold', cursive;
+  background: #87CEEB;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ---- SCREENS ---- */
+.screen { display: none; min-height: 100vh; padding: 20px; text-align: center; }
+.screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+/* ---- HOME ---- */
+#home-screen {
+  background: linear-gradient(180deg, #64B5F6 0%, #A5D6A7 65%, #8D6E63 100%);
+}
+
+.school-building {
+  font-size: 5em;
+  line-height: 1;
+  margin-bottom: 5px;
+  animation: bounce 2s infinite;
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+
+.school-title {
+  font-size: 2.8em;
+  color: #fff;
+  text-shadow: 3px 3px 0 #E65100, -1px -1px 0 #E65100;
+  margin-bottom: 6px;
+}
+.school-subtitle {
+  font-size: 1.1em;
+  color: #fff;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.4);
+  margin-bottom: 14px;
+}
+.stars-bar {
+  background: rgba(255,255,255,0.85);
+  border: 3px solid #FFC107;
+  border-radius: 20px;
+  padding: 8px 24px;
+  font-size: 1.2em;
+  color: #E65100;
+  font-weight: bold;
+  margin-bottom: 14px;
+  box-shadow: 2px 2px 0 #E65100;
+}
+
+/* ---- DIFFICULTY SELECTOR ---- */
+.diff-label {
+  font-size: 1em;
+  color: #fff;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+.diff-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+  max-width: 400px;
+  width: 100%;
+}
+.diff-btn {
+  flex: 1;
+  padding: 12px 6px;
+  border: 3px solid #333;
+  border-radius: 16px;
+  font-size: 1em;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 3px 3px 0 #333;
+  transition: all 0.15s;
+  background: rgba(255,255,255,0.75);
+  font-weight: bold;
+}
+.diff-btn:hover { transform: translateY(-3px); box-shadow: 3px 6px 0 #333; }
+.diff-btn.selected {
+  transform: translateY(-3px);
+  box-shadow: 3px 6px 0 #333;
+}
+#btn-easy.selected   { background: #C8E6C9; border-color: #2E7D32; }
+#btn-medium.selected { background: #FFF9C4; border-color: #F9A825; }
+#btn-hard.selected   { background: #FFCDD2; border-color: #C62828; }
+
+/* ---- SUBJECTS GRID ---- */
+.subjects-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  max-width: 680px;
+  width: 100%;
+}
+.subject-btn {
+  border: 4px solid #333;
+  border-radius: 22px;
+  padding: 16px 10px 12px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 4px 4px 0 #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.subject-btn:hover  { transform: translateY(-5px); box-shadow: 4px 9px 0 #333; }
+.subject-btn:active { transform: translateY(2px);  box-shadow: 2px 2px 0 #333; }
+.subject-emoji { font-size: 2.6em; line-height: 1; }
+.subject-name  { font-size: 0.82em; font-weight: bold; color: #333; }
+
+/* ---- GAME SCREEN ---- */
+#game-screen { background: #FFF8F0; }
+
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 640px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.back-btn {
+  background: #EF5350;
+  color: #fff;
+  border: 3px solid #333;
+  border-radius: 14px;
+  padding: 10px 18px;
+  font-size: 1em;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 3px 3px 0 #333;
+  transition: transform 0.1s;
+}
+.back-btn:hover { transform: translateY(-2px); }
+
+.game-title-label { font-size: 1.5em; color: #333; font-weight: bold; }
+
+.badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.score-badge {
+  background: #FFF9C4;
+  border: 3px solid #F9A825;
+  border-radius: 14px;
+  padding: 7px 14px;
+  font-size: 0.95em;
+  color: #E65100;
+  font-weight: bold;
+}
+.diff-badge {
+  border-radius: 14px;
+  padding: 7px 14px;
+  font-size: 0.95em;
+  font-weight: bold;
+  border: 3px solid #333;
+}
+.diff-badge.easy   { background: #C8E6C9; color: #2E7D32; border-color: #2E7D32; }
+.diff-badge.medium { background: #FFF9C4; color: #E65100; border-color: #F9A825; }
+.diff-badge.hard   { background: #FFCDD2; color: #C62828; border-color: #C62828; }
+
+/* ---- GAME AREA ---- */
+.game-area {
+  background: #fff;
+  border: 4px solid #333;
+  border-radius: 28px;
+  padding: 28px 24px;
+  max-width: 640px;
+  width: 100%;
+  box-shadow: 5px 5px 0 #333;
+}
+.question-text {
+  font-size: 1.5em;
+  color: #333;
+  margin-bottom: 22px;
+  line-height: 1.5;
+}
+.options-grid {
+  display: grid;
+  gap: 14px;
+}
+.options-grid.cols-1 { grid-template-columns: 1fr; }
+.options-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+
+.option-btn {
+  background: #E3F2FD;
+  border: 3px solid #1E88E5;
+  border-radius: 16px;
+  padding: 18px 12px;
+  font-size: 1.3em;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  box-shadow: 3px 3px 0 #1E88E5;
+  line-height: 1.3;
+}
+.option-btn:hover:not(:disabled) { background: #BBDEFB; transform: translateY(-3px); box-shadow: 3px 6px 0 #1E88E5; }
+.option-btn.correct { background: #C8E6C9; border-color: #2E7D32; box-shadow: 3px 3px 0 #2E7D32; }
+.option-btn.wrong   { background: #FFCDD2; border-color: #C62828; box-shadow: 3px 3px 0 #C62828; }
+
+.feedback-text {
+  font-size: 1.7em;
+  margin: 16px 0 8px;
+  min-height: 48px;
+}
+.next-btn {
+  background: #43A047;
+  color: #fff;
+  border: 3px solid #333;
+  border-radius: 16px;
+  padding: 14px 36px;
+  font-size: 1.1em;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 4px 4px 0 #333;
+  display: none;
+  transition: transform 0.15s;
+}
+.next-btn:hover { transform: translateY(-3px); }
+
+/* ---- GYM ---- */
+.gym-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.timer-track {
+  width: 100%; background: #E0E0E0; border-radius: 12px;
+  height: 22px; border: 2px solid #333; overflow: hidden;
+}
+.timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF7043, #FFD740);
+  transition: width 0.25s linear;
+  border-radius: 10px;
+}
+.click-ball {
+  font-size: 5em; cursor: pointer; transition: transform 0.08s;
+  display: inline-block; user-select: none; line-height: 1;
+}
+.click-ball:active { transform: scale(0.8) !important; }
+.big-count { font-size: 3.5em; font-weight: bold; color: #333; }
+
+/* ---- ART ---- */
+.color-circle {
+  width: 90px; height: 90px; border-radius: 50%; border: 4px solid #333;
+  cursor: pointer; transition: transform 0.15s; font-size: 1.6em;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 3px 3px 0 #333; flex-direction: column; gap: 2px;
+}
+.color-circle:hover:not(:disabled) { transform: scale(1.15); }
+.color-circle:disabled { opacity: 0.7; cursor: default; }
+.color-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin: 12px 0; }
+.mix-bowl {
+  width: 110px; height: 110px; border-radius: 50%; border: 4px solid #333;
+  margin: 10px auto; display: flex; align-items: center; justify-content: center;
+  font-size: 2.2em; box-shadow: 3px 3px 0 #333; background: #f5f5f5;
+  transition: background 0.4s;
+}
+
+/* ---- RESULT ---- */
+#result-screen { background: linear-gradient(135deg, #FFD740 0%, #FF6F00 100%); }
+.result-title { font-size: 3em; color: #fff; text-shadow: 3px 3px 0 #333; margin-bottom: 12px; }
+.result-stars { font-size: 3.2em; margin-bottom: 14px; }
+.result-msg   { font-size: 1.4em; color: #fff; margin-bottom: 24px; text-shadow: 1px 1px 0 rgba(0,0,0,0.3); }
+.big-btn {
+  background: #fff; color: #333; border: 4px solid #333; border-radius: 20px;
+  padding: 15px 36px; font-size: 1.2em; cursor: pointer; font-family: inherit;
+  box-shadow: 5px 5px 0 #333; margin: 8px; transition: transform 0.15s;
+}
+.big-btn:hover { transform: translateY(-4px); }
+
+/* ---- CONFETTI ---- */
+.confetti-bit {
+  position: fixed; border-radius: 2px; pointer-events: none;
+  z-index: 9999; animation: cffall linear forwards;
+}
+@keyframes cffall {
+  0%   { transform: translateY(-20px) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(105vh)  rotate(720deg); opacity: 0; }
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 520px) {
+  .subjects-grid { grid-template-columns: repeat(2, 1fr); }
+  .school-title  { font-size: 2em; }
+  .subject-emoji { font-size: 2em; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== HOME SCREEN ===================== -->
+<div id="home-screen" class="screen active">
+  <div class="school-building">🏫</div>
+  <div class="school-title">School Game!</div>
+  <div class="school-subtitle">Pick a subject and learn something fun!</div>
+  <div class="stars-bar" id="total-stars-bar">⭐ Total Stars: 0</div>
+
+  <div class="diff-label">Choose your level:</div>
+  <div class="diff-row">
+    <button class="diff-btn" id="btn-easy"   onclick="setDiff('easy')">🟢 Easy</button>
+    <button class="diff-btn" id="btn-medium" onclick="setDiff('medium')">🟡 Medium</button>
+    <button class="diff-btn" id="btn-hard"   onclick="setDiff('hard')">🔴 Hard</button>
+  </div>
+
+  <div class="subjects-grid">
+    <button class="subject-btn" onclick="startSubject('math')"       style="background:#FFF9C4;">
+      <span class="subject-emoji">➕</span><span class="subject-name">Math</span>
+    </button>
+    <button class="subject-btn" onclick="startSubject('reading')"    style="background:#E3F2FD;">
+      <span class="subject-emoji">📚</span><span class="subject-name">Reading</span>
+    </button>
+    <button class="subject-btn" onclick="startSubject('gym')"        style="background:#E8F5E9;">
+      <span class="subject-emoji">⚽</span><span class="subject-name">Gym</span>
+    </button>
+    <button class="subject-btn" onclick="startSubject('music')"      style="background:#F3E5F5;">
+      <span class="subject-emoji">🎵</span><span class="subject-name">Music</span>
+    </button>
+    <button class="subject-btn" onclick="startSubject('science')"    style="background:#E0F7FA;">
+      <span class="subject-emoji">🔬</span><span class="subject-name">Science</span>
+    </button>
+    <button class="subject-btn" onclick="startSubject('library')"    style="background:#FFF3E0;">
+      <span class="subject-emoji">📖</span><span class="subject-name">Library</span>
+    </button>
+    <button class="subject-btn" onclick="startSubject('technology')" style="background:#E8EAF6;">
+      <span class="subject-emoji">💻</span><span class="subject-name">Technology</span>
+    </button>
+    <button class="subject-btn" onclick="startSubject('art')"        style="background:#FCE4EC;">
+      <span class="subject-emoji">🎨</span><span class="subject-name">Art</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===================== GAME SCREEN ===================== -->
+<div id="game-screen" class="screen">
+  <div class="game-header">
+    <button class="back-btn" onclick="goHome()">🏠 Home</button>
+    <div class="game-title-label" id="game-title-label">Math</div>
+    <div class="badges">
+      <div class="diff-badge" id="diff-badge">🟢 Easy</div>
+      <div class="score-badge" id="score-badge">⭐ 0 / 5</div>
+    </div>
+  </div>
+  <div class="game-area" id="game-area"></div>
+</div>
+
+<!-- ===================== RESULT SCREEN ===================== -->
+<div id="result-screen" class="screen">
+  <div class="result-title" id="res-title">Amazing! 🌟</div>
+  <div class="result-stars" id="res-stars">⭐⭐⭐⭐⭐</div>
+  <div class="result-msg"   id="res-msg">You got 5 out of 5!</div>
+  <button class="big-btn" onclick="replaySubject()">🔄 Play Again</button>
+  <button class="big-btn" onclick="goHome()">🏠 Choose Subject</button>
+</div>
+
+<script>
+// =========================================================
+//  STATE
+// =========================================================
+let totalStars  = 0;
+let curSubject  = '';
+let curScore    = 0;
+let curQuestion = 0;
+let difficulty  = 'easy';
+const TOTAL_Q   = 5;
+
+let gymTimer = null, gymCount = 0, gymSecs = 10, gymGoing = false;
+let artIdx = 0, artScore = 0;
+
+// =========================================================
+//  DIFFICULTY
+// =========================================================
+const DIFF_CONFIG = {
+  easy:   { secs: 10, gymThresh: [3,8,15,25,40],  artChoices: 2, label: '🟢 Easy',   cls: 'easy'   },
+  medium: { secs: 15, gymThresh: [5,12,22,35,50],  artChoices: 4, label: '🟡 Medium', cls: 'medium' },
+  hard:   { secs: 20, gymThresh: [8,18,32,50,70],  artChoices: 4, label: '🔴 Hard',   cls: 'hard'   },
+};
+
+function setDiff(d) {
+  difficulty = d;
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('btn-' + d).classList.add('selected');
+}
+
+// =========================================================
+//  AUDIO
+// =========================================================
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function beep(freqs, type = 'sine', vol = 0.28) {
+  try {
+    const ctx = getCtx();
+    freqs.forEach(([f], i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(vol, ctx.currentTime + i * 0.13);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.13 + 0.28);
+      o.start(ctx.currentTime + i * 0.13);
+      o.stop(ctx.currentTime + i * 0.13 + 0.3);
+    });
+  } catch(_) {}
+}
+const playCorrect = () => beep([[523],[659],[784]]);
+const playWrong   = () => beep([[200],[180]], 'sawtooth', 0.18);
+const playTap     = () => beep([[900]], 'sine', 0.12);
+
+// =========================================================
+//  SCREENS
+// =========================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goHome() {
+  clearGymTimer();
+  updateStarsBar();
+  showScreen('home-screen');
+}
+function updateStarsBar() {
+  document.getElementById('total-stars-bar').textContent = '⭐ Total Stars: ' + totalStars;
+}
+
+// =========================================================
+//  SUBJECTS
+// =========================================================
+const SUBJECTS = {
+  math:       { label: '➕ Math Class',      color: '#FFF9C4', type: 'quiz', gen: mathQ     },
+  reading:    { label: '📚 Reading Class',    color: '#E3F2FD', type: 'quiz', gen: readingQ  },
+  gym:        { label: '⚽ Gym Class',        color: '#E8F5E9', type: 'gym'                  },
+  music:      { label: '🎵 Music Class',      color: '#F3E5F5', type: 'quiz', gen: musicQ   },
+  science:    { label: '🔬 Science Class',    color: '#E0F7FA', type: 'quiz', gen: scienceQ },
+  library:    { label: '📖 Library',          color: '#FFF3E0', type: 'quiz', gen: libraryQ },
+  technology: { label: '💻 Technology Class', color: '#E8EAF6', type: 'quiz', gen: techQ    },
+  art:        { label: '🎨 Art Class',        color: '#FCE4EC', type: 'art'                 },
+};
+
+function startSubject(s) {
+  curSubject  = s; curScore = 0; curQuestion = 0;
+  artIdx = 0; artScore = 0;
+
+  const sub  = SUBJECTS[s];
+  const dcfg = DIFF_CONFIG[difficulty];
+
+  document.getElementById('game-title-label').textContent = sub.label;
+  document.getElementById('game-area').style.background   = sub.color;
+  document.getElementById('score-badge').textContent = '⭐ 0 / ' + TOTAL_Q;
+
+  const db = document.getElementById('diff-badge');
+  db.textContent = dcfg.label;
+  db.className   = 'diff-badge ' + dcfg.cls;
+
+  showScreen('game-screen');
+
+  if      (sub.type === 'quiz') showQuizQuestion();
+  else if (sub.type === 'gym')  initGym();
+  else if (sub.type === 'art')  initArt();
+}
+
+function replaySubject() { startSubject(curSubject); }
+
+// =========================================================
+//  QUIZ ENGINE
+// =========================================================
+function showQuizQuestion() {
+  if (curQuestion >= TOTAL_Q) { endGame(); return; }
+
+  const { question, options, correct } = SUBJECTS[curSubject].gen(curQuestion);
+  const cols = options.length <= 2 ? 'cols-1' : 'cols-2';
+
+  document.getElementById('game-area').innerHTML = `
+    <div class="question-text">${question}</div>
+    <div class="options-grid ${cols}">
+      ${options.map((o, i) => `
+        <button class="option-btn" onclick="checkQuiz(${i},${correct},this)">${o}</button>
+      `).join('')}
+    </div>
+    <div class="feedback-text" id="fb"></div>
+    <button class="next-btn" id="nxt" onclick="nextQuizQ()">
+      ${curQuestion < TOTAL_Q - 1 ? 'Next ➡️' : 'See Results! 🎉'}
+    </button>
+  `;
+}
+
+function checkQuiz(chosen, correct, btn) {
+  document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+  const fb  = document.getElementById('fb');
+  const nxt = document.getElementById('nxt');
+
+  if (chosen === correct) {
+    btn.classList.add('correct');
+    fb.textContent = ['Great job! 🌟','You got it! 🎉','Awesome! ⭐','Wow! 👏','Amazing! 🥳'][Math.floor(Math.random()*5)];
+    curScore++;
+    document.getElementById('score-badge').textContent = '⭐ ' + curScore + ' / ' + TOTAL_Q;
+    playCorrect();
+  } else {
+    btn.classList.add('wrong');
+    document.querySelectorAll('.option-btn')[correct].classList.add('correct');
+    fb.textContent = 'Good try! 💪';
+    playWrong();
+  }
+  nxt.style.display = 'inline-block';
+}
+
+function nextQuizQ() { curQuestion++; showQuizQuestion(); }
+
+// =========================================================
+//  END GAME
+// =========================================================
+function endGame(score) {
+  const s = (score !== undefined) ? score : curScore;
+  totalStars += s;
+  updateStarsBar();
+
+  const pct = s / TOTAL_Q;
+  let title, stars;
+  if      (pct >= 0.8) { title = 'Amazing! 🌟';        stars = '⭐⭐⭐⭐⭐'; setTimeout(confetti, 100); playCorrect(); }
+  else if (pct >= 0.6) { title = 'Great Job! 🎉';       stars = '⭐⭐⭐⭐';  setTimeout(confetti, 100); }
+  else if (pct >= 0.4) { title = 'Good Try! 💪';        stars = '⭐⭐⭐'; }
+  else                 { title = 'Keep Practicing! 🏫'; stars = '⭐⭐'; }
+
+  document.getElementById('res-title').textContent = title;
+  document.getElementById('res-stars').textContent = stars;
+  document.getElementById('res-msg').textContent   = 'You got ' + s + ' out of ' + TOTAL_Q + '!';
+  showScreen('result-screen');
+}
+
+// =========================================================
+//  GYM
+// =========================================================
+function initGym() {
+  gymCount = 0; gymGoing = false;
+  gymSecs  = DIFF_CONFIG[difficulty].secs;
+  clearGymTimer();
+
+  const hints = { easy: 'Just tap the ball!', medium: 'Tap fast! ⚡', hard: 'GO GO GO! 🔥' };
+  document.getElementById('game-area').innerHTML = `
+    <div class="gym-wrap">
+      <div style="font-size:1.2em;color:#333;">Tap the ball as fast as you can! 🏃</div>
+      <div style="font-size:0.95em;color:#666;margin-top:-6px;">${hints[difficulty]}</div>
+      <div class="timer-track"><div class="timer-fill" id="gym-bar"></div></div>
+      <div style="font-size:1em;color:#666;" id="gym-time">⏱️ ${gymSecs} seconds</div>
+      <div class="big-count" id="gym-count">0</div>
+      <div style="color:#999;font-size:0.9em;">taps!</div>
+      <span class="click-ball" id="gym-ball" onclick="tapBall()">⚽</span>
+      <div style="font-size:1em;color:#888;" id="gym-msg">Tap the ball to start!</div>
+    </div>
+  `;
+}
+
+function tapBall() {
+  playTap();
+  const totalSecs = DIFF_CONFIG[difficulty].secs;
+
+  if (!gymGoing) {
+    gymGoing = true;
+    document.getElementById('gym-msg').textContent = 'Keep going! 💪';
+    gymTimer = setInterval(() => {
+      gymSecs--;
+      const pct = (gymSecs / totalSecs) * 100;
+      const bar = document.getElementById('gym-bar');
+      const tEl = document.getElementById('gym-time');
+      if (bar) bar.style.width = pct + '%';
+      if (tEl) tEl.textContent = '⏱️ ' + gymSecs + ' second' + (gymSecs !== 1 ? 's' : '');
+      if (gymSecs <= 0) { clearGymTimer(); gymFinish(); }
+    }, 1000);
+  }
+
+  if (gymGoing && gymSecs > 0) {
+    gymCount++;
+    const el   = document.getElementById('gym-count');
+    const ball = document.getElementById('gym-ball');
+    if (el)   el.textContent = gymCount;
+    if (ball) {
+      ball.style.transform = 'scale(0.82) rotate(' + (gymCount * 18) + 'deg)';
+      setTimeout(() => { if (ball) ball.style.transform = 'scale(1) rotate(' + (gymCount * 18) + 'deg)'; }, 90);
+    }
+  }
+}
+
+function gymFinish() {
+  gymGoing = false;
+  const thresh = DIFF_CONFIG[difficulty].gymThresh;
+  let stars = 1;
+  if      (gymCount >= thresh[4]) stars = 5;
+  else if (gymCount >= thresh[3]) stars = 4;
+  else if (gymCount >= thresh[2]) stars = 3;
+  else if (gymCount >= thresh[1]) stars = 2;
+  else                            stars = 1;
+
+  const msgs = ['🙂 Nice try!','👍 Good effort!','⭐ Great job!','💪 Amazing speed!','🔥 Super athlete!'];
+  document.getElementById('game-area').innerHTML = `
+    <div style="font-size:1.4em;color:#333;margin-bottom:8px;">Time's up! ⏰</div>
+    <div style="font-size:1.1em;color:#555;">You tapped <strong>${gymCount}</strong> times!</div>
+    <div style="font-size:2.4em;margin:16px 0;">${'⭐'.repeat(stars)}</div>
+    <div style="font-size:1.2em;color:#2E7D32;">${msgs[stars-1]}</div>
+    <br>
+    <button class="next-btn" style="display:inline-block;" onclick="endGame(${stars})">See Results! 🎉</button>
+  `;
+  playCorrect(); confetti();
+}
+
+function clearGymTimer() { if (gymTimer) { clearInterval(gymTimer); gymTimer = null; } }
+
+// =========================================================
+//  ART
+// =========================================================
+const COLOR_MIXES = [
+  { n1:'Red',   n2:'Blue',   rn:'Purple', e1:'🔴', e2:'🔵', resE:'🟣', res:'#7B1FA2' },
+  { n1:'Red',   n2:'Yellow', rn:'Orange', e1:'🔴', e2:'🟡', resE:'🟠', res:'#E65100' },
+  { n1:'Blue',  n2:'Yellow', rn:'Green',  e1:'🔵', e2:'🟡', resE:'🟢', res:'#2E7D32' },
+  { n1:'Red',   n2:'White',  rn:'Pink',   e1:'🔴', e2:'⬜', resE:'🩷', res:'#F48FB1' },
+  { n1:'Black', n2:'White',  rn:'Gray',   e1:'⬛', e2:'⬜', resE:'🩶', res:'#9E9E9E' },
+];
+const ALL_COLORS = [
+  { color:'#E53935', e:'🔴', name:'Red'    },
+  { color:'#1E88E5', e:'🔵', name:'Blue'   },
+  { color:'#FDD835', e:'🟡', name:'Yellow' },
+  { color:'#7B1FA2', e:'🟣', name:'Purple' },
+  { color:'#E65100', e:'🟠', name:'Orange' },
+  { color:'#2E7D32', e:'🟢', name:'Green'  },
+  { color:'#F48FB1', e:'🩷', name:'Pink'   },
+  { color:'#9E9E9E', e:'🩶', name:'Gray'   },
+];
+// Extra tricky wrong answers for hard mode (similar hues)
+const HARD_WRONG = {
+  Purple: [{ color:'#4A148C', e:'🟣', name:'Dark Purple' },{ color:'#AD1457', e:'🟥', name:'Magenta' }],
+  Orange: [{ color:'#BF360C', e:'🔴', name:'Dark Red'    },{ color:'#F9A825', e:'🟡', name:'Gold'    }],
+  Green:  [{ color:'#1B5E20', e:'🟢', name:'Dark Green'  },{ color:'#00838F', e:'🔵', name:'Teal'    }],
+  Pink:   [{ color:'#AD1457', e:'🟥', name:'Hot Pink'    },{ color:'#EF9A9A', e:'🩷', name:'Peach'   }],
+  Gray:   [{ color:'#546E7A', e:'🩶', name:'Blue-Gray'   },{ color:'#A1887F', e:'🟫', name:'Tan'     }],
+};
+
+function initArt() { artIdx = 0; artScore = 0; showArtQ(); }
+
+function showArtQ() {
+  if (artIdx >= TOTAL_Q) { endGame(artScore); return; }
+  document.getElementById('score-badge').textContent = '⭐ ' + artScore + ' / ' + TOTAL_Q;
+
+  const mix     = COLOR_MIXES[artIdx % COLOR_MIXES.length];
+  const correct = ALL_COLORS.find(c => c.name === mix.rn);
+  const nChoices = DIFF_CONFIG[difficulty].artChoices;
+
+  let choices;
+  if (nChoices <= 2) {
+    // Easy: correct + 1 clearly wrong
+    const wrong = shuffle(ALL_COLORS.filter(c => c.name !== mix.rn))[0];
+    choices = shuffle([correct, wrong]);
+  } else if (difficulty === 'hard' && HARD_WRONG[mix.rn]) {
+    // Hard: use tricky similar wrong answers
+    const tricky = shuffle(HARD_WRONG[mix.rn]).slice(0, 2);
+    const other  = shuffle(ALL_COLORS.filter(c => c.name !== mix.rn))[0];
+    choices = shuffle([correct, ...tricky, other]);
+  } else {
+    // Medium: 4 random different wrong answers
+    const wrongs = shuffle(ALL_COLORS.filter(c => c.name !== mix.rn)).slice(0, 3);
+    choices = shuffle([correct, ...wrongs]);
+  }
+
+  document.getElementById('game-area').innerHTML = `
+    <div style="font-size:1.15em;color:#333;margin-bottom:5px;">🎨 What color do you get?</div>
+    <div style="font-size:1.05em;color:#555;margin-bottom:8px;">
+      Mix <strong>${mix.n1}</strong> ${mix.e1} + <strong>${mix.n2}</strong> ${mix.e2} = ?
+    </div>
+    <div class="mix-bowl" id="mix-bowl">❓</div>
+    <div style="font-size:0.9em;color:#999;margin-bottom:4px;">Pick the right color:</div>
+    <div class="color-row">
+      ${choices.map(c => `
+        <button class="color-circle" style="background:${c.color};"
+                onclick="checkArt('${c.name}','${mix.rn}','${mix.res}','${mix.resE}',this)">
+          <span>${c.e}</span>
+          <span style="font-size:0.38em;background:rgba(255,255,255,0.8);border-radius:6px;padding:1px 4px;color:#333;">${c.name}</span>
+        </button>`).join('')}
+    </div>
+    <div class="feedback-text" id="art-fb"></div>
+    <button class="next-btn" id="art-nxt" onclick="nextArtQ()">
+      ${artIdx < TOTAL_Q - 1 ? 'Next ➡️' : 'See Results! 🎉'}
+    </button>
+  `;
+  artIdx++;
+}
+
+function checkArt(chosen, correct, resColor, resEmoji, btn) {
+  document.querySelectorAll('.color-circle').forEach(b => b.disabled = true);
+  const bowl = document.getElementById('mix-bowl');
+  const fb   = document.getElementById('art-fb');
+  const nxt  = document.getElementById('art-nxt');
+  bowl.style.background = resColor;
+  bowl.textContent = resEmoji;
+  if (chosen === correct) {
+    btn.style.outline = '5px solid #2E7D32';
+    fb.textContent = "🌟 Correct! You're a color master!";
+    artScore++;
+    document.getElementById('score-badge').textContent = '⭐ ' + artScore + ' / ' + TOTAL_Q;
+    playCorrect();
+  } else {
+    btn.style.outline = '5px solid #C62828';
+    fb.textContent = "💡 It's " + correct + "! You'll get it next time!";
+    playWrong();
+  }
+  nxt.style.display = 'inline-block';
+}
+
+function nextArtQ() { showArtQ(); }
+
+// =========================================================
+//  QUESTION BANKS
+// =========================================================
+
+// ---------- MATH ----------
+function mathQ(n) {
+  const emojis = ['🍎','🌟','🐱','🦋','🍭','🌸','🎈','🐸'];
+
+  if (difficulty === 'easy') {
+    // Count 1-5, 2 choices
+    const num  = rnd(1, 5);
+    const e    = emojis[rnd(0, emojis.length-1)];
+    const wrong = num === 5 ? 4 : num + 1;
+    const opts  = shuffle([num, wrong]);
+    return {
+      question: `Count the ${e}:<br><span style="letter-spacing:5px;font-size:1.1em;">${e.repeat(num)}</span><br>How many?`,
+      options:  opts.map(String),
+      correct:  opts.indexOf(num)
+    };
+  }
+
+  if (difficulty === 'medium') {
+    if (n % 2 === 0) {
+      const num  = rnd(1, 8);
+      const e    = emojis[rnd(0, emojis.length-1)];
+      const opts = makeNums(num, 4);
+      return {
+        question: `Count the ${e}:<br><span style="letter-spacing:4px;">${e.repeat(num)}</span><br>How many?`,
+        options:  opts.map(String), correct: opts.indexOf(num)
+      };
+    } else {
+      const a = rnd(1,5), b = rnd(1,5), ans = a+b;
+      const opts = makeNums(ans, 4);
+      return { question: `What is ${a} + ${b}? 🔢`, options: opts.map(String), correct: opts.indexOf(ans) };
+    }
+  }
+
+  // Hard: mix of add, subtract, bigger numbers
+  const types = ['add','add','sub','add','sub'];
+  if (types[n] === 'add') {
+    const a = rnd(5,12), b = rnd(3,10), ans = a+b;
+    const opts = makeNums(ans, 4, 3);
+    return { question: `What is ${a} + ${b}? ➕`, options: opts.map(String), correct: opts.indexOf(ans) };
+  } else {
+    const b = rnd(2,8), a = rnd(b+1, b+10), ans = a-b;
+    const opts = makeNums(ans, 4, 2);
+    return { question: `What is ${a} − ${b}? ➖`, options: opts.map(String), correct: opts.indexOf(ans) };
+  }
+}
+
+// ---------- READING ----------
+const READ_EASY = [
+  { q:'Which one is a 🐱 cat?',  opts:['🐱 Cat','🐶 Dog'], ans:0 },
+  { q:'Which one is a ☀️ sun?',  opts:['🌙 Moon','☀️ Sun'], ans:1 },
+  { q:'Which one is a 🐸 frog?', opts:['🐸 Frog','🐦 Bird'], ans:0 },
+  { q:'Which one is an 🍎 apple?',opts:['🍌 Banana','🍎 Apple'], ans:1 },
+  { q:'Which one is a ⭐ star?',  opts:['⭐ Star','❤️ Heart'], ans:0 },
+];
+const READ_MEDIUM = [
+  { q:'Which animal starts with A?', opts:['🐊 Alligator','🐶 Dog','🐱 Cat','🐧 Penguin'], ans:0 },
+  { q:'Which animal starts with B?', opts:['🦁 Lion','🐻 Bear','🐸 Frog','🐬 Dolphin'],   ans:1 },
+  { q:'Which animal starts with E?', opts:['🐅 Tiger','🦊 Fox','🐟 Fish','🐘 Elephant'],   ans:3 },
+  { q:'Find the word that matches 🐱:', opts:['DOG','CAT','SUN','HAT'], ans:1 },
+  { q:'Find the word that matches ☀️:', opts:['MOON','STAR','SUN','SKY'], ans:2 },
+];
+const READ_HARD = [
+  { q:'Which word rhymes with CAT?', opts:['DOG','BAT','SUN','PIG'], ans:1 },
+  { q:'Which word rhymes with BIG?', opts:['CAT','HAT','PIG','DIG'], ans:3 },
+  { q:'Which letter comes after B?', opts:['A','D','C','B'], ans:2 },
+  { q:'Which word means the opposite of HOT?', opts:['WARM','BIG','COLD','FAST'], ans:2 },
+  { q:'How many letters in the word DOG?', opts:['2','3','4','5'], ans:1 },
+];
+function readingQ(n) {
+  const pool = difficulty === 'easy' ? READ_EASY : difficulty === 'medium' ? READ_MEDIUM : READ_HARD;
+  const q = pool[n % pool.length];
+  return { question: q.q, options: q.opts, correct: q.ans };
+}
+
+// ---------- MUSIC ----------
+const MUSIC_EASY = [
+  { q:'Is a 🎸 guitar a musical instrument?', opts:['Yes! 🎵','No ❌'], ans:0 },
+  { q:'Is a 🪨 rock a musical instrument?',   opts:['Yes! 🎵','No ❌'], ans:1 },
+  { q:'Is a 🎹 piano a musical instrument?',  opts:['Yes! 🎵','No ❌'], ans:0 },
+  { q:'Does music have a beat?',              opts:['Yes! 🥁','No ❌'], ans:0 },
+  { q:'Can you sing a song?',                 opts:['Yes! 🎤','No ❌'], ans:0 },
+];
+const MUSIC_MEDIUM = [
+  { q:'Which one makes music? 🎵',                   opts:['🎸 Guitar','🪨 Rock','📦 Box','🪣 Bucket'],         ans:0 },
+  { q:'Which instrument do you blow into?',          opts:['🥁 Drum','🎸 Guitar','🎺 Trumpet','🎹 Piano'],      ans:2 },
+  { q:'Which instrument has black & white keys? ⌨️', opts:['🎸 Guitar','🎹 Piano','🎻 Violin','🥁 Drum'],       ans:1 },
+  { q:'What makes a BOOM sound? 💥',                 opts:['🎹 Piano','🎸 Guitar','🥁 Drum','🎺 Trumpet'],      ans:2 },
+  { q:'What do you call a person who sings?',        opts:['🎨 Artist','🎤 Singer','📚 Reader','🔬 Scientist'], ans:1 },
+];
+const MUSIC_HARD = [
+  { q:'What do you call a group of musicians playing together?', opts:['A team','A band','A class','A club'], ans:1 },
+  { q:'Which instrument has strings you pluck?',  opts:['🥁 Drum','🎺 Trumpet','🎸 Guitar','🎹 Piano'], ans:2 },
+  { q:'What is it called when music gets louder?', opts:['Faster','Softer','Louder (crescendo)','Slower'], ans:2 },
+  { q:'How many beats are in most music bars?',   opts:['1','2','4','10'], ans:2 },
+  { q:'What do sheet music notes look like?',     opts:['🔴 Dots','🎵 Note shapes','⭐ Stars','🔶 Diamonds'], ans:1 },
+];
+function musicQ(n) {
+  const pool = difficulty === 'easy' ? MUSIC_EASY : difficulty === 'medium' ? MUSIC_MEDIUM : MUSIC_HARD;
+  const q = pool[n % pool.length];
+  return { question: q.q, options: q.opts, correct: q.ans };
+}
+
+// ---------- SCIENCE ----------
+const SCI_EASY = [
+  { q:'Does a fish live in water? 🐟', opts:['Yes! 💧','No ❌'], ans:0 },
+  { q:'Is the sun hot? ☀️',            opts:['Yes! 🔥','No ❌'], ans:0 },
+  { q:'Can a butterfly fly? 🦋',       opts:['Yes! ✈️','No ❌'], ans:0 },
+  { q:'Do plants need water to grow?', opts:['Yes! 💧','No ❌'], ans:0 },
+  { q:'Is the moon in the sky? 🌙',    opts:['Yes! ⭐','No ❌'], ans:0 },
+];
+const SCI_MEDIUM = [
+  { q:'Where does a fish live? 🐟',              opts:['🌳 Forest','🏔️ Mountain','💧 Water','🏜️ Desert'],     ans:2 },
+  { q:'What do plants need to grow? 🌱',         opts:['🍕 Pizza','☀️ Sunlight','🎮 Games','🎵 Music'],        ans:1 },
+  { q:'Which animal can fly? ✈️',               opts:['🐶 Dog','🐠 Fish','🦋 Butterfly','🐸 Frog'],           ans:2 },
+  { q:'What is the big bright star in the sky?', opts:['🌙 Moon','☀️ Sun','⭐ Night Star','🌈 Rainbow'],       ans:1 },
+  { q:'What do caterpillars turn into? 🐛',      opts:['🐸 Frogs','🐦 Birds','🦋 Butterflies','🐝 Bees'],      ans:2 },
+];
+const SCI_HARD = [
+  { q:'What do you call animals that eat only plants?',       opts:['Carnivores','Herbivores','Omnivores','Predators'], ans:1 },
+  { q:'How many legs does an insect have?',                   opts:['4','6','8','10'], ans:1 },
+  { q:'What gas do plants breathe in to make food?',          opts:['Oxygen','Hydrogen','Carbon dioxide','Nitrogen'], ans:2 },
+  { q:'What is the hardest natural substance on Earth? 💎',   opts:['Iron','Gold','Diamond','Rock'], ans:2 },
+  { q:'What kind of animal is a whale? 🐋',                   opts:['Fish','Reptile','Mammal','Bird'], ans:2 },
+];
+function scienceQ(n) {
+  const pool = difficulty === 'easy' ? SCI_EASY : difficulty === 'medium' ? SCI_MEDIUM : SCI_HARD;
+  const q = pool[n % pool.length];
+  return { question: q.q, options: q.opts, correct: q.ans };
+}
+
+// ---------- LIBRARY ----------
+const LIB_EASY = [
+  { q:'"Jack and Jill went up the ___" ⛰️',  opts:['Hill','Tree'], ans:0 },
+  { q:'"Twinkle twinkle little ___" ⭐',      opts:['Moon','Star'], ans:1 },
+  { q:'Is a library a place with books? 📚',  opts:['Yes! 📖','No ❌'], ans:0 },
+  { q:'"Humpty Dumpty sat on a ___"',          opts:['Wall','Chair'], ans:0 },
+  { q:'What do you do with a book? 📖',        opts:['Read it 📖','Eat it 🍕'], ans:0 },
+];
+const LIB_MEDIUM = [
+  { q:'Jack and Jill went up the ___ 🏔️',        opts:['🏠 House','⛰️ Hill','🌊 River','🌳 Tree'],              ans:1 },
+  { q:'Humpty Dumpty sat on a ___',               opts:['🪑 Chair','🌳 Tree','🧱 Wall','🎠 Ride'],               ans:2 },
+  { q:'What did the Big Bad Wolf do? 🐺',         opts:['🎵 Sang','🏃 Ran','💨 Blew the house down','😴 Slept'], ans:2 },
+  { q:'Where do you go to borrow books? 📚',      opts:['🏥 Hospital','📖 Library','🛒 Store','🏠 House'],        ans:1 },
+  { q:'"Twinkle twinkle little ___" 🌟',          opts:['🌙 Moon','☀️ Sun','⭐ Star','🌈 Rainbow'],              ans:2 },
+];
+const LIB_HARD = [
+  { q:'What is the MAIN character in a story called?', opts:['The setting','The plot','The protagonist','The chapter'], ans:2 },
+  { q:'What do you call the problem in a story?',      opts:['The title','The conflict','The author','The ending'],    ans:1 },
+  { q:'What is a story that is NOT real called?',      opts:['Non-fiction','A diary','Fiction','A newspaper'],         ans:2 },
+  { q:'What is the person who writes a book called?',  opts:['Illustrator','Editor','Publisher','Author'],             ans:3 },
+  { q:'What do you call a short funny poem?',          opts:['Novel','Limerick','Chapter','Paragraph'],                ans:1 },
+];
+function libraryQ(n) {
+  const pool = difficulty === 'easy' ? LIB_EASY : difficulty === 'medium' ? LIB_MEDIUM : LIB_HARD;
+  const q = pool[n % pool.length];
+  return { question: q.q, options: q.opts, correct: q.ans };
+}
+
+// ---------- TECHNOLOGY ----------
+const TECH_EASY = [
+  { q:'Is a 💻 laptop a computer?',  opts:['Yes! ✅','No ❌'], ans:0 },
+  { q:'Is a 📱 phone a technology?', opts:['Yes! ✅','No ❌'], ans:0 },
+  { q:'Is a 🪨 rock a computer?',    opts:['Yes! ✅','No ❌'], ans:1 },
+  { q:'Can a phone take pictures?',  opts:['Yes! 📸','No ❌'], ans:0 },
+  { q:'Does a computer need power?', opts:['Yes! ⚡','No ❌'], ans:0 },
+];
+const TECH_MEDIUM = [
+  { q:'Which one can you use to look things up? 🔍', opts:['🥁 Drum','💻 Computer','🎸 Guitar','📖 Storybook'], ans:1 },
+  { q:'Which one is a phone? 📱',                    opts:['🍎 Apple','📱 Phone','🖊️ Pencil','📦 Box'],          ans:1 },
+  { q:'What do you use to take pictures? 📸',        opts:['🎹 Piano','🪣 Bucket','📸 Camera','🎨 Paintbrush'], ans:2 },
+  { q:'How do you turn on a computer? ⏻',            opts:['Bang it','⏻ Power button','Add water','Sing to it'], ans:1 },
+  { q:'What is a robot? 🤖',                         opts:['A cookie','A machine that does tasks','A cloud','A plant'], ans:1 },
+];
+const TECH_HARD = [
+  { q:'What does "Wi-Fi" let you do?',               opts:['Watch TV','Connect to the internet','Cook food','Print books'], ans:1 },
+  { q:'What does a computer use to think? 🧠',       opts:['Memory card','Battery','CPU (processor)','Screen'], ans:2 },
+  { q:'What does "USB" stand for?',                  opts:['Ultra Speed Boot','Universal Serial Bus','Unique Software Block','User System Base'], ans:1 },
+  { q:'What is a computer program called?',          opts:['A book','Software','Hardware','A document'], ans:1 },
+  { q:'What does "www" stand for in a website?',     opts:['World Wide Web','Wild Wild West','Web Wide World','Work With Windows'], ans:0 },
+];
+function techQ(n) {
+  const pool = difficulty === 'easy' ? TECH_EASY : difficulty === 'medium' ? TECH_MEDIUM : TECH_HARD;
+  const q = pool[n % pool.length];
+  return { question: q.q, options: q.opts, correct: q.ans };
+}
+
+// =========================================================
+//  UTILS
+// =========================================================
+function rnd(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+function makeNums(correct, count, spread = 4) {
+  const set = new Set([correct]);
+  let attempts = 0;
+  while (set.size < count && attempts < 100) {
+    const c = Math.max(0, correct + rnd(-spread, spread));
+    if (c !== correct) set.add(c);
+    attempts++;
+  }
+  return shuffle([...set]);
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function confetti() {
+  const colors = ['#FF6F00','#FFD740','#43A047','#1E88E5','#E91E63','#9C27B0','#00BCD4'];
+  for (let i = 0; i < 50; i++) {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'confetti-bit';
+      el.style.cssText = `left:${Math.random()*100}vw;top:-14px;background:${colors[Math.floor(Math.random()*colors.length)]};animation-duration:${1.4+Math.random()*1.8}s;width:${6+Math.random()*8}px;height:${6+Math.random()*8}px;border-radius:${Math.random()>0.5?'50%':'2px'};`;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }, i * 55);
+  }
+}
+
+// =========================================================
+//  INIT
+// =========================================================
+setDiff('easy');
+</script>
+</body>
+</html>

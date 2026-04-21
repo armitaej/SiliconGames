@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON PERDITION — The Maze</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; cursor: none; }
+canvas { display: block; }
+#ui-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 10;
+}
+#hud {
+  position: fixed; top: 15px; left: 15px; color: #0ff; font-size: 14px;
+  text-shadow: 0 0 8px #0ff, 0 0 16px #08f; z-index: 20; pointer-events: none;
+  line-height: 1.8;
+}
+#minimap-container {
+  position: fixed; bottom: 15px; right: 15px; z-index: 20;
+  border: 1px solid rgba(0,255,255,0.3); box-shadow: 0 0 12px rgba(0,255,255,0.2);
+  pointer-events: none;
+}
+#title-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #000; z-index: 100; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; cursor: default;
+}
+#title-screen h1 {
+  font-size: 64px; color: #f0f; text-shadow: 0 0 20px #f0f, 0 0 40px #a0f, 0 0 80px #60f;
+  letter-spacing: 12px; margin-bottom: 10px; animation: flicker 3s infinite;
+}
+#title-screen h2 {
+  font-size: 22px; color: #0ff; text-shadow: 0 0 10px #0ff;
+  letter-spacing: 6px; margin-bottom: 50px;
+}
+#title-screen .info {
+  color: #888; font-size: 13px; line-height: 2; text-align: center;
+  margin-bottom: 40px;
+}
+#title-screen .info span { color: #ff0; text-shadow: 0 0 6px #ff0; }
+#start-btn {
+  padding: 15px 60px; font-size: 20px; font-family: 'Courier New', monospace;
+  background: transparent; color: #0f0; border: 2px solid #0f0;
+  cursor: pointer; letter-spacing: 4px;
+  text-shadow: 0 0 10px #0f0; box-shadow: 0 0 15px rgba(0,255,0,0.3);
+  transition: all 0.3s;
+}
+#start-btn:hover {
+  background: rgba(0,255,0,0.1); box-shadow: 0 0 30px rgba(0,255,0,0.5);
+}
+#game-over-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.92); z-index: 100; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+}
+#game-over-screen h1 { font-size: 56px; margin-bottom: 20px; letter-spacing: 8px; }
+#game-over-screen p { color: #888; font-size: 16px; margin-bottom: 30px; }
+#restart-btn {
+  padding: 12px 50px; font-size: 18px; font-family: 'Courier New', monospace;
+  background: transparent; color: #0ff; border: 2px solid #0ff;
+  cursor: pointer; letter-spacing: 4px;
+  text-shadow: 0 0 10px #0ff; box-shadow: 0 0 15px rgba(0,255,255,0.3);
+  transition: all 0.3s;
+}
+#restart-btn:hover {
+  background: rgba(0,255,255,0.1); box-shadow: 0 0 30px rgba(0,255,255,0.5);
+}
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  5% { opacity: 0.8; }
+  10% { opacity: 1; }
+  50% { opacity: 1; }
+  55% { opacity: 0.7; }
+  60% { opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+<div id="title-screen">
+  <h1>NEON PERDITION</h1>
+  <h2>THE MAZE</h2>
+  <div class="info">
+    <span>WASD / Arrow Keys</span> — Move<br>
+    <span>Mouse</span> — Click to move toward cursor<br>
+    <span>SHIFT</span> — Sprint (drains stamina)<br>
+    <span>SPACE</span> — Pulse (reveals area, limited uses)<br><br>
+    Collect <span>orbs</span> for points &amp; time bonuses<br>
+    Avoid <span>sentinels</span> — they hunt you<br>
+    Dodge <span>barriers</span> — they shift and block paths<br>
+    Reach the <span>EXIT</span> before time runs out
+  </div>
+  <button id="start-btn" onclick="startGame()">ENTER THE MAZE</button>
+</div>
+
+<div id="game-over-screen">
+  <h1 id="go-title">GAME OVER</h1>
+  <p id="go-message">You were consumed by the maze.</p>
+  <p id="go-stats"></p>
+  <button id="restart-btn" onclick="location.reload()">TRY AGAIN</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+<canvas id="minimapCanvas" id="minimap-container"></canvas>
+<div id="hud"></div>
+<div id="minimap-container"><canvas id="minimapCanvas2"></canvas></div>
+
+<script>
+// ===================== AUDIO ENGINE (Web Audio API) =====================
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+function initAudio() { audioCtx = new AudioCtx(); }
+
+function playTone(freq, dur, type = 'sine', vol = 0.1) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + dur);
+}
+
+function sfxCollect() { playTone(880, 0.15, 'sine', 0.12); setTimeout(() => playTone(1320, 0.12, 'sine', 0.1), 80); }
+function sfxHurt() { playTone(120, 0.3, 'sawtooth', 0.15); playTone(80, 0.4, 'square', 0.08); }
+function sfxPulse() { playTone(220, 0.5, 'sine', 0.08); playTone(440, 0.4, 'sine', 0.06); }
+function sfxStep() { playTone(60 + Math.random() * 30, 0.05, 'triangle', 0.03); }
+function sfxWin() { [523,659,784,1047].forEach((f,i) => setTimeout(() => playTone(f, 0.3, 'sine', 0.12), i * 150)); }
+function sfxAlarm() { playTone(300, 0.2, 'square', 0.06); setTimeout(() => playTone(200, 0.2, 'square', 0.06), 200); }
+
+// ===================== MAZE GENERATION =====================
+const COLS = 80, ROWS = 80; // massive maze
+const CELL = 40; // pixels per cell
+const WALL = 4;
+
+// Maze grid: each cell stores { n, s, e, w } walls (true = wall exists)
+let maze = [];
+function initMaze() {
+  maze = [];
+  for (let r = 0; r < ROWS; r++) {
+    maze[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      maze[r][c] = { n: true, s: true, e: true, w: true, visited: false };
+    }
+  }
+}
+
+function generateMaze() {
+  initMaze();
+  // Recursive backtracker (iterative stack version)
+  const stack = [];
+  let cr = 0, cc = 0;
+  maze[cr][cc].visited = true;
+  let visited = 1;
+  const total = ROWS * COLS;
+
+  while (visited < total) {
+    const neighbors = [];
+    if (cr > 0 && !maze[cr-1][cc].visited) neighbors.push([cr-1, cc, 'n', 's']);
+    if (cr < ROWS-1 && !maze[cr+1][cc].visited) neighbors.push([cr+1, cc, 's', 'n']);
+    if (cc > 0 && !maze[cr][cc-1].visited) neighbors.push([cr, cc-1, 'w', 'e']);
+    if (cc < COLS-1 && !maze[cr][cc+1].visited) neighbors.push([cr, cc+1, 'e', 'w']);
+
+    if (neighbors.length > 0) {
+      const [nr, nc, d1, d2] = neighbors[Math.floor(Math.random() * neighbors.length)];
+      stack.push([cr, cc]);
+      maze[cr][cc][d1] = false;
+      maze[nr][nc][d2] = false;
+      cr = nr; cc = nc;
+      maze[cr][cc].visited = true;
+      visited++;
+    } else {
+      [cr, cc] = stack.pop();
+    }
+  }
+
+  // Remove some extra walls to create loops (makes it harder to navigate — multiple paths, dead ends feel worse)
+  for (let i = 0; i < Math.floor(ROWS * COLS * 0.06); i++) {
+    const r = Math.floor(Math.random() * (ROWS - 2)) + 1;
+    const c = Math.floor(Math.random() * (COLS - 2)) + 1;
+    const dir = ['n','s','e','w'][Math.floor(Math.random() * 4)];
+    maze[r][c][dir] = false;
+    const opp = {n:'s',s:'n',e:'w',w:'e'}[dir];
+    const dr = dir === 'n' ? -1 : dir === 's' ? 1 : 0;
+    const dc = dir === 'w' ? -1 : dir === 'e' ? 1 : 0;
+    const nr = r + dr, nc = c + dc;
+    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) maze[nr][nc][opp] = false;
+  }
+}
+
+// ===================== GAME STATE =====================
+let canvas, ctx, minimapCanvas, minimapCtx;
+let gameRunning = false;
+let gameTime = 300; // seconds
+let score = 0;
+let pulses = 5;
+let stamina = 100;
+let staminaRecovery = true;
+let playerHealth = 3;
+let stepTimer = 0;
+let pulseEffect = 0; // radius of current pulse
+let pulseActive = false;
+let shakeTimer = 0;
+let shakeIntensity = 0;
+
+// Player
+const player = { x: 0, y: 0, r: 8, speed: 2.8, sprintSpeed: 4.8, vx: 0, vy: 0 };
+// Exit
+const exit = { r: ROWS - 1, c: COLS - 1 };
+
+// Input
+const keys = {};
+let mouseTarget = null;
+
+// Camera
+const cam = { x: 0, y: 0 };
+
+// Fog of war — which cells have been revealed
+let fogRevealed = [];
+
+// Collectibles
+let orbs = [];
+const ORB_COUNT = 120;
+
+// Enemies (sentinels)
+let enemies = [];
+const ENEMY_COUNT = 18;
+
+// Moving obstacles (barriers)
+let barriers = [];
+const BARRIER_COUNT = 25;
+
+// Discovered cells tracking for minimap
+let discoveredCells = [];
+
+// ===================== INITIALIZATION =====================
+function startGame() {
+  document.getElementById('title-screen').style.display = 'none';
+  initAudio();
+  canvas = document.getElementById('gameCanvas');
+  ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const mc = document.getElementById('minimapCanvas2');
+  minimapCanvas = mc;
+  const mmSize = Math.min(200, Math.floor(window.innerWidth * 0.2));
+  mc.width = mmSize; mc.height = mmSize;
+  minimapCtx = mc.getContext('2d');
+
+  generateMaze();
+
+  // Player start
+  player.x = CELL / 2;
+  player.y = CELL / 2;
+
+  // Init fog
+  fogRevealed = [];
+  discoveredCells = [];
+  for (let r = 0; r < ROWS; r++) {
+    fogRevealed[r] = [];
+    discoveredCells[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      fogRevealed[r][c] = false;
+      discoveredCells[r][c] = false;
+    }
+  }
+
+  // Spawn orbs
+  orbs = [];
+  for (let i = 0; i < ORB_COUNT; i++) {
+    let r, c;
+    do { r = Math.floor(Math.random() * ROWS); c = Math.floor(Math.random() * COLS); }
+    while ((r === 0 && c === 0) || (r === exit.r && c === exit.c));
+    orbs.push({
+      x: c * CELL + CELL / 2 + (Math.random() - 0.5) * 16,
+      y: r * CELL + CELL / 2 + (Math.random() - 0.5) * 16,
+      collected: false,
+      type: Math.random() < 0.2 ? 'time' : Math.random() < 0.3 ? 'pulse' : 'score',
+      bobPhase: Math.random() * Math.PI * 2
+    });
+  }
+
+  // Spawn enemies
+  enemies = [];
+  for (let i = 0; i < ENEMY_COUNT; i++) {
+    let r, c;
+    do { r = Math.floor(Math.random() * ROWS); c = Math.floor(Math.random() * COLS); }
+    while (Math.abs(r) + Math.abs(c) < 15); // not too close to start
+    enemies.push({
+      x: c * CELL + CELL / 2,
+      y: r * CELL + CELL / 2,
+      speed: 1.2 + Math.random() * 0.8,
+      dir: Math.random() * Math.PI * 2,
+      changeTimer: 0,
+      alerted: false,
+      alertTimer: 0,
+      patrolPath: [],
+      patrolIdx: 0,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+
+  // Spawn moving barriers
+  barriers = [];
+  for (let i = 0; i < BARRIER_COUNT; i++) {
+    let r, c;
+    do { r = Math.floor(Math.random() * ROWS); c = Math.floor(Math.random() * COLS); }
+    while ((r === 0 && c === 0) || (r === exit.r && c === exit.c));
+    const horizontal = Math.random() < 0.5;
+    barriers.push({
+      x: c * CELL + CELL / 2,
+      y: r * CELL + CELL / 2,
+      w: horizontal ? CELL * 0.8 : 8,
+      h: horizontal ? 8 : CELL * 0.8,
+      speed: 0.3 + Math.random() * 0.5,
+      horizontal,
+      dir: 1,
+      originX: c * CELL + CELL / 2,
+      originY: r * CELL + CELL / 2,
+      range: CELL * (1 + Math.random()),
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+
+  gameRunning = true;
+  gameTime = 300;
+  score = 0;
+  pulses = 5;
+  stamina = 100;
+  playerHealth = 3;
+  requestAnimationFrame(gameLoop);
+}
+
+// ===================== INPUT =====================
+document.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+document.addEventListener('mousedown', e => {
+  if (!gameRunning) return;
+  mouseTarget = { x: e.clientX, y: e.clientY };
+});
+document.addEventListener('mouseup', () => { mouseTarget = null; });
+document.addEventListener('mousemove', e => {
+  if (mouseTarget) mouseTarget = { x: e.clientX, y: e.clientY };
+});
+
+// ===================== COLLISION =====================
+function canMove(px, py, r) {
+  // Check against maze walls
+  const margin = r;
+  // Check four corners of bounding box
+  const checks = [
+    [px - margin, py - margin], [px + margin, py - margin],
+    [px - margin, py + margin], [px + margin, py + margin],
+    [px, py - margin], [px, py + margin], [px - margin, py], [px + margin, py]
+  ];
+
+  for (const [cx, cy] of checks) {
+    if (cx < 0 || cy < 0 || cx >= COLS * CELL || cy >= ROWS * CELL) return false;
+
+    const col = Math.floor(cx / CELL);
+    const row = Math.floor(cy / CELL);
+    if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return false;
+
+    const cell = maze[row][col];
+    const localX = cx - col * CELL;
+    const localY = cy - row * CELL;
+
+    // Wall checks
+    if (cell.n && localY < WALL) return false;
+    if (cell.s && localY > CELL - WALL) return false;
+    if (cell.w && localX < WALL) return false;
+    if (cell.e && localX > CELL - WALL) return false;
+  }
+
+  // Check barriers
+  for (const b of barriers) {
+    const bx1 = b.x - b.w / 2, by1 = b.y - b.h / 2;
+    const bx2 = b.x + b.w / 2, by2 = b.y + b.h / 2;
+    const closestX = Math.max(bx1, Math.min(px, bx2));
+    const closestY = Math.max(by1, Math.min(py, by2));
+    const dx = px - closestX, dy = py - closestY;
+    if (dx * dx + dy * dy < r * r) return false;
+  }
+
+  return true;
+}
+
+// ===================== UPDATE =====================
+let lastTime = 0;
+function gameLoop(timestamp) {
+  if (!gameRunning) return;
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  update(dt);
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+function update(dt) {
+  // Timer
+  gameTime -= dt;
+  if (gameTime <= 0) { endGame(false, 'Time ran out!'); return; }
+  if (gameTime < 30 && Math.floor(gameTime * 2) % 2 === 0) sfxAlarm();
+
+  // Pulse
+  if (keys['Space'] && pulses > 0 && !pulseActive) {
+    pulseActive = true;
+    pulseEffect = 0;
+    pulses--;
+    sfxPulse();
+  }
+  if (pulseActive) {
+    pulseEffect += 300 * dt;
+    if (pulseEffect > 400) pulseActive = false;
+  }
+
+  // Sprint
+  const sprinting = keys['ShiftLeft'] || keys['ShiftRight'];
+  let speed = player.speed;
+  if (sprinting && stamina > 0) {
+    speed = player.sprintSpeed;
+    stamina = Math.max(0, stamina - 40 * dt);
+    staminaRecovery = false;
+  } else {
+    if (!sprinting) staminaRecovery = true;
+    if (staminaRecovery) stamina = Math.min(100, stamina + 15 * dt);
+  }
+
+  // Movement
+  let dx = 0, dy = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) dy = -1;
+  if (keys['KeyS'] || keys['ArrowDown']) dy = 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) dx = -1;
+  if (keys['KeyD'] || keys['ArrowRight']) dx = 1;
+
+  // Mouse movement
+  if (mouseTarget && dx === 0 && dy === 0) {
+    const worldX = mouseTarget.x + cam.x - canvas.width / 2;
+    const worldY = mouseTarget.y + cam.y - canvas.height / 2;
+    dx = worldX - player.x;
+    dy = worldY - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 5) { dx /= dist; dy /= dist; }
+    else { dx = 0; dy = 0; mouseTarget = null; }
+  }
+
+  // Normalize
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len > 0) {
+    dx /= len; dy /= len;
+    const nx = player.x + dx * speed;
+    const ny = player.y + dy * speed;
+
+    // Try full movement, then axis-separate
+    if (canMove(nx, ny, player.r)) { player.x = nx; player.y = ny; }
+    else if (canMove(nx, player.y, player.r)) { player.x = nx; }
+    else if (canMove(player.x, ny, player.r)) { player.y = ny; }
+
+    // Footstep sounds
+    stepTimer += dt;
+    if (stepTimer > (sprinting ? 0.15 : 0.25)) { sfxStep(); stepTimer = 0; }
+  }
+
+  // Update camera
+  cam.x += (player.x - cam.x) * 0.1;
+  cam.y += (player.y - cam.y) * 0.1;
+
+  // Reveal fog
+  const pr = Math.floor(player.y / CELL), pc = Math.floor(player.x / CELL);
+  const revealRadius = 3;
+  for (let dr = -revealRadius; dr <= revealRadius; dr++) {
+    for (let dc = -revealRadius; dc <= revealRadius; dc++) {
+      const rr = pr + dr, rc = pc + dc;
+      if (rr >= 0 && rr < ROWS && rc >= 0 && rc < COLS) {
+        if (dr * dr + dc * dc <= revealRadius * revealRadius + 1) {
+          fogRevealed[rr][rc] = true;
+          discoveredCells[rr][rc] = true;
+        }
+      }
+    }
+  }
+
+  // Pulse reveals
+  if (pulseActive) {
+    const pulseR = Math.floor(pulseEffect / CELL);
+    for (let dr = -pulseR; dr <= pulseR; dr++) {
+      for (let dc = -pulseR; dc <= pulseR; dc++) {
+        const rr = pr + dr, rc = pc + dc;
+        if (rr >= 0 && rr < ROWS && rc >= 0 && rc < COLS) {
+          discoveredCells[rr][rc] = true;
+          if (dr * dr + dc * dc <= pulseR * pulseR) fogRevealed[rr][rc] = true;
+        }
+      }
+    }
+  } else {
+    // Un-reveal distant cells (keep discovered but remove active visibility)
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const dr = r - pr, dc = c - pc;
+        if (dr * dr + dc * dc > (revealRadius + 1) * (revealRadius + 1)) {
+          fogRevealed[r][c] = false;
+        }
+      }
+    }
+  }
+
+  // Orb collection
+  for (const orb of orbs) {
+    if (orb.collected) continue;
+    const dx2 = player.x - orb.x, dy2 = player.y - orb.y;
+    if (dx2 * dx2 + dy2 * dy2 < 400) {
+      orb.collected = true;
+      sfxCollect();
+      if (orb.type === 'score') score += 100;
+      else if (orb.type === 'time') { score += 50; gameTime += 15; }
+      else if (orb.type === 'pulse') { score += 50; pulses = Math.min(pulses + 2, 10); }
+    }
+    orb.bobPhase += dt * 3;
+  }
+
+  // Enemy update
+  for (const e of enemies) {
+    const edx = player.x - e.x, edy = player.y - e.y;
+    const eDist = Math.sqrt(edx * edx + edy * edy);
+
+    // Detection
+    if (eDist < CELL * 5 && fogRevealed[Math.floor(e.y / CELL)]?.[Math.floor(e.x / CELL)]) {
+      e.alerted = true;
+      e.alertTimer = 5;
+    }
+    if (e.alertTimer > 0) e.alertTimer -= dt;
+    else e.alerted = false;
+
+    let emx = 0, emy = 0;
+    if (e.alerted && eDist > 0) {
+      // Chase player
+      emx = (edx / eDist) * e.speed * 1.5;
+      emy = (edy / eDist) * e.speed * 1.5;
+    } else {
+      // Patrol — wander
+      e.changeTimer -= dt;
+      if (e.changeTimer <= 0) {
+        e.dir = Math.random() * Math.PI * 2;
+        e.changeTimer = 1.5 + Math.random() * 3;
+      }
+      emx = Math.cos(e.dir) * e.speed;
+      emy = Math.sin(e.dir) * e.speed;
+    }
+
+    const enx = e.x + emx, eny = e.y + emy;
+    if (canMove(enx, eny, 6)) { e.x = enx; e.y = eny; }
+    else {
+      e.dir = Math.random() * Math.PI * 2;
+      e.changeTimer = 0.5;
+      // Try just one axis
+      if (canMove(enx, e.y, 6)) e.x = enx;
+      else if (canMove(e.x, eny, 6)) e.y = eny;
+    }
+
+    e.phase += dt * 4;
+
+    // Collision with player
+    if (eDist < 18) {
+      playerHealth--;
+      sfxHurt();
+      shakeTimer = 0.3;
+      shakeIntensity = 8;
+      // Knock player back
+      if (eDist > 0) {
+        player.x -= (edx / eDist) * 30;
+        player.y -= (edy / eDist) * 30;
+      }
+      // Teleport enemy away
+      e.x += (Math.random() - 0.5) * CELL * 6;
+      e.y += (Math.random() - 0.5) * CELL * 6;
+      e.x = Math.max(CELL, Math.min(e.x, (COLS - 1) * CELL));
+      e.y = Math.max(CELL, Math.min(e.y, (ROWS - 1) * CELL));
+
+      if (playerHealth <= 0) { endGame(false, 'Destroyed by a Sentinel!'); return; }
+    }
+  }
+
+  // Barrier update
+  for (const b of barriers) {
+    b.phase += dt;
+    if (b.horizontal) {
+      b.x = b.originX + Math.sin(b.phase * b.speed) * b.range;
+    } else {
+      b.y = b.originY + Math.sin(b.phase * b.speed) * b.range;
+    }
+  }
+
+  // Screen shake
+  if (shakeTimer > 0) shakeTimer -= dt;
+
+  // Win condition
+  const exitX = exit.c * CELL + CELL / 2, exitY = exit.r * CELL + CELL / 2;
+  const wdx = player.x - exitX, wdy = player.y - exitY;
+  if (wdx * wdx + wdy * wdy < 500) {
+    endGame(true);
+  }
+}
+
+function endGame(won, msg) {
+  gameRunning = false;
+  const screen = document.getElementById('game-over-screen');
+  const title = document.getElementById('go-title');
+  const message = document.getElementById('go-message');
+  const stats = document.getElementById('go-stats');
+  screen.style.display = 'flex';
+
+  if (won) {
+    sfxWin();
+    title.style.color = '#0f0';
+    title.style.textShadow = '0 0 20px #0f0, 0 0 40px #0a0';
+    title.textContent = 'ESCAPED';
+    message.textContent = 'You conquered Neon Perdition.';
+    const bonus = Math.floor(gameTime) * 10;
+    score += bonus;
+    stats.textContent = `Score: ${score} | Time Bonus: ${bonus} | Time Left: ${Math.floor(gameTime)}s`;
+    stats.style.color = '#0f0';
+  } else {
+    title.style.color = '#f00';
+    title.style.textShadow = '0 0 20px #f00, 0 0 40px #800';
+    title.textContent = 'TERMINATED';
+    message.textContent = msg || 'The maze consumed you.';
+    stats.textContent = `Score: ${score} | Orbs: ${orbs.filter(o => o.collected).length}/${ORB_COUNT}`;
+    stats.style.color = '#f66';
+  }
+}
+
+// ===================== RENDER =====================
+function render() {
+  const W = canvas.width = window.innerWidth;
+  const H = canvas.height = window.innerHeight;
+  ctx.fillStyle = '#050508';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  // Camera + shake
+  let sx = 0, sy = 0;
+  if (shakeTimer > 0) {
+    sx = (Math.random() - 0.5) * shakeIntensity;
+    sy = (Math.random() - 0.5) * shakeIntensity;
+  }
+  ctx.translate(W / 2 - cam.x + sx, H / 2 - cam.y + sy);
+
+  // Determine visible range
+  const viewCols = Math.ceil(W / CELL / 2) + 2;
+  const viewRows = Math.ceil(H / CELL / 2) + 2;
+  const pcr = Math.floor(cam.y / CELL), pcc = Math.floor(cam.x / CELL);
+  const rMin = Math.max(0, pcr - viewRows), rMax = Math.min(ROWS - 1, pcr + viewRows);
+  const cMin = Math.max(0, pcc - viewCols), cMax = Math.min(COLS - 1, pcc + viewCols);
+
+  // Draw maze walls
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
+      if (!fogRevealed[r][c]) continue;
+      const cell = maze[r][c];
+      const x = c * CELL, y = r * CELL;
+
+      // Floor glow
+      const pr2 = Math.floor(player.y / CELL), pc2 = Math.floor(player.x / CELL);
+      const dist = Math.sqrt((r - pr2) ** 2 + (c - pc2) ** 2);
+      const alpha = Math.max(0, 1 - dist / 4) * 0.08;
+      ctx.fillStyle = `rgba(0, 255, 255, ${alpha})`;
+      ctx.fillRect(x + WALL, y + WALL, CELL - WALL * 2, CELL - WALL * 2);
+
+      // Walls with neon glow
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = '#0ff';
+      ctx.strokeStyle = '#0af';
+      ctx.lineWidth = WALL;
+
+      if (cell.n) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + CELL, y); ctx.stroke(); }
+      if (cell.s) { ctx.beginPath(); ctx.moveTo(x, y + CELL); ctx.lineTo(x + CELL, y + CELL); ctx.stroke(); }
+      if (cell.w) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + CELL); ctx.stroke(); }
+      if (cell.e) { ctx.beginPath(); ctx.moveTo(x + CELL, y); ctx.lineTo(x + CELL, y + CELL); ctx.stroke(); }
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  // Draw exit
+  const exitX = exit.c * CELL, exitY = exit.r * CELL;
+  if (fogRevealed[exit.r]?.[exit.c] || discoveredCells[exit.r]?.[exit.c]) {
+    const t = Date.now() / 500;
+    ctx.shadowBlur = 20 + Math.sin(t) * 10;
+    ctx.shadowColor = '#0f0';
+    ctx.fillStyle = `rgba(0, 255, 0, ${0.3 + Math.sin(t) * 0.15})`;
+    ctx.fillRect(exitX + 4, exitY + 4, CELL - 8, CELL - 8);
+    ctx.strokeStyle = '#0f0';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(exitX + 4, exitY + 4, CELL - 8, CELL - 8);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#0f0';
+    ctx.font = 'bold 12px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('EXIT', exitX + CELL / 2, exitY + CELL / 2 + 4);
+  }
+
+  // Draw barriers
+  for (const b of barriers) {
+    const br = Math.floor(b.y / CELL), bc = Math.floor(b.x / CELL);
+    if (br < rMin || br > rMax || bc < cMin || bc > cMax) continue;
+    if (!fogRevealed[br]?.[bc]) continue;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#f80';
+    ctx.fillStyle = `rgba(255, 140, 0, ${0.6 + Math.sin(b.phase * 3) * 0.2})`;
+    ctx.fillRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h);
+    ctx.shadowBlur = 0;
+  }
+
+  // Draw orbs
+  for (const orb of orbs) {
+    if (orb.collected) continue;
+    const or = Math.floor(orb.y / CELL), oc = Math.floor(orb.x / CELL);
+    if (!fogRevealed[or]?.[oc]) continue;
+    const bob = Math.sin(orb.bobPhase) * 3;
+    const colors = { score: '#ff0', time: '#0ff', pulse: '#f0f' };
+    const color = colors[orb.type];
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = color;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(orb.x, orb.y + bob, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Draw enemies
+  for (const e of enemies) {
+    const er = Math.floor(e.y / CELL), ec = Math.floor(e.x / CELL);
+    if (er < rMin - 2 || er > rMax + 2 || ec < cMin - 2 || ec > cMax + 2) continue;
+    if (!fogRevealed[er]?.[ec]) continue;
+
+    const pulse = Math.sin(e.phase) * 3;
+    ctx.shadowBlur = e.alerted ? 20 : 10;
+    ctx.shadowColor = e.alerted ? '#f00' : '#f0f';
+
+    // Body
+    ctx.fillStyle = e.alerted ? '#f44' : '#c0f';
+    ctx.beginPath();
+    ctx.moveTo(e.x, e.y - 10 - pulse);
+    ctx.lineTo(e.x - 8, e.y + 8);
+    ctx.lineTo(e.x + 8, e.y + 8);
+    ctx.closePath();
+    ctx.fill();
+
+    // Eye
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(e.x, e.y - 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = e.alerted ? '#f00' : '#f0f';
+    ctx.beginPath();
+    ctx.arc(e.x, e.y - 2, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+  }
+
+  // Draw player
+  const t = Date.now() / 300;
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = '#0ff';
+  ctx.fillStyle = '#0ff';
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.r + Math.sin(t) * 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Inner
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.r * 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Pulse wave effect
+  if (pulseActive) {
+    ctx.strokeStyle = `rgba(0, 255, 255, ${Math.max(0, 1 - pulseEffect / 400) * 0.6})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, pulseEffect, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(100, 200, 255, ${Math.max(0, 1 - pulseEffect / 400) * 0.3})`;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, pulseEffect * 0.9, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Fog overlay — darken unrevealed cells
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
+      if (!fogRevealed[r][c]) {
+        ctx.fillStyle = 'rgba(5, 5, 8, 0.95)';
+        ctx.fillRect(c * CELL - 1, r * CELL - 1, CELL + 2, CELL + 2);
+      }
+    }
+  }
+
+  ctx.restore();
+
+  // ===== HUD =====
+  const hud = document.getElementById('hud');
+  const timeColor = gameTime < 30 ? '#f44' : gameTime < 60 ? '#fa0' : '#0ff';
+  const hearts = '♥'.repeat(playerHealth) + '<span style="color:#444">' + '♥'.repeat(3 - playerHealth) + '</span>';
+  hud.innerHTML = `
+    <span style="color:${timeColor}">⏱ ${Math.floor(gameTime / 60)}:${String(Math.floor(gameTime % 60)).padStart(2, '0')}</span><br>
+    <span style="color:#ff0">★ ${score}</span><br>
+    <span style="color:#f66">${hearts}</span><br>
+    <span style="color:#0af">⚡ ${'█'.repeat(Math.floor(stamina / 10))}${'░'.repeat(10 - Math.floor(stamina / 10))}</span><br>
+    <span style="color:#f0f">◉ Pulses: ${pulses}</span>
+  `;
+
+  // ===== MINIMAP =====
+  renderMinimap();
+}
+
+function renderMinimap() {
+  const mc = minimapCanvas;
+  const mctx = minimapCtx;
+  const size = mc.width;
+  const cellSize = size / Math.max(ROWS, COLS);
+
+  mctx.fillStyle = 'rgba(0,0,0,0.85)';
+  mctx.fillRect(0, 0, size, size);
+
+  // Draw discovered walls
+  mctx.strokeStyle = 'rgba(0, 170, 255, 0.4)';
+  mctx.lineWidth = 0.5;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!discoveredCells[r][c]) continue;
+      const x = c * cellSize, y = r * cellSize;
+      const cell = maze[r][c];
+      if (cell.n) { mctx.beginPath(); mctx.moveTo(x, y); mctx.lineTo(x + cellSize, y); mctx.stroke(); }
+      if (cell.s) { mctx.beginPath(); mctx.moveTo(x, y + cellSize); mctx.lineTo(x + cellSize, y + cellSize); mctx.stroke(); }
+      if (cell.w) { mctx.beginPath(); mctx.moveTo(x, y); mctx.lineTo(x, y + cellSize); mctx.stroke(); }
+      if (cell.e) { mctx.beginPath(); mctx.moveTo(x + cellSize, y); mctx.lineTo(x + cellSize, y + cellSize); mctx.stroke(); }
+    }
+  }
+
+  // Exit on minimap
+  mctx.fillStyle = '#0f0';
+  mctx.fillRect(exit.c * cellSize, exit.r * cellSize, cellSize + 1, cellSize + 1);
+
+  // Player on minimap
+  mctx.fillStyle = '#0ff';
+  mctx.shadowBlur = 4;
+  mctx.shadowColor = '#0ff';
+  mctx.beginPath();
+  mctx.arc(player.x / CELL * cellSize, player.y / CELL * cellSize, Math.max(2, cellSize), 0, Math.PI * 2);
+  mctx.fill();
+  mctx.shadowBlur = 0;
+
+  // Alerted enemies on minimap
+  for (const e of enemies) {
+    if (e.alerted) {
+      mctx.fillStyle = '#f44';
+      mctx.beginPath();
+      mctx.arc(e.x / CELL * cellSize, e.y / CELL * cellSize, Math.max(1.5, cellSize * 0.8), 0, Math.PI * 2);
+      mctx.fill();
+    }
+  }
+}
+
+</script>
+</body>
+</html>

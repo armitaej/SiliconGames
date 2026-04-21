@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NFL Guess Who?</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    color: #fff;
+  }
+
+  header {
+    text-align: center;
+    padding: 18px;
+    background: rgba(0,0,0,0.4);
+    border-bottom: 2px solid #e94560;
+  }
+  header h1 { font-size: 2rem; letter-spacing: 2px; color: #e94560; text-shadow: 0 0 20px #e94560; }
+  header p { color: #aaa; font-size: 0.85rem; margin-top: 4px; }
+
+  #screen-setup, #screen-game, #screen-win { display: none; }
+  #screen-setup.active, #screen-game.active, #screen-win.active { display: block; }
+
+  /* SETUP SCREEN */
+  #screen-setup {
+    max-width: 700px;
+    margin: 40px auto;
+    padding: 20px;
+    text-align: center;
+  }
+  #screen-setup h2 { font-size: 1.5rem; margin-bottom: 10px; color: #ffd700; }
+  #screen-setup p { color: #ccc; margin-bottom: 24px; }
+  .setup-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .setup-card {
+    background: rgba(255,255,255,0.08);
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 10px 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .setup-card:hover { background: rgba(255,255,255,0.15); transform: translateY(-2px); }
+  .setup-card.selected { border-color: #ffd700; background: rgba(255,215,0,0.15); }
+  .setup-card .emoji { font-size: 1.8rem; display: block; }
+  .setup-card .name { font-size: 0.62rem; font-weight: bold; margin-top: 4px; line-height: 1.2; }
+  .setup-card .pos-badge {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 0.55rem;
+    padding: 1px 5px;
+    border-radius: 10px;
+    font-weight: bold;
+  }
+  .btn {
+    background: #e94560;
+    color: #fff;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 30px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+  .btn:hover { background: #c73652; transform: scale(1.04); }
+  .btn:disabled { background: #555; cursor: not-allowed; transform: none; }
+  .btn-secondary {
+    background: transparent;
+    border: 2px solid #e94560;
+    color: #e94560;
+  }
+  .btn-secondary:hover { background: #e94560; color: #fff; }
+
+  /* GAME SCREEN */
+  #screen-game {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  .game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    background: rgba(0,0,0,0.3);
+    padding: 10px 18px;
+    border-radius: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .secret-player {
+    background: rgba(255,215,0,0.15);
+    border: 1px solid #ffd700;
+    border-radius: 10px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    color: #ffd700;
+  }
+  .turn-indicator {
+    font-size: 0.9rem;
+    font-weight: bold;
+    padding: 6px 14px;
+    border-radius: 10px;
+  }
+  .turn-you { background: rgba(46,213,115,0.2); color: #2ed573; border: 1px solid #2ed573; }
+  .turn-cpu { background: rgba(255,71,87,0.2); color: #ff4757; border: 1px solid #ff4757; }
+
+  .boards-wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+  .board-section h3 {
+    font-size: 0.85rem;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+  }
+  .card {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 6px 4px;
+    text-align: center;
+    transition: all 0.3s;
+    cursor: default;
+    position: relative;
+  }
+  .card.eliminated {
+    opacity: 0.18;
+    filter: grayscale(1);
+    transform: scale(0.95);
+  }
+  .card.clickable { cursor: pointer; }
+  .card.clickable:hover { border-color: #e94560; background: rgba(233,69,96,0.15); transform: scale(1.06); }
+  .card .emoji { font-size: 1.5rem; display: block; }
+  .card .name { font-size: 0.55rem; font-weight: bold; margin-top: 2px; line-height: 1.2; }
+  .card .pos-badge {
+    display: inline-block;
+    margin-top: 2px;
+    font-size: 0.48rem;
+    padding: 1px 4px;
+    border-radius: 8px;
+    font-weight: bold;
+  }
+
+  /* Question Panel */
+  .question-panel {
+    background: rgba(0,0,0,0.35);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .question-panel h3 { font-size: 0.9rem; color: #ffd700; margin-bottom: 10px; }
+  .questions-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px;
+    margin-bottom: 12px;
+  }
+  .q-btn {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #ddd;
+    padding: 7px 5px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .q-btn:hover:not(:disabled) { background: rgba(255,215,0,0.15); border-color: #ffd700; color: #ffd700; }
+  .q-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .guess-section { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .guess-section input {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    flex: 1;
+    min-width: 160px;
+  }
+  .guess-section input::placeholder { color: #888; }
+
+  /* Log */
+  .log {
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+    max-height: 110px;
+    overflow-y: auto;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .log-entry { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: #ccc; }
+  .log-entry.you { color: #2ed573; }
+  .log-entry.cpu { color: #ff6b81; }
+  .log-entry.system { color: #ffd700; font-weight: bold; }
+
+  /* WIN SCREEN */
+  #screen-win {
+    max-width: 500px;
+    margin: 80px auto;
+    text-align: center;
+    padding: 20px;
+  }
+  #screen-win .trophy { font-size: 5rem; margin-bottom: 16px; display: block; }
+  #screen-win h2 { font-size: 2.2rem; margin-bottom: 10px; }
+  #screen-win p { color: #ccc; margin-bottom: 24px; font-size: 1rem; }
+
+  /* Position colors */
+  .pos-QB { background: #e94560; color: #fff; }
+  .pos-WR { background: #2ed573; color: #000; }
+  .pos-RB { background: #ffd700; color: #000; }
+  .pos-TE { background: #1e90ff; color: #fff; }
+  .pos-OL { background: #a29bfe; color: #000; }
+  .pos-DL { background: #fd79a8; color: #000; }
+  .pos-LB { background: #00cec9; color: #000; }
+  .pos-DB { background: #6c5ce7; color: #fff; }
+  .pos-K  { background: #fdcb6e; color: #000; }
+
+  .answer-yes { color: #2ed573; font-weight: bold; }
+  .answer-no  { color: #ff4757; font-weight: bold; }
+
+  @media (max-width: 700px) {
+    .boards-wrap { grid-template-columns: 1fr; }
+    .questions-grid { grid-template-columns: repeat(2,1fr); }
+    .setup-grid { grid-template-columns: repeat(4,1fr); }
+    .board { grid-template-columns: repeat(4,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏈 NFL GUESS WHO?</h1>
+  <p>Pick your secret player — can you guess the computer's before it guesses yours?</p>
+</header>
+
+<!-- SETUP SCREEN -->
+<div id="screen-setup" class="active">
+  <h2>Choose Your Secret Player</h2>
+  <p>Click a player to select them as your secret. The computer won't know who you picked!</p>
+  <div class="setup-grid" id="setup-grid"></div>
+  <button class="btn" id="btn-start" disabled onclick="startGame()">🚀 Start Game</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="screen-game">
+  <div class="game-header">
+    <div class="secret-player" id="secret-display">🤫 Your secret: —</div>
+    <div class="turn-indicator turn-you" id="turn-display">🎯 YOUR TURN</div>
+    <button class="btn btn-secondary" style="padding:6px 16px;font-size:0.8rem" onclick="restartGame()">↩ Restart</button>
+  </div>
+
+  <div class="boards-wrap">
+    <div class="board-section">
+      <h3>📋 Your Board — eliminate players</h3>
+      <div class="board" id="player-board"></div>
+    </div>
+    <div class="board-section">
+      <h3>🤖 Computer's Board (mirrored)</h3>
+      <div class="board" id="cpu-board"></div>
+    </div>
+  </div>
+
+  <div class="question-panel">
+    <h3>❓ Ask a Question (Your Turn)</h3>
+    <div class="questions-grid" id="questions-grid"></div>
+    <div class="guess-section">
+      <input type="text" id="guess-input" placeholder="Type a player name to guess..." list="players-list" />
+      <datalist id="players-list"></datalist>
+      <button class="btn" id="btn-guess" onclick="makeGuess()">🎯 Final Guess!</button>
+    </div>
+  </div>
+
+  <div class="log" id="game-log"></div>
+</div>
+
+<!-- WIN SCREEN -->
+<div id="screen-win">
+  <span class="trophy" id="win-trophy">🏆</span>
+  <h2 id="win-title">You Win!</h2>
+  <p id="win-msg"></p>
+  <button class="btn" onclick="restartGame()">🔄 Play Again</button>
+</div>
+
+<script>
+// ===================== DATA =====================
+const PLAYERS = [
+  { id:1,  name:"Patrick Mahomes",  team:"KC",  conf:"AFC", pos:"QB",  rookie:false, superBowl:true,  mvp:true,  age:29, emoji:"🔥" },
+  { id:2,  name:"Josh Allen",       team:"BUF", conf:"AFC", pos:"QB",  rookie:false, superBowl:false, mvp:false, age:28, emoji:"⚡" },
+  { id:3,  name:"Lamar Jackson",    team:"BAL", conf:"AFC", pos:"QB",  rookie:false, superBowl:false, mvp:true,  age:27, emoji:"🦅" },
+  { id:4,  name:"Joe Burrow",       team:"CIN", conf:"AFC", pos:"QB",  rookie:false, superBowl:false, mvp:false, age:28, emoji:"🐯" },
+  { id:5,  name:"Jalen Hurts",      team:"PHI", conf:"NFC", pos:"QB",  rookie:false, superBowl:true,  mvp:false, age:26, emoji:"🦅" },
+  { id:6,  name:"Dak Prescott",     team:"DAL", conf:"NFC", pos:"QB",  rookie:false, superBowl:false, mvp:false, age:31, emoji:"⭐" },
+  { id:7,  name:"Justin Jefferson", team:"MIN", conf:"NFC", pos:"WR",  rookie:false, superBowl:false, mvp:false, age:25, emoji:"🎯" },
+  { id:8,  name:"Tyreek Hill",      team:"MIA", conf:"AFC", pos:"WR",  rookie:false, superBowl:true,  mvp:false, age:30, emoji:"💨" },
+  { id:9,  name:"Davante Adams",    team:"LV",  conf:"AFC", pos:"WR",  rookie:false, superBowl:false, mvp:false, age:31, emoji:"🏆" },
+  { id:10, name:"CeeDee Lamb",      team:"DAL", conf:"NFC", pos:"WR",  rookie:false, superBowl:false, mvp:false, age:25, emoji:"🐑" },
+  { id:11, name:"Travis Kelce",     team:"KC",  conf:"AFC", pos:"TE",  rookie:false, superBowl:true,  mvp:false, age:35, emoji:"👑" },
+  { id:12, name:"Sam LaPorta",      team:"DET", conf:"NFC", pos:"TE",  rookie:false, superBowl:false, mvp:false, age:24, emoji:"🦁" },
+  { id:13, name:"Christian McCaffrey",team:"SF",conf:"NFC", pos:"RB",  rookie:false, superBowl:false, mvp:false, age:28, emoji:"💪" },
+  { id:14, name:"Derrick Henry",    team:"BAL", conf:"AFC", pos:"RB",  rookie:false, superBowl:false, mvp:false, age:30, emoji:"🔨" },
+  { id:15, name:"Saquon Barkley",   team:"PHI", conf:"NFC", pos:"RB",  rookie:false, superBowl:true,  mvp:false, age:27, emoji:"🚀" },
+  { id:16, name:"Nick Chubb",       team:"CLE", conf:"AFC", pos:"RB",  rookie:false, superBowl:false, mvp:false, age:29, emoji:"🐶" },
+  { id:17, name:"Micah Parsons",    team:"DAL", conf:"NFC", pos:"LB",  rookie:false, superBowl:false, mvp:false, age:25, emoji:"🐺" },
+  { id:18, name:"T.J. Watt",        team:"PIT", conf:"AFC", pos:"LB",  rookie:false, superBowl:false, mvp:false, age:29, emoji:"⚡" },
+  { id:19, name:"Myles Garrett",    team:"CLE", conf:"AFC", pos:"DL",  rookie:false, superBowl:false, mvp:false, age:29, emoji:"🦷" },
+  { id:20, name:"Maxx Crosby",      team:"LV",  conf:"AFC", pos:"DL",  rookie:false, superBowl:false, mvp:false, age:27, emoji:"🦊" },
+  { id:21, name:"Jalen Ramsey",     team:"LAR", conf:"NFC", pos:"DB",  rookie:false, superBowl:true,  mvp:false, age:30, emoji:"🔒" },
+  { id:22, name:"Sauce Gardner",    team:"NYJ", conf:"AFC", pos:"DB",  rookie:false, superBowl:false, mvp:false, age:23, emoji:"🌶️" },
+  { id:23, name:"Justin Tucker",    team:"BAL", conf:"AFC", pos:"K",   rookie:false, superBowl:false, mvp:false, age:34, emoji:"🎱" },
+  { id:24, name:"Tua Tagovailoa",   team:"MIA", conf:"AFC", pos:"QB",  rookie:false, superBowl:false, mvp:false, age:26, emoji:"🤙" },
+];
+
+// ===================== QUESTIONS =====================
+const QUESTIONS = [
+  { text: "Is your player a QB?",        fn: p => p.pos === "QB" },
+  { text: "Is your player a WR?",        fn: p => p.pos === "WR" },
+  { text: "Is your player a RB?",        fn: p => p.pos === "RB" },
+  { text: "Is your player a TE?",        fn: p => p.pos === "TE" },
+  { text: "Is your player a defender?",  fn: p => ["LB","DL","DB"].includes(p.pos) },
+  { text: "Is your player in the AFC?",  fn: p => p.conf === "AFC" },
+  { text: "Is your player in the NFC?",  fn: p => p.conf === "NFC" },
+  { text: "Won a Super Bowl?",           fn: p => p.superBowl },
+  { text: "Won an MVP award?",           fn: p => p.mvp },
+  { text: "Age 30 or older?",            fn: p => p.age >= 30 },
+  { text: "Age under 27?",               fn: p => p.age < 27 },
+  { text: "Play for KC, PHI, or BAL?",   fn: p => ["KC","PHI","BAL"].includes(p.team) },
+  { text: "Play for DAL or MIN?",        fn: p => ["DAL","MIN"].includes(p.team) },
+  { text: "Play for a Florida team?",    fn: p => ["MIA","TB","JAX"].includes(p.team) },
+  { text: "Play for AFC East?",          fn: p => ["BUF","MIA","NE","NYJ"].includes(p.team) },
+  { text: "Play for NFC North?",         fn: p => ["MIN","DET","GB","CHI"].includes(p.team) },
+];
+
+// ===================== STATE =====================
+let state = {};
+
+function initState(mySecret) {
+  const cpuSecret = PLAYERS[Math.floor(Math.random() * PLAYERS.length)];
+  state = {
+    mySecret,
+    cpuSecret,
+    myEliminated: new Set(),   // indices in PLAYERS that I've crossed off
+    cpuEliminated: new Set(),  // indices cpu has crossed off
+    cpuRemaining: [...PLAYERS],
+    isMyTurn: true,
+    gameOver: false,
+    askedQs: new Set(),
+    log: [],
+  };
+}
+
+// ===================== RENDERING =====================
+function posColor(pos) { return `pos-${pos}`; }
+
+function renderSetupGrid() {
+  const grid = document.getElementById('setup-grid');
+  grid.innerHTML = '';
+  PLAYERS.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'setup-card';
+    div.id = `setup-${i}`;
+    div.innerHTML = `<span class="emoji">${p.emoji}</span>
+      <div class="name">${p.name}</div>
+      <span class="pos-badge ${posColor(p.pos)}">${p.pos} · ${p.team}</span>`;
+    div.onclick = () => selectSetupCard(i);
+    grid.appendChild(div);
+  });
+}
+
+let selectedSetupIdx = null;
+function selectSetupCard(i) {
+  document.querySelectorAll('.setup-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById(`setup-${i}`).classList.add('selected');
+  selectedSetupIdx = i;
+  document.getElementById('btn-start').disabled = false;
+}
+
+function startGame() {
+  if (selectedSetupIdx === null) return;
+  initState(PLAYERS[selectedSetupIdx]);
+  renderGame();
+  showScreen('game');
+}
+
+function renderGame() {
+  renderBoard('player-board', true);
+  renderBoard('cpu-board', false);
+  renderQuestions();
+  renderLog();
+  document.getElementById('secret-display').textContent = `🤫 Your secret: ${state.mySecret.emoji} ${state.mySecret.name}`;
+  updateTurnDisplay();
+  populateDatalist();
+}
+
+function renderBoard(boardId, isPlayer) {
+  const board = document.getElementById(boardId);
+  board.innerHTML = '';
+  PLAYERS.forEach((p, i) => {
+    const div = document.createElement('div');
+    const eliminated = isPlayer ? state.myEliminated.has(i) : state.cpuEliminated.has(i);
+    div.className = 'card' + (eliminated ? ' eliminated' : '') + (isPlayer && !eliminated ? ' clickable' : '');
+    div.innerHTML = `<span class="emoji">${p.emoji}</span>
+      <div class="name">${p.name}</div>
+      <span class="pos-badge ${posColor(p.pos)}">${p.pos}</span>`;
+    if (isPlayer && !eliminated) {
+      div.onclick = () => toggleEliminate(i);
+      div.title = `Click to eliminate ${p.name}`;
+    }
+    board.appendChild(div);
+  });
+}
+
+function toggleEliminate(i) {
+  if (state.myEliminated.has(i)) {
+    state.myEliminated.delete(i);
+  } else {
+    state.myEliminated.add(i);
+  }
+  renderBoard('player-board', true);
+}
+
+function renderQuestions() {
+  const grid = document.getElementById('questions-grid');
+  grid.innerHTML = '';
+  QUESTIONS.forEach((q, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'q-btn';
+    btn.textContent = q.text;
+    btn.disabled = !state.isMyTurn || state.askedQs.has(i) || state.gameOver;
+    btn.onclick = () => askQuestion(i);
+    grid.appendChild(btn);
+  });
+  document.getElementById('btn-guess').disabled = !state.isMyTurn || state.gameOver;
+  document.getElementById('guess-input').disabled = !state.isMyTurn || state.gameOver;
+}
+
+function populateDatalist() {
+  const dl = document.getElementById('players-list');
+  dl.innerHTML = '';
+  PLAYERS.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.name;
+    dl.appendChild(opt);
+  });
+}
+
+function updateTurnDisplay() {
+  const el = document.getElementById('turn-display');
+  if (state.isMyTurn) {
+    el.textContent = '🎯 YOUR TURN';
+    el.className = 'turn-indicator turn-you';
+  } else {
+    el.textContent = '🤖 CPU THINKING...';
+    el.className = 'turn-indicator turn-cpu';
+  }
+}
+
+function renderLog() {
+  const log = document.getElementById('game-log');
+  log.innerHTML = state.log.map(e =>
+    `<div class="log-entry ${e.type}">${e.text}</div>`
+  ).join('');
+  log.scrollTop = log.scrollHeight;
+}
+
+function addLog(text, type='system') {
+  state.log.push({ text, type });
+  renderLog();
+}
+
+// ===================== PLAYER TURN =====================
+function askQuestion(qi) {
+  if (!state.isMyTurn || state.gameOver) return;
+  const q = QUESTIONS[qi];
+  const answer = q.fn(state.cpuSecret);
+  state.askedQs.add(qi);
+  const answerText = answer
+    ? `<span class="answer-yes">YES ✅</span>`
+    : `<span class="answer-no">NO ❌</span>`;
+  addLog(`YOU asked: "${q.text}" → ${answerText}`, 'you');
+
+  // End player turn, CPU goes
+  state.isMyTurn = false;
+  updateTurnDisplay();
+  renderQuestions();
+  setTimeout(cpuTurn, 1200);
+}
+
+function makeGuess() {
+  if (!state.isMyTurn || state.gameOver) return;
+  const input = document.getElementById('guess-input').value.trim();
+  const match = PLAYERS.find(p => p.name.toLowerCase() === input.toLowerCase());
+  if (!match) {
+    addLog(`⚠️ "${input}" is not a valid player name. Try again.`, 'system');
+    return;
+  }
+  if (match.id === state.cpuSecret.id) {
+    endGame(true, `You correctly guessed ${match.emoji} ${match.name}!`);
+  } else {
+    addLog(`YOU guessed: ${match.name} — ❌ WRONG! The game continues...`, 'you');
+    document.getElementById('guess-input').value = '';
+    state.isMyTurn = false;
+    updateTurnDisplay();
+    renderQuestions();
+    setTimeout(cpuTurn, 1200);
+  }
+}
+
+// ===================== CPU AI =====================
+function cpuTurn() {
+  if (state.gameOver) return;
+
+  // CPU tries to guess if only 1 remains
+  if (state.cpuRemaining.length === 1) {
+    const guess = state.cpuRemaining[0];
+    if (guess.id === state.mySecret.id) {
+      endGame(false, `CPU guessed ${guess.emoji} ${guess.name} — and was right!`);
+    } else {
+      addLog(`CPU guessed: ${guess.name} — ❌ WRONG! (CPU somehow messed up 😅)`, 'cpu');
+      state.isMyTurn = true;
+      updateTurnDisplay();
+      renderQuestions();
+    }
+    return;
+  }
+
+  // CPU tries to guess if very few remain
+  if (state.cpuRemaining.length <= 2 && Math.random() < 0.7) {
+    const guess = state.cpuRemaining[Math.floor(Math.random() * state.cpuRemaining.length)];
+    addLog(`🤖 CPU makes a final guess: "${guess.name}"`, 'cpu');
+    if (guess.id === state.mySecret.id) {
+      endGame(false, `CPU guessed ${guess.emoji} ${guess.name} — and was right!`);
+    } else {
+      addLog(`CPU guessed wrong! It guessed ${guess.name}. Game continues...`, 'cpu');
+      state.cpuRemaining = state.cpuRemaining.filter(p => p.id !== guess.id);
+      state.isMyTurn = true;
+      updateTurnDisplay();
+      renderQuestions();
+    }
+    return;
+  }
+
+  // CPU picks the best question (most eliminates ~50/50 split)
+  const bestQ = chooseBestQuestion(state.cpuRemaining);
+  const answer = bestQ.fn(state.mySecret);
+
+  // Narrow CPU's remaining list
+  const before = state.cpuRemaining.length;
+  state.cpuRemaining = state.cpuRemaining.filter(p => bestQ.fn(p) === answer);
+  const after = state.cpuRemaining.length;
+  const eliminated = before - after;
+
+  // Update CPU's board visuals
+  state.cpuEliminated = new Set();
+  PLAYERS.forEach((p, i) => {
+    if (!state.cpuRemaining.find(r => r.id === p.id)) {
+      state.cpuEliminated.add(i);
+    }
+  });
+
+  const answerWord = answer ? 'YES ✅' : 'NO ❌';
+  addLog(`🤖 CPU asked: "${bestQ.text}" → You answer: ${answerWord} (eliminated ${eliminated})`, 'cpu');
+
+  renderBoard('cpu-board', false);
+
+  state.isMyTurn = true;
+  updateTurnDisplay();
+  renderQuestions();
+}
+
+function chooseBestQuestion(remaining) {
+  let best = null;
+  let bestScore = Infinity;
+  QUESTIONS.forEach(q => {
+    const yes = remaining.filter(p => q.fn(p)).length;
+    const no  = remaining.length - yes;
+    // score = how far from 50/50
+    const score = Math.abs(yes - no);
+    if (score < bestScore && yes > 0 && no > 0) {
+      bestScore = score;
+      best = q;
+    }
+  });
+  return best || QUESTIONS[0];
+}
+
+// ===================== WIN/LOSE =====================
+function endGame(playerWon, reason) {
+  state.gameOver = true;
+  const trophy = document.getElementById('win-trophy');
+  const title = document.getElementById('win-title');
+  const msg = document.getElementById('win-msg');
+
+  if (playerWon) {
+    trophy.textContent = '🏆';
+    title.textContent = 'You Win!';
+    title.style.color = '#2ed573';
+  } else {
+    trophy.textContent = '🤖';
+    title.textContent = 'CPU Wins!';
+    title.style.color = '#ff4757';
+  }
+  msg.innerHTML = `${reason}<br><br>
+    CPU's secret was: <strong>${state.cpuSecret.emoji} ${state.cpuSecret.name}</strong><br>
+    Your secret was: <strong>${state.mySecret.emoji} ${state.mySecret.name}</strong>`;
+
+  setTimeout(() => showScreen('win'), 600);
+}
+
+// ===================== SCREENS =====================
+function showScreen(name) {
+  document.getElementById('screen-setup').classList.remove('active');
+  document.getElementById('screen-game').classList.remove('active');
+  document.getElementById('screen-win').classList.remove('active');
+  document.getElementById(`screen-${name}`).classList.add('active');
+}
+
+function restartGame() {
+  selectedSetupIdx = null;
+  document.querySelectorAll('.setup-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('guess-input').value = '';
+  showScreen('setup');
+}
+
+// ===================== INIT =====================
+renderSetupGrid();
+</script>
+</body>
+</html>
