@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="aura_primary">#6C63FF</color>
+    <color name="aura_primary_dark">#5A52E0</color>
+    <color name="aura_accent">#BB86FC</color>
+    <color name="aura_background">#121212</color>
+    <color name="aura_surface">#1E1E1E</color>
+    <color name="aura_on_surface">#FFFFFF</color>
+    <color name="aura_on_surface_secondary">#99FFFFFF</color>
+    <color name="aura_error">#CF6679</color>
+
+    <color name="aura_green">#4CAF50</color>
+    <color name="aura_orange">#FF9800</color>
+    <color name="aura_blue">#2196F3</color>
+    <color name="aura_cyan">#00BCD4</color>
+    <color name="aura_red">#F44336</color>
+</resources>

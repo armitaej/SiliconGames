@@ -1,0 +1,34 @@
+# --- Secrets ---
+# Aura stores the Anthropic key in SharedPreferences on the phone, never on disk.
+# These patterns just defend against accidental commits.
+*api_key*.txt
+*secrets*
+.env
+.env.local
+
+# --- Android build output ---
+*.apk
+*.aab
+*.ap_
+*.dex
+build/
+.gradle/
+captures/
+output.json
+
+# --- Machine-specific ---
+local.properties
+**/.cxx/
+.externalNativeBuild/
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+*.swp
+.DS_Store
+
+# --- Keystore ---
+*.jks
+*.keystore
+keystore.properties

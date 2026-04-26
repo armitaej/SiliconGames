@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Aura" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/aura_primary</item>
+        <item name="colorPrimaryDark">@color/aura_primary_dark</item>
+        <item name="colorAccent">@color/aura_accent</item>
+        <item name="android:colorBackground">@color/aura_background</item>
+        <item name="colorSurface">@color/aura_surface</item>
+        <item name="colorOnSurface">@color/aura_on_surface</item>
+        <item name="colorError">@color/aura_error</item>
+        <item name="android:statusBarColor">@color/aura_background</item>
+        <item name="android:navigationBarColor">@color/aura_background</item>
+    </style>
+</resources>

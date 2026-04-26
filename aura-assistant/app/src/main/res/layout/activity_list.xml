@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF121212">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- ============ GROCERY ============ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="GROCERY LIST"
+            android:textColor="#FF4CAF50"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/text_grocery_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Empty. Say 'we need onions' and Aura will add it."
+            android:textColor="#66FFFFFF"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_grocery"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:nestedScrollingEnabled="false" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_clear_grocery"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clear Checked"
+            android:layout_marginTop="4dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#22FFFFFF"
+            android:layout_marginVertical="16dp" />
+
+        <!-- ============ TO-DO ============ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TO-DO LIST"
+            android:textColor="#FF2196F3"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/text_todo_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Empty. Say 'I need to call John' and Aura will add it."
+            android:textColor="#66FFFFFF"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_todo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:nestedScrollingEnabled="false" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_clear_todo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clear Checked"
+            android:layout_marginTop="4dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#22FFFFFF"
+            android:layout_marginVertical="16dp" />
+
+        <!-- ============ QUESTIONS ============ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="QUESTIONS"
+            android:textColor="#FF6C63FF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap an unanswered question to send it to Claude."
+            android:textColor="#88FFFFFF"
+            android:textSize="11sp"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/text_questions_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="No questions captured yet."
+            android:textColor="#66FFFFFF"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_questions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:nestedScrollingEnabled="false" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_clear_questions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clear Answered"
+            android:layout_marginTop="4dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#22FFFFFF"
+            android:layout_marginVertical="16dp" />
+
+        <!-- ============ WEB LOOKUPS ============ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="WEB LOOKUPS"
+            android:textColor="#FF9C27B0"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap an unanswered lookup to fetch it from Claude."
+            android:textColor="#88FFFFFF"
+            android:textSize="11sp"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/text_lookups_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="No lookups captured yet."
+            android:textColor="#66FFFFFF"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_lookups"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:nestedScrollingEnabled="false" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_clear_lookups"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clear Resolved"
+            android:layout_marginTop="4dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#22FFFFFF"
+            android:layout_marginVertical="16dp" />
+
+        <!-- ============ REMINDERS ============ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="REMINDERS"
+            android:textColor="#FFFF9800"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/text_reminders_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="No reminders set. Say 'remind me to...' and Aura will add them here."
+            android:textColor="#66FFFFFF"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_reminders"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:nestedScrollingEnabled="false" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_clear_reminders"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clear Completed"
+            android:layout_marginTop="4dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="16dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="8dp"
+    android:backgroundTint="#F01E1E2E">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <!-- Accent color bar -->
+        <View
+            android:id="@+id/overlay_accent_bar"
+            android:layout_width="4dp"
+            android:layout_height="match_parent"
+            android:background="#FF6C63FF" />
+
+        <!-- Icon -->
+        <ImageView
+            android:id="@+id/overlay_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_margin="12dp"
+            android:layout_gravity="center_vertical"
+            android:src="@drawable/ic_aura_ear"
+            app:tint="#FF6C63FF" />
+
+        <!-- Text content -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingVertical="12dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:id="@+id/overlay_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Answer"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="2dp" />
+
+            <TextView
+                android:id="@+id/overlay_message"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Response text here"
+                android:textColor="#CCFFFFFF"
+                android:textSize="14sp"
+                android:maxLines="5"
+                android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

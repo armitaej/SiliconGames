@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingVertical="10dp"
+    android:paddingHorizontal="4dp"
+    android:background="?android:selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/text_question_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="?"
+            android:textColor="#FF6C63FF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="12dp"
+            android:minWidth="20dp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/text_question"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#EEFFFFFF"
+            android:textSize="15sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/text_answer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#BBFFFFFF"
+        android:textSize="13sp"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="6dp"
+        android:visibility="gone" />
+</LinearLayout>
