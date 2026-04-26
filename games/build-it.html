@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build It! – LEGO 3D Builder</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#12122a;color:#fff;overflow:hidden;height:100vh;width:100vw;}
+
+/* ── HOME SCREEN ── */
+#screen-home{display:flex;flex-direction:column;height:100vh;padding:24px 32px;}
+.logo{text-align:center;padding:16px 0 8px;}
+.logo-title{font-size:3rem;font-weight:900;letter-spacing:3px;background:linear-gradient(135deg,#FFD700,#FF6B35);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.logo-sub{color:#8888aa;font-size:1rem;margin-top:2px;}
+
+.search-row{display:flex;gap:10px;max-width:560px;margin:18px auto 0;width:100%;}
+.search-input{flex:1;padding:12px 20px;border-radius:50px;border:2px solid #3a3a6a;background:rgba(255,255,255,0.07);color:#fff;font-size:1rem;outline:none;transition:border .2s;}
+.search-input::placeholder{color:#666;}
+.search-input:focus{border-color:#FFD700;}
+.search-btn{padding:12px 26px;border-radius:50px;border:none;background:linear-gradient(135deg,#FFD700,#FF6B35);color:#12122a;font-weight:800;cursor:pointer;font-size:1rem;transition:opacity .2s;}
+.search-btn:hover{opacity:.85;}
+
+.chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:14px 0 16px;}
+.chip{padding:5px 16px;border-radius:50px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#ccc;cursor:pointer;font-size:.82rem;transition:all .18s;}
+.chip.active,.chip:hover{background:#FFD700;color:#12122a;border-color:#FFD700;font-weight:700;}
+
+.sets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:18px;overflow-y:auto;flex:1;padding-bottom:16px;scrollbar-width:thin;scrollbar-color:#3a3a6a transparent;}
+.set-card{background:linear-gradient(145deg,#1c1c40,#16163a);border:2px solid rgba(255,255,255,0.08);border-radius:18px;padding:22px 18px;cursor:pointer;transition:all .2s;text-align:center;user-select:none;}
+.set-card:hover{transform:translateY(-5px);border-color:#FFD700;box-shadow:0 10px 36px rgba(255,215,0,0.25);}
+.set-emoji{font-size:2.8rem;display:block;margin-bottom:12px;}
+.set-name{font-size:1.05rem;font-weight:700;margin-bottom:3px;}
+.set-theme{color:#FFD700;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.set-meta{display:flex;justify-content:space-between;font-size:.78rem;color:#888;}
+.stars{color:#FFD700;}
+.no-results{text-align:center;color:#666;grid-column:1/-1;padding:60px;font-size:1.1rem;}
+
+/* ── BUILD SCREEN ── */
+#screen-build{display:none;flex-direction:row;height:100vh;}
+#three-canvas{display:block;flex:1;}
+#sidebar{width:300px;background:#181836;display:flex;flex-direction:column;padding:20px;overflow-y:auto;border-left:2px solid rgba(255,255,255,0.07);flex-shrink:0;}
+
+.sb-head{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
+.back-btn{background:rgba(255,255,255,0.1);border:none;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s;}
+.back-btn:hover{background:rgba(255,255,255,0.2);}
+.sb-title{font-size:1rem;font-weight:700;line-height:1.3;}
+
+.prog-section{margin-bottom:18px;}
+.prog-lbl{display:flex;justify-content:space-between;font-size:.75rem;color:#888;margin-bottom:6px;}
+.prog-bar{height:7px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,#FFD700,#FF6B35);border-radius:4px;transition:width .5s ease;}
+
+.view-row{display:flex;gap:8px;margin-bottom:14px;}
+.view-btn{flex:1;padding:7px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#ccc;cursor:pointer;font-size:.78rem;transition:all .2s;}
+.view-btn:hover{background:rgba(255,255,255,0.1);color:#fff;}
+.view-btn.on{background:#FFD700;color:#12122a;border-color:#FFD700;font-weight:700;}
+
+.step-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:14px;margin-bottom:14px;}
+.step-lbl{font-size:.68rem;color:#FFD700;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.step-desc{font-size:.92rem;line-height:1.55;color:#ddd;}
+.brick-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;}
+.b-chip{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:50px;background:rgba(255,255,255,0.08);font-size:.72rem;color:#ccc;}
+.b-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+.place-counter{margin-top:10px;font-size:.82rem;color:#FFD700;font-weight:600;min-height:1.2em;}
+.place-counter.done{color:#39ff14;text-shadow:0 0 8px rgba(57,255,20,0.5);}
+.place-hint{font-size:.72rem;color:#5555aa;margin-top:4px;font-style:italic;}
+
+/* ── MODE TOGGLE ── */
+.mode-row{display:flex;gap:6px;margin-bottom:14px;}
+.mode-btn{flex:1;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#aaa;cursor:pointer;font-size:.76rem;transition:all .2s;font-weight:600;}
+.mode-btn.active{background:#FFD700;color:#12122a;border-color:#FFD700;}
+.mode-btn:not(.active):hover{background:rgba(255,255,255,0.1);color:#fff;}
+
+/* ── 2D INSTRUCTION CANVAS ── */
+.instr-wrap{margin-bottom:14px;}
+.instr-lbl{font-size:.65rem;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
+#instr-canvas{width:100%;height:110px;border-radius:8px;background:#08081a;display:block;border:1px solid rgba(255,255,255,0.06);}
+
+/* ── PARTS TRAY (challenge mode) ── */
+.tray-section{margin-bottom:12px;display:none;}
+.tray-lbl{font-size:.65rem;color:#FFD700;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:7px;}
+.tray-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.tray-piece{display:flex;flex-direction:column;align-items:center;padding:6px 7px;border-radius:8px;border:2px solid rgba(255,255,255,0.1);cursor:pointer;transition:all .2s;background:rgba(255,255,255,0.03);}
+.tray-piece:hover:not(.placed){border-color:#FFD700;background:rgba(255,215,0,0.08);}
+.tray-piece.selected{border-color:#FFD700;background:rgba(255,215,0,0.18);box-shadow:0 0 14px rgba(255,215,0,0.4);}
+.tray-piece.placed{opacity:.22;cursor:default;pointer-events:none;}
+.piece-swatch{border-radius:3px;margin-bottom:3px;box-shadow:inset 0 -2px 0 rgba(0,0,0,0.25);}
+.piece-label{font-size:.62rem;color:#888;}
+
+/* ── WRONG PLACEMENT FLASH ── */
+@keyframes wrongFlash{0%,100%{background:transparent}25%,75%{background:rgba(255,50,50,0.3)}}
+.wrong-flash{animation:wrongFlash .5s ease-out;}
+.wrong-msg{font-size:.78rem;color:#ff4444;font-weight:700;margin-top:6px;min-height:1.1em;}
+
+.complete-box{text-align:center;padding:18px 10px;display:none;}
+.complete-box h2{font-size:1.6rem;margin-bottom:6px;}
+.complete-box p{color:#888;font-size:.9rem;margin-bottom:16px;}
+
+.nav-row{display:flex;gap:10px;margin-top:auto;padding-top:14px;}
+.nav-btn{flex:1;padding:11px;border-radius:10px;border:none;cursor:pointer;font-size:.92rem;font-weight:700;transition:all .2s;}
+.nav-btn.prev{background:rgba(255,255,255,0.1);color:#fff;}
+.nav-btn.prev:hover{background:rgba(255,255,255,0.18);}
+.nav-btn.next{background:linear-gradient(135deg,#FFD700,#FF6B35);color:#12122a;}
+.nav-btn.next:hover{opacity:.88;}
+.nav-btn:disabled{opacity:.35;cursor:not-allowed;}
+
+.btn-primary{padding:12px 28px;border-radius:50px;border:none;background:linear-gradient(135deg,#FFD700,#FF6B35);color:#12122a;font-size:1rem;font-weight:800;cursor:pointer;}
+.btn-primary:hover{opacity:.85;}
+
+/* Hint text at bottom of home */
+.hint{text-align:center;color:#44445a;font-size:.8rem;padding-top:8px;}
+</style>
+</head>
+<body>
+
+<!-- ═══ HOME SCREEN ═══ -->
+<div id="screen-home">
+  <div class="logo">
+    <div class="logo-title">🧱 BUILD IT!</div>
+    <div class="logo-sub">Search for a LEGO set and build it step-by-step in 3D</div>
+  </div>
+
+  <div class="search-row">
+    <input type="text" id="search-input" class="search-input" placeholder="🔍  Search sets — try 'space', 'city', 'pirate'…" oninput="renderGrid()">
+    <button class="search-btn" onclick="renderGrid()">Search</button>
+  </div>
+
+  <div class="chips" id="chips-row"></div>
+  <div class="sets-grid" id="sets-grid"></div>
+  <div class="hint">Click any set to start building • Click glowing bricks to place them • Drag to rotate • Scroll to zoom</div>
+</div>
+
+<!-- ═══ BUILD SCREEN ═══ -->
+<div id="screen-build">
+  <canvas id="three-canvas"></canvas>
+
+  <div id="sidebar">
+    <div class="sb-head">
+      <button class="back-btn" onclick="goHome()" title="Back">←</button>
+      <div class="sb-title" id="sb-title">—</div>
+    </div>
+
+    <div class="mode-row">
+      <button class="mode-btn active" id="mode-easy" onclick="setMode('easy')">🟢 Easy</button>
+      <button class="mode-btn" id="mode-challenge" onclick="setMode('challenge')">🔴 Challenge</button>
+    </div>
+
+    <div class="instr-wrap">
+      <div class="instr-lbl">📐 Instructions</div>
+      <canvas id="instr-canvas" width="260" height="110"></canvas>
+    </div>
+
+    <div class="prog-section">
+      <div class="prog-lbl"><span>Progress</span><span id="prog-pct">0%</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="view-row">
+      <button class="view-btn" onclick="resetCam()">🎯 Reset View</button>
+      <button class="view-btn" id="rot-btn" onclick="toggleRot()">▶ Rotate</button>
+    </div>
+
+    <div class="step-card">
+      <div class="step-lbl" id="step-lbl">STEP 1</div>
+      <div class="step-desc" id="step-desc">—</div>
+      <div class="place-counter" id="place-counter"></div>
+      <div class="place-hint" id="place-hint">👆 Click glowing bricks to place them</div>
+      <div class="wrong-msg" id="wrong-msg"></div>
+      <div class="brick-chips" id="brick-chips"></div>
+    </div>
+
+    <div class="tray-section" id="tray-section">
+      <div class="tray-lbl">🧱 Pieces to place</div>
+      <div class="tray-grid" id="tray-grid"></div>
+    </div>
+
+    <div class="complete-box" id="complete-box">
+      <h2>🎉 Complete!</h2>
+      <p id="complete-msg">You built it!</p>
+      <button class="btn-primary" onclick="goHome()">Build Another</button>
+    </div>
+
+    <div class="nav-row" id="nav-row">
+      <button class="nav-btn prev" id="btn-prev" onclick="goPrev()">◀ Back</button>
+      <button class="nav-btn next" id="btn-next" onclick="goNext()" style="background:rgba(255,255,255,0.12);color:#aaa;" title="Skip this step">Skip →</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const PH = 0.4;   // one plate height in Three.js units
+const S  = 1.0;   // one stud = 1 unit
+const SR = 0.30;  // stud radius
+const SH = 0.18;  // stud cylinder height
+
+// Shorthand brick factory
+// x,z = stud grid; y = plate grid (1 brick = 3 plates); w,d = studs; h = plates
+function B(x,y,z,w,d,h,color){ return {x,y,z,w,d,h,color}; }
+
+// Color palette (real LEGO-ish colors)
+const C={
+  red:'#C91111', dkred:'#6B0000', blue:'#0057A6', dkblue:'#00316E',
+  yellow:'#F5CD2F', green:'#237841', ltgreen:'#4DBD33', white:'#F5F5F5',
+  black:'#1A1A1A', gray:'#9C9C9C', ltgray:'#CACACA', dkgray:'#4A4A4A',
+  orange:'#FF6B00', brown:'#6B3A2A', ltbrown:'#C09060', tan:'#E8D5A3',
+  cream:'#FFF0CE', sky:'#6BBFE0', pink:'#FF69B4', purple:'#7B0FAA',
+  sand:'#D2B48C', teal:'#008080',
+};
+
+// ═══════════════════════════════════════════════════════════
+//  LEGO SETS DATA
+// ═══════════════════════════════════════════════════════════
+const SETS = [
+
+// ─── 1. CLASSIC HOUSE ───────────────────────────────────
+{id:'house', name:'Classic House', theme:'City', pieces:34, diff:2, emoji:'🏠',
+ desc:'Build a charming city house with cream walls, red roof, and a front door!',
+ steps:[
+  {t:'Lay the green base plate — the foundation of your house.',
+   b:[B(0,0,0,8,6,1,C.ltgreen)]},
+  {t:'First row of back wall bricks.',
+   b:[B(0,1,0,2,1,3,C.cream),B(2,1,0,2,1,3,C.cream),B(4,1,0,2,1,3,C.cream),B(6,1,0,2,1,3,C.cream)]},
+  {t:'First row of side walls on left and right.',
+   b:[B(0,1,1,1,4,3,C.cream),B(7,1,1,1,4,3,C.cream)]},
+  {t:'Front wall first row — with a gap for the doorway.',
+   b:[B(0,1,5,2,1,3,C.cream),B(5,1,5,3,1,3,C.cream)]},
+  {t:'Stack the second row of bricks on the back wall.',
+   b:[B(1,4,0,2,1,3,C.cream),B(3,4,0,2,1,3,C.cream),B(5,4,0,2,1,3,C.cream)]},
+  {t:'Second row — side walls continue to rise.',
+   b:[B(0,4,1,1,4,3,C.cream),B(7,4,1,1,4,3,C.cream)]},
+  {t:'Front wall second row — leave a gap for the window.',
+   b:[B(0,4,5,1,1,3,C.cream),B(6,4,5,2,1,3,C.cream)]},
+  {t:'Third row on all four walls — almost to the roof!',
+   b:[B(0,7,0,2,1,3,C.cream),B(2,7,0,2,1,3,C.cream),B(4,7,0,2,1,3,C.cream),B(6,7,0,2,1,3,C.cream),
+      B(0,7,5,2,1,3,C.cream),B(2,7,5,2,1,3,C.cream),B(4,7,5,2,1,3,C.cream),B(6,7,5,2,1,3,C.cream),
+      B(0,7,1,1,4,3,C.cream),B(7,7,1,1,4,3,C.cream)]},
+  {t:'Add the red roof support row across the top of all walls.',
+   b:[B(0,10,0,2,1,3,C.red),B(2,10,0,2,1,3,C.red),B(4,10,0,2,1,3,C.red),B(6,10,0,2,1,3,C.red),
+      B(0,10,5,2,1,3,C.red),B(2,10,5,2,1,3,C.red),B(4,10,5,2,1,3,C.red),B(6,10,5,2,1,3,C.red),
+      B(0,10,1,1,4,3,C.red),B(7,10,1,1,4,3,C.red)]},
+  {t:'Place the first wide roof layer in red.',
+   b:[B(0,13,0,8,6,2,C.red)]},
+  {t:'Second roof layer — step it in on all sides.',
+   b:[B(1,15,1,6,4,2,C.red)]},
+  {t:'Final roof ridge piece — the crown of the house!',
+   b:[B(2,17,2,4,2,2,C.red)]},
+  {t:'🏠 The Classic House is complete! Great building!', b:[]},
+]},
+
+// ─── 2. RACE CAR ────────────────────────────────────────
+{id:'racecar', name:'Race Car', theme:'Speed', pieces:22, diff:2, emoji:'🏎️',
+ desc:'Zoom zoom! Build a sleek race car with spoiler and racing stripes!',
+ steps:[
+  {t:'Place the red car body chassis.',
+   b:[B(0,0,0,8,4,2,C.red)]},
+  {t:'Add the white racing stripe down the center.',
+   b:[B(0,2,1,8,2,2,C.white)]},
+  {t:'Build the low nose section at the front.',
+   b:[B(6,2,1,2,2,1,C.red)]},
+  {t:'Raise the driver cockpit in the middle of the car.',
+   b:[B(2,2,1,4,2,3,C.red)]},
+  {t:'Attach the four black wheels (they stick out to the sides).',
+   b:[B(-1,0,0,1,2,3,C.black),B(-1,0,2,1,2,3,C.black),
+      B(8,0,0,1,2,3,C.black),B(8,0,2,1,2,3,C.black)]},
+  {t:'Add the sky-blue windshield glass.',
+   b:[B(3,5,1,2,2,2,C.sky)]},
+  {t:'Attach the dark engine block at the rear.',
+   b:[B(0,2,1,2,2,2,C.dkgray)]},
+  {t:'Build the rear spoiler — every race car needs one!',
+   b:[B(0,5,0,2,4,1,C.red),B(1,6,1,1,2,2,C.red)]},
+  {t:'Add yellow headlights at the front.',
+   b:[B(7,2,0,1,1,2,C.yellow),B(7,2,3,1,1,2,C.yellow)]},
+  {t:'🏎️ Race Car is ready! On your marks, get set, go!', b:[]},
+]},
+
+// ─── 3. SPACE ROCKET ────────────────────────────────────
+{id:'rocket', name:'Space Rocket', theme:'Space', pieces:30, diff:3, emoji:'🚀',
+ desc:'3… 2… 1… Blast off! Build a towering rocket on its launch pad!',
+ steps:[
+  {t:'Assemble the dark gray launch pad base.',
+   b:[B(0,0,0,8,8,2,C.dkgray)]},
+  {t:'Add launch support towers on both sides.',
+   b:[B(0,2,2,1,1,9,C.gray),B(7,2,2,1,1,9,C.gray)]},
+  {t:'Place the first section of the white rocket body.',
+   b:[B(3,2,3,2,2,3,C.white)]},
+  {t:'Add an orange booster ring — extra power!',
+   b:[B(3,5,3,2,2,2,C.orange)]},
+  {t:'Continue building up the rocket body.',
+   b:[B(3,7,3,2,2,4,C.white)]},
+  {t:'Second orange booster ring for the upper stage.',
+   b:[B(3,11,3,2,2,2,C.orange)]},
+  {t:'Upper rocket stage rising to the sky.',
+   b:[B(3,13,3,2,2,5,C.white)]},
+  {t:'Add the astronaut capsule section.',
+   b:[B(3,18,3,2,2,3,C.ltgray)]},
+  {t:'Attach the four red stabilizer fins at the base.',
+   b:[B(2,2,3,1,2,4,C.red),B(5,2,3,1,2,4,C.red),B(3,2,2,2,1,4,C.red),B(3,2,5,2,1,4,C.red)]},
+  {t:'Cap off the rocket with the pointed nose cone.',
+   b:[B(3,21,3,2,2,2,C.white),B(4,23,3,1,1,2,C.white)]},
+  {t:'🚀 Space Rocket complete! 3… 2… 1… Blast off!', b:[]},
+]},
+
+// ─── 4. PIRATE SHIP ─────────────────────────────────────
+{id:'pirate', name:'Pirate Ship', theme:'Pirates', pieces:40, diff:4, emoji:'🏴‍☠️',
+ desc:'Sail the seven seas! Build a classic pirate ship with mast, sails, and cannons!',
+ steps:[
+  {t:'Lay the long brown hull of the ship.',
+   b:[B(0,0,0,14,5,2,C.brown)]},
+  {t:'Build up the port and starboard hull walls.',
+   b:[B(0,2,0,14,1,3,C.brown),B(0,2,4,14,1,3,C.brown)]},
+  {t:'Second row of hull walls — your ship is taking shape!',
+   b:[B(0,5,0,14,1,3,C.ltbrown),B(0,5,4,14,1,3,C.ltbrown)]},
+  {t:'Lay the wooden deck planks across the middle.',
+   b:[B(1,5,1,12,3,2,C.tan)]},
+  {t:'Build up the bow (front) of the ship.',
+   b:[B(11,7,0,3,5,4,C.brown)]},
+  {t:'Build the stern (rear) captain\'s cabin.',
+   b:[B(0,7,0,3,5,4,C.brown)]},
+  {t:'Plant the main mast firmly in the center deck.',
+   b:[B(6,7,2,1,1,12,C.brown)]},
+  {t:'Raise the mast even higher into the sky!',
+   b:[B(6,19,2,1,1,10,C.brown)]},
+  {t:'Add the crow\'s nest — a lookout point for the lookout!',
+   b:[B(5,24,1,3,3,2,C.ltbrown)]},
+  {t:'Attach the main sail crossbeam and white sail.',
+   b:[B(3,10,2,1,1,9,C.brown),B(9,10,2,1,1,9,C.brown),B(3,11,2,7,1,8,C.white)]},
+  {t:'Add the upper sail.',
+   b:[B(4,16,2,1,1,6,C.brown),B(9,16,2,1,1,6,C.brown),B(4,17,2,6,1,6,C.white)]},
+  {t:'Place two cannons on the port side — BOOM!',
+   b:[B(3,7,0,2,1,2,C.dkgray),B(7,7,0,2,1,2,C.dkgray)]},
+  {t:'Hoist the Jolly Roger — the pirate flag!',
+   b:[B(6,26,2,1,1,4,C.black)]},
+  {t:'🏴‍☠️ Pirate Ship complete! Yarr, she\'s a beauty!', b:[]},
+]},
+
+// ─── 5. T-REX ───────────────────────────────────────────
+{id:'trex', name:'T-Rex', theme:'Dinosaurs', pieces:36, diff:4, emoji:'🦖',
+ desc:'ROAR! Build the fearsome king of the dinosaurs — the mighty T-Rex!',
+ steps:[
+  {t:'Build the powerful back legs — T-Rex needs a sturdy stance!',
+   b:[B(1,0,1,2,2,7,C.green),B(5,0,1,2,2,7,C.green)]},
+  {t:'Add wide feet for balance.',
+   b:[B(0,0,0,3,2,2,C.ltgreen),B(4,0,0,3,2,2,C.ltgreen)]},
+  {t:'Connect the legs with the hip/pelvis section.',
+   b:[B(1,7,1,6,2,4,C.green)]},
+  {t:'Build the powerful lower body of the T-Rex.',
+   b:[B(1,11,1,6,2,3,C.green)]},
+  {t:'Add the barrel chest — T-Rex was huge!',
+   b:[B(1,14,1,5,2,3,C.green)]},
+  {t:'Attach the tiny front arms — T-Rex\'s famous little arms!',
+   b:[B(0,14,1,1,2,2,C.ltgreen),B(5,14,1,1,2,2,C.ltgreen)]},
+  {t:'Build the thick neck.',
+   b:[B(2,17,1,3,2,3,C.green)]},
+  {t:'Start the massive jaw — T-Rex had the most powerful bite!',
+   b:[B(1,20,0,5,2,6,C.green)]},
+  {t:'Add the top of the skull and eye area.',
+   b:[B(1,23,1,5,1,3,C.green),B(2,23,0,1,1,2,C.yellow),B(2,23,4,1,1,2,C.yellow)]},
+  {t:'Build the long powerful tail stretching behind.',
+   b:[B(7,11,2,3,1,3,C.green),B(10,8,2,3,1,3,C.green),B(13,5,2,2,1,3,C.ltgreen),B(15,2,2,2,1,2,C.ltgreen)]},
+  {t:'🦖 T-Rex complete! ROOOAR! The king of dinosaurs stands!', b:[]},
+]},
+
+// ─── 6. FLOWER GARDEN ───────────────────────────────────
+{id:'garden', name:'Flower Garden', theme:'Nature', pieces:20, diff:1, emoji:'🌸',
+ desc:'Build a lovely LEGO flower garden with colorful blooms on green stems!',
+ steps:[
+  {t:'Lay the green garden base plate.',
+   b:[B(0,0,0,10,6,1,C.ltgreen)]},
+  {t:'Plant the first tall stem.',
+   b:[B(1,1,1,1,1,9,C.green)]},
+  {t:'Add a beautiful pink flower with a yellow center!',
+   b:[B(0,10,0,3,3,2,C.pink),B(1,12,1,1,1,2,C.yellow)]},
+  {t:'Plant the second stem — a bit taller for variety.',
+   b:[B(4,1,1,1,1,11,C.green)]},
+  {t:'A vivid purple flower for the second stem!',
+   b:[B(3,12,0,3,3,2,C.purple),B(4,14,1,1,1,2,C.yellow)]},
+  {t:'Plant the third stem.',
+   b:[B(7,1,1,1,1,8,C.green)]},
+  {t:'A cheerful red flower on the third stem!',
+   b:[B(6,9,0,3,3,2,C.red),B(7,11,1,1,1,2,C.yellow)]},
+  {t:'Add some leaves along the stems.',
+   b:[B(0,4,1,2,1,1,C.ltgreen),B(3,5,1,2,1,1,C.ltgreen),B(6,4,1,2,1,1,C.ltgreen)]},
+  {t:'Plant a green shrub in the corner for decoration.',
+   b:[B(8,1,3,2,3,5,C.green)]},
+  {t:'🌸 Flower Garden complete! What a beautiful bouquet!', b:[]},
+]},
+
+// ─── 7. CASTLE TOWER ────────────────────────────────────
+{id:'castle', name:'Castle Tower', theme:'Castle', pieces:38, diff:3, emoji:'🏰',
+ desc:'Defend the realm! Build a mighty stone castle tower with battlements and a flag!',
+ steps:[
+  {t:'Lay the stone gray base for your castle tower.',
+   b:[B(0,0,0,8,8,2,C.ltgray)]},
+  {t:'Build the first row of castle walls on all four sides.',
+   b:[B(0,2,0,1,8,3,C.gray),B(7,2,0,1,8,3,C.gray),B(1,2,0,6,1,3,C.gray),B(1,2,7,6,1,3,C.gray)]},
+  {t:'Second row — the walls grow tall.',
+   b:[B(0,5,0,1,8,3,C.gray),B(7,5,0,1,8,3,C.gray),B(1,5,0,6,1,3,C.gray),B(1,5,7,6,1,3,C.gray)]},
+  {t:'Third row — the castle grows mighty!',
+   b:[B(0,8,0,1,8,3,C.gray),B(7,8,0,1,8,3,C.gray),B(1,8,0,6,1,3,C.gray),B(1,8,7,6,1,3,C.gray)]},
+  {t:'Add the gate archway at the front.',
+   b:[B(3,2,7,2,1,6,C.dkgray),B(2,2,7,1,1,4,C.dkgray),B(5,2,7,1,1,4,C.dkgray)]},
+  {t:'Fourth wall row — almost to the top!',
+   b:[B(0,11,0,1,8,3,C.gray),B(7,11,0,1,8,3,C.gray),B(1,11,0,6,1,3,C.gray),B(1,11,7,6,1,3,C.gray)]},
+  {t:'Add castle battlements on the front and back.',
+   b:[B(0,14,0,2,1,3,C.gray),B(3,14,0,2,1,3,C.gray),B(6,14,0,2,1,3,C.gray),
+      B(0,14,7,2,1,3,C.gray),B(3,14,7,2,1,3,C.gray),B(6,14,7,2,1,3,C.gray)]},
+  {t:'Battlements on the side walls too.',
+   b:[B(0,14,2,1,2,3,C.gray),B(0,14,5,1,2,3,C.gray),B(7,14,2,1,2,3,C.gray),B(7,14,5,1,2,3,C.gray)]},
+  {t:'Hoist the royal flag at the top of the tower!',
+   b:[B(3,14,3,1,1,7,C.ltbrown),B(4,17,3,1,1,4,C.red),B(4,19,3,1,1,4,C.red)]},
+  {t:'🏰 Castle Tower complete! The kingdom is safe!', b:[]},
+]},
+
+// ─── 8. STEAM LOCOMOTIVE ────────────────────────────────
+{id:'loco', name:'Steam Locomotive', theme:'City', pieces:36, diff:3, emoji:'🚂',
+ desc:'All aboard! Build a classic steam locomotive with smokestack and tender car!',
+ steps:[
+  {t:'Lay down the long black locomotive chassis.',
+   b:[B(0,0,0,10,4,2,C.black)]},
+  {t:'Add the large drive wheels on each side.',
+   b:[B(-1,0,0,1,2,3,C.dkgray),B(7,0,0,1,2,3,C.dkgray),B(8,0,0,1,2,3,C.dkgray),
+      B(-1,0,2,1,2,3,C.dkgray),B(7,0,2,1,2,3,C.dkgray),B(8,0,2,1,2,3,C.dkgray)]},
+  {t:'Build the big red boiler — the engine\'s heart.',
+   b:[B(2,2,0,7,4,3,C.red)]},
+  {t:'Add the steam dome on top of the boiler.',
+   b:[B(7,5,1,2,2,2,C.red),B(7,7,1,2,1,2,C.red)]},
+  {t:'Build the tall black smokestack at the front.',
+   b:[B(8,2,1,2,2,2,C.black),B(7,4,1,2,1,2,C.black),B(7,5,1,4,1,2,C.black)]},
+  {t:'Construct the engineer\'s cab at the rear.',
+   b:[B(0,2,0,3,4,4,C.red)]},
+  {t:'Add windows to the cab for the engineer to see out.',
+   b:[B(0,3,0,1,1,2,C.sky),B(0,3,3,1,1,2,C.sky)]},
+  {t:'Attach the cowcatcher at the very front.',
+   b:[B(9,0,1,2,2,2,C.gray)]},
+  {t:'Hitch the tender car (for coal and water) to the locomotive.',
+   b:[B(-5,0,0,5,4,2,C.black),B(-5,2,1,5,3,2,C.dkgray)]},
+  {t:'Add wheels to the tender car.',
+   b:[B(-6,0,0,1,2,3,C.dkgray),B(-2,0,0,1,2,3,C.dkgray),
+      B(-6,0,2,1,2,3,C.dkgray),B(-2,0,2,1,2,3,C.dkgray)]},
+  {t:'🚂 Steam Locomotive complete! All aboard!', b:[]},
+]},
+
+
+// ─── 9. LINK'S AWAKENING ────────────────────────────────
+{id:'zelda', name:"Link's Awakening", theme:'Zelda', pieces:30, diff:3, emoji:'🌟',
+ desc:"Build the mysterious Wind Fish Egg atop Koholint Island's Tal Tal Mountain!",
+ steps:[
+  {t:"Lay Koholint Island's lush green base.",
+   b:[B(0,0,0,12,10,1,C.ltgreen)]},
+  {t:'Raise the rocky gray mountain base.',
+   b:[B(2,1,2,8,6,3,C.gray)]},
+  {t:'Build the second mountain tier — the peak grows!',
+   b:[B(3,4,3,6,4,3,C.ltgray)]},
+  {t:'Stack the jagged mountain peak.',
+   b:[B(4,7,4,4,2,3,C.gray)]},
+  {t:'Place the base ring of the legendary Wind Fish Egg.',
+   b:[B(3,10,3,6,4,2,C.pink)]},
+  {t:'Build up the glowing middle of the egg.',
+   b:[B(3,12,3,6,4,4,C.pink)]},
+  {t:'Crown the egg with its mystical purple top.',
+   b:[B(3,16,3,6,4,3,C.purple),B(4,19,4,4,2,3,C.purple)]},
+  {t:'Plant four trees around the island.',
+   b:[B(0,1,0,2,2,6,C.green),B(9,1,0,2,2,5,C.green),
+      B(0,1,7,2,2,5,C.green),B(9,1,7,2,2,6,C.green)]},
+  {t:"Add a golden Triforce on the island shore.",
+   b:[B(4,1,0,2,1,3,C.yellow),B(3,1,0,1,1,2,C.yellow),B(6,1,0,1,1,2,C.yellow)]},
+  {t:"🌟 Complete! 'Someday you'll leave this island… I'll be here waiting.'", b:[]},
+ ]},
+
+// ─── 10. SUPER SMASH BROS ───────────────────────────────
+{id:'smash', name:'Super Smash Bros', theme:'Nintendo', pieces:28, diff:2, emoji:'💥',
+ desc:'Build the iconic Final Destination stage from Super Smash Brothers!',
+ steps:[
+  {t:'Lay the deep cosmic base of Final Destination.',
+   b:[B(0,0,0,14,5,2,C.dkblue)]},
+  {t:'Add a glowing purple energy underlayer.',
+   b:[B(1,2,0,12,5,1,C.purple)]},
+  {t:'Place the smooth gray platform surface.',
+   b:[B(0,3,0,14,5,2,C.ltgray)]},
+  {t:'Add golden trim lines along both long edges.',
+   b:[B(0,5,0,14,1,1,C.yellow),B(0,5,4,14,1,1,C.yellow)]},
+  {t:'Build the glowing Smash Ball hovering above center stage.',
+   b:[B(5,6,1,4,3,4,C.white)]},
+  {t:'Add the starburst explosion effect — someone got the Smash Ball!',
+   b:[B(4,8,0,1,1,4,C.yellow),B(9,8,4,1,1,4,C.yellow),
+      B(4,6,4,1,1,4,C.yellow),B(9,6,0,1,1,4,C.yellow)]},
+  {t:'Place the KO blast zones on each side of the stage.',
+   b:[B(0,5,1,2,3,4,C.orange),B(12,5,1,2,3,4,C.orange)]},
+  {t:'💥 Final Destination is ready! 3 stock, no items — FIGHT!', b:[]},
+ ]},
+
+// ─── 11. MARIO KART 8 DELUXE ────────────────────────────
+{id:'mariokart', name:'Mario Kart 8 Deluxe', theme:'Nintendo', pieces:28, diff:2, emoji:'🏁',
+ desc:"Build Mario's iconic red racing kart — Super Mushroom boost included!",
+ steps:[
+  {t:"Place Mario's red kart body chassis.",
+   b:[B(0,0,0,8,4,2,C.red)]},
+  {t:'Add the white racing stripe and yellow front bumper.',
+   b:[B(0,2,1,8,2,1,C.white),B(7,0,1,1,2,2,C.yellow)]},
+  {t:"Raise Mario's driving cockpit.",
+   b:[B(2,2,1,4,2,3,C.red)]},
+  {t:'Attach four black wheels — time to drift!',
+   b:[B(-1,0,0,1,2,3,C.black),B(-1,0,2,1,2,3,C.black),
+      B(8,0,0,1,2,3,C.black),B(8,0,2,1,2,3,C.black)]},
+  {t:'Fit the sky-blue windshield glass.',
+   b:[B(3,5,1,2,2,2,C.sky)]},
+  {t:'Mount the rear spoiler for aerodynamics.',
+   b:[B(0,2,0,2,4,1,C.red),B(1,3,1,1,2,3,C.red)]},
+  {t:'Place a Super Mushroom power-up on the back — BOOST!',
+   b:[B(0,4,0,2,4,4,C.red),B(0,8,0,2,4,2,C.white),
+      B(0,6,0,1,1,2,C.white),B(0,6,3,1,1,2,C.white)]},
+  {t:'Add the headlights and finish the kart detail.',
+   b:[B(7,2,0,1,1,2,C.yellow),B(7,2,3,1,1,2,C.yellow)]},
+  {t:'🏁 Mario Kart complete! Here we go! WAHOO!', b:[]},
+ ]},
+
+// ─── 12. STAR WARS ──────────────────────────────────────
+{id:'starwars', name:'Star Wars', theme:'Sci-Fi', pieces:38, diff:4, emoji:'⭐',
+ desc:"May the Force be with you! Build Luke Skywalker's T-65 X-Wing Starfighter!",
+ steps:[
+  {t:'Assemble a display stand for the X-Wing.',
+   b:[B(5,0,3,2,2,4,C.dkgray)]},
+  {t:'Lay the long gray fuselage of the X-Wing.',
+   b:[B(0,4,3,16,2,2,C.ltgray)]},
+  {t:'Build up the cockpit and canopy section.',
+   b:[B(9,6,3,5,2,3,C.ltgray),B(13,6,3,3,2,2,C.white)]},
+  {t:'Attach the R2-D2 astromech droid unit.',
+   b:[B(7,6,3,3,2,3,C.white),B(8,9,4,2,1,2,C.sky)]},
+  {t:'Deploy the upper two S-foils in attack position!',
+   b:[B(0,6,0,9,3,1,C.ltgray),B(0,6,5,9,3,1,C.ltgray)]},
+  {t:'Deploy the lower two S-foils — the full X shape!',
+   b:[B(0,2,0,9,3,1,C.ltgray),B(0,2,5,9,3,1,C.ltgray)]},
+  {t:'Paint Rebel Alliance red stripes on all four wings.',
+   b:[B(1,6,0,6,1,1,C.red),B(1,6,7,6,1,1,C.red),
+      B(1,2,0,6,1,1,C.red),B(1,2,7,6,1,1,C.red)]},
+  {t:'Fit the four red laser cannons at each wingtip.',
+   b:[B(0,7,0,3,1,1,C.red),B(0,7,7,3,1,1,C.red),
+      B(0,3,0,3,1,1,C.red),B(0,3,7,3,1,1,C.red)]},
+  {t:'Add the twin ion engine exhaust at the rear.',
+   b:[B(0,4,2,3,4,3,C.dkgray),B(0,7,2,3,4,2,C.orange)]},
+  {t:'⭐ X-Wing complete! Red Five — standing by! May the Force be with you!', b:[]},
+ ]},
+
+// ─── 13. MINECRAFT ──────────────────────────────────────
+{id:'minecraft', name:'Minecraft', theme:'Gaming', pieces:34, diff:3, emoji:'🌿',
+ desc:"Build the iconic Creeper from Minecraft — SSSSssss... don't let it get too close!",
+ steps:[
+  {t:'Place the four stubby green Creeper legs.',
+   b:[B(0,0,0,2,2,6,C.green),B(3,0,0,2,2,6,C.green),
+      B(0,0,3,2,2,6,C.green),B(3,0,3,2,2,6,C.green)]},
+  {t:'Connect the legs with the wide Creeper body.',
+   b:[B(0,6,0,5,5,12,C.green)]},
+  {t:"Start building the Creeper's big square head.",
+   b:[B(0,18,0,6,6,6,C.green)]},
+  {t:'Build up the full cube head.',
+   b:[B(0,24,0,6,6,6,C.green)]},
+  {t:'Add the forehead to cap off the head.',
+   b:[B(0,30,0,6,6,3,C.green)]},
+  {t:'Place the two dark pixelated eyes — those haunting stares!',
+   b:[B(1,27,0,2,1,3,C.dkgray),B(3,27,0,2,1,3,C.dkgray)]},
+  {t:'Add the iconic creepy Creeper frown.',
+   b:[B(2,25,0,2,1,2,C.dkgray),B(1,23,0,1,1,4,C.dkgray),
+      B(3,23,0,1,1,4,C.dkgray),B(2,22,0,2,1,2,C.dkgray)]},
+  {t:'Place a TNT block nearby — for the full Minecraft experience!',
+   b:[B(8,0,2,3,3,3,C.red),B(8,3,2,3,3,3,C.red),B(9,1,2,1,1,4,C.ltgray)]},
+  {t:'🌿 Creeper complete! SSSSssss... 💥 Have a nice day!', b:[]},
+ ]},
+
+];// end SETS
+
+// ═══════════════════════════════════════════════════════════
+//  HOME SCREEN
+// ═══════════════════════════════════════════════════════════
+const THEMES = ['All', ...new Set(SETS.map(s=>s.theme))];
+let activeTheme = 'All';
+
+function buildHome(){
+  const row = document.getElementById('chips-row');
+  row.innerHTML = THEMES.map(t=>`<button class="chip${t==='All'?' active':''}" onclick="setTheme('${t}')">${t}</button>`).join('');
+  renderGrid();
+}
+
+function setTheme(t){
+  activeTheme = t;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active', c.textContent===t));
+  renderGrid();
+}
+
+function renderGrid(){
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  const grid = document.getElementById('sets-grid');
+  const filtered = SETS.filter(s=>{
+    const matchTheme = activeTheme==='All' || s.theme===activeTheme;
+    const matchQ = !q || s.name.toLowerCase().includes(q)||s.theme.toLowerCase().includes(q)||s.desc.toLowerCase().includes(q);
+    return matchTheme && matchQ;
+  });
+  if(!filtered.length){
+    grid.innerHTML='<div class="no-results">🔍 No sets found — try a different search!</div>';
+    return;
+  }
+  grid.innerHTML = filtered.map(s=>`
+    <div class="set-card" onclick="startBuild('${s.id}')">
+      <span class="set-emoji">${s.emoji}</span>
+      <div class="set-name">${s.name}</div>
+      <div class="set-theme">${s.theme}</div>
+      <div class="set-meta">
+        <span>🧱 ${s.pieces} pcs</span>
+        <span class="stars">${'⭐'.repeat(s.diff)}</span>
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  THREE.JS STATE
+// ═══════════════════════════════════════════════════════════
+let scene, camera, renderer;
+let solidMeshes = [];
+let ghostItems = [];      // [{brickData, group}] — unplaced bricks for current step
+let hoveredItem = null;   // ghost item hovered in easy mode
+let dragGhost  = null;    // floating ghost following cursor in challenge mode
+let selectedTrayItem = null; // {brickData, group} chosen from tray
+let autoRot = false;
+let sph = {theta:0.6, phi:0.75, r:28};
+let camTarget = new THREE.Vector3(4,4,3);
+let mouseDown=false, lastMX=0, lastMY=0;
+let clickStart={x:0,y:0};
+let mousePos = new THREE.Vector2();
+const raycaster  = new THREE.Raycaster();
+const placePlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+const planeHit   = new THREE.Vector3();
+let stepMinY = 0;   // plate-unit y for placement plane in challenge mode
+let placedCount=0, totalInStep=0, stepCompleting=false;
+let gameMode = 'easy'; // 'easy' | 'challenge'
+
+function initThree(){
+  const canvas = document.getElementById('three-canvas');
+  const W = window.innerWidth-300, H = window.innerHeight;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x12122a);
+  scene.fog = new THREE.FogExp2(0x12122a, 0.018);
+
+  camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 200);
+  renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+  renderer.setSize(W,H);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+  sun.position.set(20,30,20); sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048);
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0x8899cc, 0.35);
+  fill.position.set(-10,5,-10); scene.add(fill);
+
+  // Grid
+  const grid = new THREE.GridHelper(60,60,0x2a2a50,0x22223a);
+  grid.position.y = -0.05; scene.add(grid);
+
+  // ── Mouse orbit + click detection ──
+  canvas.addEventListener('mousedown', e=>{
+    mouseDown=true;
+    lastMX=e.clientX; lastMY=e.clientY;
+    clickStart={x:e.clientX, y:e.clientY};
+    canvas.style.cursor='grabbing';
+  });
+  canvas.addEventListener('mouseup', e=>{
+    mouseDown=false;
+    const dx=e.clientX-clickStart.x, dy=e.clientY-clickStart.y;
+    if(Math.sqrt(dx*dx+dy*dy)<6 && !stepCompleting){
+      if(gameMode==='easy' && hoveredItem) placeItem(hoveredItem);
+      else if(gameMode==='challenge') tryChallengePlacement();
+    }
+    canvas.style.cursor = hoveredItem ? 'pointer' : 'grab';
+  });
+  canvas.addEventListener('mouseleave',()=>{ mouseDown=false; canvas.style.cursor='grab'; });
+  canvas.addEventListener('mousemove', e=>{
+    const rect=canvas.getBoundingClientRect();
+    mousePos.x=((e.clientX-rect.left)/rect.width)*2-1;
+    mousePos.y=-((e.clientY-rect.top)/rect.height)*2+1;
+    if(mouseDown){
+      sph.theta -= (e.clientX-lastMX)*0.012;
+      sph.phi = Math.max(0.15, Math.min(Math.PI*0.85, sph.phi+(e.clientY-lastMY)*0.012));
+      lastMX=e.clientX; lastMY=e.clientY; camSync();
+    }
+  });
+  canvas.addEventListener('wheel', e=>{
+    sph.r = Math.max(4, Math.min(70, sph.r+e.deltaY*0.06));
+    camSync(); e.preventDefault();
+  },{passive:false});
+
+  // Touch orbit
+  let lt=null;
+  canvas.addEventListener('touchstart',e=>{ lt=e.touches; },{passive:true});
+  canvas.addEventListener('touchmove',e=>{
+    if(lt&&e.touches.length===1){
+      sph.theta -= (e.touches[0].clientX-lt[0].clientX)*0.012;
+      sph.phi = Math.max(0.15,Math.min(Math.PI*0.85,sph.phi+(e.touches[0].clientY-lt[0].clientY)*0.012));
+      camSync();
+    }
+    lt=e.touches; e.preventDefault();
+  },{passive:false});
+
+  window.addEventListener('resize', ()=>{
+    if(!renderer)return;
+    const W2=window.innerWidth-300, H2=window.innerHeight;
+    camera.aspect=W2/H2; camera.updateProjectionMatrix();
+    renderer.setSize(W2,H2);
+  });
+
+  document.addEventListener('keydown', e=>{
+    if(document.getElementById('screen-build').style.display==='none') return;
+    if(e.key==='ArrowLeft') goPrev();
+    if(e.key===' '||e.key==='Enter'){
+      if(gameMode==='easy' && hoveredItem && !stepCompleting){ placeItem(hoveredItem); e.preventDefault(); }
+      else if(gameMode==='challenge' && !stepCompleting){ tryChallengePlacement(); e.preventDefault(); }
+    }
+  });
+
+  canvas.style.cursor='grab';
+  camSync();
+  animate();
+}
+
+function camSync(){
+  if(!camera)return;
+  const x = sph.r*Math.sin(sph.phi)*Math.sin(sph.theta);
+  const y = sph.r*Math.cos(sph.phi);
+  const z = sph.r*Math.sin(sph.phi)*Math.cos(sph.theta);
+  camera.position.set(camTarget.x+x, camTarget.y+y, camTarget.z+z);
+  camera.lookAt(camTarget);
+}
+
+function resetCam(){
+  const b = bounds(currentSet);
+  camTarget.set(b.cx, b.cy*0.7, b.cz);
+  sph = {theta:0.6, phi:0.75, r: Math.max(18, b.size*2.2+6)};
+  camSync();
+}
+
+function toggleRot(){
+  autoRot=!autoRot;
+  const btn=document.getElementById('rot-btn');
+  btn.textContent = autoRot ? '⏸ Stop' : '▶ Rotate';
+  btn.classList.toggle('on', autoRot);
+}
+
+let hlT=0;
+function animate(){
+  requestAnimationFrame(animate);
+  if(autoRot){ sph.theta+=0.006; camSync(); }
+  hlT+=0.05;
+
+  if(gameMode==='easy'){
+    // Pulse ghost bricks
+    const gOp = 0.30+0.13*Math.sin(hlT);
+    const gEmi= 0.18+0.14*Math.sin(hlT);
+    ghostItems.forEach(item=>{
+      if(item===hoveredItem) return;
+      item.group.children.forEach(c=>{
+        if(c.material&&c.material.transparent&&!c.material.wireframe){
+          c.material.opacity=gOp; c.material.emissiveIntensity=gEmi;
+        }
+      });
+    });
+    // Hover raycasting
+    if(!mouseDown && ghostItems.length>0){
+      raycaster.setFromCamera(mousePos, camera);
+      const targets=ghostItems.flatMap(item=>item.group.children.filter(c=>c.material&&!c.material.wireframe));
+      const hits=raycaster.intersectObjects(targets,false);
+      const newHov=hits.length>0 ? ghostItems.find(item=>item.group.children.includes(hits[0].object)) : null;
+      if(newHov!==hoveredItem){
+        if(hoveredItem) setGhostHover(hoveredItem.group,false);
+        hoveredItem=newHov;
+        if(hoveredItem) setGhostHover(hoveredItem.group,true);
+        document.getElementById('three-canvas').style.cursor=hoveredItem?'pointer':'grab';
+      }
+    } else if(!mouseDown && !ghostItems.length && hoveredItem){ hoveredItem=null; }
+  }
+
+  if(gameMode==='challenge' && selectedTrayItem && dragGhost){
+    updateDragGhost();
+  }
+
+  renderer.render(scene,camera);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MODE
+// ═══════════════════════════════════════════════════════════
+function setMode(m){
+  gameMode=m;
+  document.getElementById('mode-easy').classList.toggle('active',m==='easy');
+  document.getElementById('mode-challenge').classList.toggle('active',m==='challenge');
+  const hint=document.getElementById('place-hint');
+  if(hint) hint.textContent = m==='easy' ? '👆 Click glowing bricks to place them' : '🧱 Pick a piece from the tray, then click its spot';
+  clearDragGhost(); selectedTrayItem=null;
+  // Sync ghost visibility: easy=visible in scene, challenge=hidden
+  ghostItems.forEach(item=>{
+    if(m==='easy'){ if(!scene.children.includes(item.group)) scene.add(item.group); }
+    else { scene.remove(item.group); }
+  });
+  renderTray();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  2D ISOMETRIC INSTRUCTION RENDERER
+// ═══════════════════════════════════════════════════════════
+const TW=10, TH=5, BH=7; // iso tile dimensions (px per stud / plate)
+
+function isoP(gx, gy_plates, gz, ox, oy, sc){
+  return {
+    sx: ox + (gx-gz)*TW*sc,
+    sy: oy + (gx+gz)*TH*sc - gy_plates*BH*sc
+  };
+}
+
+function shadeHex(hex, f){
+  if(!hex||!hex.startsWith('#')) return hex||'#888';
+  const r=Math.min(255,Math.max(0,Math.round(parseInt(hex.slice(1,3),16)*f)));
+  const g=Math.min(255,Math.max(0,Math.round(parseInt(hex.slice(3,5),16)*f)));
+  const b=Math.min(255,Math.max(0,Math.round(parseInt(hex.slice(5,7),16)*f)));
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawFace(ctx, pts, fill, stroke, sw){
+  ctx.beginPath();
+  ctx.moveTo(pts[0].sx,pts[0].sy);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].sx,pts[i].sy);
+  ctx.closePath();
+  ctx.fillStyle=fill; ctx.fill();
+  if(stroke){ ctx.strokeStyle=stroke; ctx.lineWidth=sw||0.5; ctx.stroke(); }
+}
+
+function drawIsoBrick(ctx, bk, col, hi, ox, oy, sc){
+  const x=bk.x, z=bk.z, w=bk.w, d=bk.d, yb=bk.y, yt=bk.y+bk.h;
+  const p=(gx,gy,gz)=>isoP(gx,gy,gz,ox,oy,sc);
+  // Right face (x+w)
+  const rf=[p(x+w,yb,z),p(x+w,yt,z),p(x+w,yt,z+d),p(x+w,yb,z+d)];
+  drawFace(ctx,rf,hi?shadeHex(col,0.65):'rgba(80,80,80,0.9)', hi?'rgba(0,0,0,0.3)':'rgba(0,0,0,0.15)',0.5);
+  // Front face (z+d)
+  const ff=[p(x,yb,z+d),p(x+w,yb,z+d),p(x+w,yt,z+d),p(x,yt,z+d)];
+  drawFace(ctx,ff,hi?shadeHex(col,0.82):'rgba(95,95,95,0.9)', hi?'rgba(0,0,0,0.3)':'rgba(0,0,0,0.15)',0.5);
+  // Top face
+  const tf=[p(x,yt,z),p(x+w,yt,z),p(x+w,yt,z+d),p(x,yt,z+d)];
+  const topFill=hi?shadeHex(col,1.18):'rgba(120,120,120,0.9)';
+  const topStroke=hi?'#FFD700':'rgba(0,0,0,0.1)';
+  drawFace(ctx,tf,topFill,topStroke,hi?1.5:0.4);
+}
+
+function drawInstructions(){
+  const canvas=document.getElementById('instr-canvas');
+  if(!canvas||!currentSet) return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const prevBricks=[];
+  for(let i=0;i<currentStep;i++) prevBricks.push(...currentSet.steps[i].b);
+  const currBricks=currentSet.steps[currentStep]?.b||[];
+  const all=[...prevBricks,...currBricks];
+  if(!all.length) return;
+
+  // Compute iso bounds at scale=1
+  let minSx=Infinity,maxSx=-Infinity,minSy=Infinity,maxSy=-Infinity;
+  const corners=(bk)=>[
+    [bk.x,bk.y,bk.z],[bk.x+bk.w,bk.y,bk.z],
+    [bk.x,bk.y+bk.h,bk.z],[bk.x,bk.y,bk.z+bk.d],
+    [bk.x+bk.w,bk.y+bk.h,bk.z+bk.d],[bk.x+bk.w,bk.y,bk.z+bk.d],
+    [bk.x,bk.y+bk.h,bk.z+bk.d],[bk.x+bk.w,bk.y+bk.h,bk.z],
+  ];
+  all.forEach(bk=>corners(bk).forEach(([gx,gy,gz])=>{
+    const p=isoP(gx,gy,gz,0,0,1);
+    minSx=Math.min(minSx,p.sx); maxSx=Math.max(maxSx,p.sx);
+    minSy=Math.min(minSy,p.sy); maxSy=Math.max(maxSy,p.sy);
+  }));
+  const cw=maxSx-minSx||1, ch=maxSy-minSy||1;
+  const sc=Math.min((W-16)/cw,(H-16)/ch,2.5);
+  const ox=W/2-(minSx+maxSx)/2*sc;
+  const oy=H/2-(minSy+maxSy)/2*sc;
+
+  // Sort by x+z (painter's algo: back first)
+  const srt=(arr)=>[...arr].sort((a,b)=>(a.x+a.z-b.x-b.z)||a.y-b.y);
+  srt(prevBricks).forEach(bk=>drawIsoBrick(ctx,bk,bk.color,false,ox,oy,sc));
+  srt(currBricks).forEach(bk=>drawIsoBrick(ctx,bk,bk.color,true,ox,oy,sc));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CHALLENGE MODE — TRAY & PLACEMENT
+// ═══════════════════════════════════════════════════════════
+function renderTray(){
+  const section=document.getElementById('tray-section');
+  const grid=document.getElementById('tray-grid');
+  if(!section||!grid) return;
+  if(gameMode!=='challenge'){ section.style.display='none'; return; }
+  section.style.display='block';
+
+  grid.innerHTML=ghostItems.map((item,i)=>{
+    const bk=item.brickData;
+    const sw=Math.max(20,Math.min(44,bk.w*9)), sh=Math.max(14,Math.min(32,bk.d*7));
+    const isSel=item===selectedTrayItem;
+    return `<div class="tray-piece${isSel?' selected':''}" onclick="selectTrayPiece(${i})" title="${bk.w}×${bk.d} stud brick">
+      <div class="piece-swatch" style="width:${sw}px;height:${sh}px;background:${bk.color};"></div>
+      <div class="piece-label">${bk.w}×${bk.d}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectTrayPiece(idx){
+  selectedTrayItem=ghostItems[idx]||null;
+  clearWrongMsg();
+  // Create / replace drag ghost
+  clearDragGhost();
+  if(selectedTrayItem){
+    dragGhost=makeGhostBrick(selectedTrayItem.brickData);
+    // Make drag ghost orange to distinguish from target
+    dragGhost.children.forEach(c=>{
+      if(c.material&&!c.material.wireframe){
+        c.material.color.set(0xFF7700);
+        c.material.emissive.set(0xFF3300);
+        c.material.opacity=0.65;
+      }
+    });
+    scene.add(dragGhost);
+    document.getElementById('three-canvas').style.cursor='crosshair';
+  }
+  renderTray();
+}
+
+function updateDragGhost(){
+  if(!dragGhost||!selectedTrayItem) return;
+  raycaster.setFromCamera(mousePos,camera);
+  placePlane.constant=-(stepMinY*PH);
+  if(!raycaster.ray.intersectPlane(placePlane,planeHit)) return;
+  const bk=selectedTrayItem.brickData;
+  // Snap top-left corner, centered on cursor
+  const snapX=Math.round(planeHit.x-bk.w/2);
+  const snapZ=Math.round(planeHit.z-bk.d/2);
+  // Offset the group from its original baked position
+  dragGhost.position.set((snapX-bk.x)*S, 0, (snapZ-bk.z)*S);
+  // Store snap for placement check
+  selectedTrayItem._snapX=snapX;
+  selectedTrayItem._snapZ=snapZ;
+}
+
+function tryChallengePlacement(){
+  if(!selectedTrayItem||stepCompleting) return;
+  const bk=selectedTrayItem.brickData;
+  const sx=selectedTrayItem._snapX, sz=selectedTrayItem._snapZ;
+  if(sx===undefined||sz===undefined) return;
+
+  if(sx===bk.x && sz===bk.z){
+    // ✅ Correct position
+    clearDragGhost();
+    placeItem(selectedTrayItem);
+    selectedTrayItem=null;
+    clearWrongMsg();
+    document.getElementById('three-canvas').style.cursor='grab';
+  } else {
+    // ❌ Wrong position
+    showWrongMsg();
+    // Shake the drag ghost briefly
+    if(dragGhost){
+      const orig=dragGhost.position.clone();
+      let t=0;
+      const shake=()=>{ t+=1; dragGhost.position.x=orig.x+(t%2?0.3:-0.3); if(t<8) requestAnimationFrame(shake); else dragGhost.position.copy(orig); };
+      requestAnimationFrame(shake);
+    }
+  }
+}
+
+function clearDragGhost(){
+  if(dragGhost){ scene.remove(dragGhost); dragGhost=null; }
+}
+
+function showWrongMsg(){
+  const el=document.getElementById('wrong-msg');
+  if(!el) return;
+  const msgs=['❌ Not quite!','❌ Wrong spot!','❌ Try again!','❌ Almost…'];
+  el.textContent=msgs[Math.floor(Math.random()*msgs.length)];
+  const step=document.querySelector('.step-card');
+  if(step){ step.classList.remove('wrong-flash'); void step.offsetWidth; step.classList.add('wrong-flash'); }
+  clearTimeout(showWrongMsg._t);
+  showWrongMsg._t=setTimeout(()=>{ if(el) el.textContent=''; },1800);
+}
+function clearWrongMsg(){ const el=document.getElementById('wrong-msg'); if(el) el.textContent=''; }
+
+// ═══════════════════════════════════════════════════════════
+//  BRICK MESH CREATION
+// ═══════════════════════════════════════════════════════════
+const STUD_GEO = new THREE.CylinderGeometry(SR,SR,SH,10);
+
+function makeBrick(bk){
+  const group = new THREE.Group();
+  const bw=bk.w*S, bh=bk.h*PH, bd=bk.d*S;
+  const cx=bk.x+bk.w/2, cy=bk.y*PH+bh/2, cz=bk.z+bk.d/2;
+
+  const bodyGeo = new THREE.BoxGeometry(bw-0.04, bh-0.04, bd-0.04);
+  const bodyMat = new THREE.MeshPhongMaterial({
+    color:bk.color, shininess:45, specular:new THREE.Color(0x222222),
+  });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.set(cx,cy,cz);
+  body.castShadow=true; body.receiveShadow=true;
+  group.add(body);
+
+  if(bh > 0.15){
+    const studMat = new THREE.MeshPhongMaterial({
+      color:bk.color, shininess:60, specular:new THREE.Color(0x333333),
+    });
+    const topY = bk.y*PH + bh + SH/2;
+    const total = bk.w*bk.d;
+    const step = total>48 ? Math.ceil(total/48) : 1;
+    let count=0;
+    for(let xi=0;xi<bk.w;xi++){
+      for(let zi=0;zi<bk.d;zi++){
+        if(count%step===0){
+          const stud = new THREE.Mesh(STUD_GEO, studMat);
+          stud.position.set(bk.x+xi+0.5, topY, bk.z+zi+0.5);
+          stud.castShadow=true; group.add(stud);
+        }
+        count++;
+      }
+    }
+  }
+  return group;
+}
+
+function makeGhostBrick(bk){
+  const group = new THREE.Group();
+  const bw=bk.w*S, bh=bk.h*PH, bd=bk.d*S;
+  const cx=bk.x+bk.w/2, cy=bk.y*PH+bh/2, cz=bk.z+bk.d/2;
+
+  const bodyGeo = new THREE.BoxGeometry(bw-0.04, bh-0.04, bd-0.04);
+
+  // Translucent fill
+  const bodyMat = new THREE.MeshPhongMaterial({
+    color:0xFFCC00, transparent:true, opacity:0.30,
+    shininess:60, specular:new THREE.Color(0x333333),
+    emissive:new THREE.Color(0xFF8800), emissiveIntensity:0.18,
+  });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.set(cx,cy,cz);
+  group.add(body);
+
+  // Crisp wireframe outline so you can see where to click
+  const wireMat = new THREE.MeshBasicMaterial({
+    color:0xFFDD00, wireframe:true, transparent:true, opacity:0.55,
+  });
+  const wire = new THREE.Mesh(bodyGeo.clone(), wireMat);
+  wire.position.set(cx,cy,cz);
+  group.add(wire);
+
+  // Ghost studs
+  if(bh > 0.15){
+    const topY = bk.y*PH + bh + SH/2;
+    const total = bk.w*bk.d;
+    const step = total>24 ? Math.ceil(total/24) : 1;
+    let count=0;
+    for(let xi=0;xi<bk.w;xi++){
+      for(let zi=0;zi<bk.d;zi++){
+        if(count%step===0){
+          const sm = new THREE.MeshPhongMaterial({
+            color:0xFFCC00, transparent:true, opacity:0.30,
+            emissive:new THREE.Color(0xFF8800), emissiveIntensity:0.18,
+          });
+          const stud = new THREE.Mesh(STUD_GEO, sm);
+          stud.position.set(bk.x+xi+0.5, topY, bk.z+zi+0.5);
+          group.add(stud);
+        }
+        count++;
+      }
+    }
+  }
+  return group;
+}
+
+function setGhostHover(group, on){
+  group.children.forEach(c=>{
+    if(!c.material || c.material.wireframe) return;
+    c.material.opacity          = on ? 0.80 : 0.30;
+    c.material.emissiveIntensity= on ? 0.70 : 0.18;
+    c.material.color.set(on ? 0xFF9900 : 0xFFCC00);
+    c.material.emissive.set(on ? 0xFF5500 : 0xFF8800);
+  });
+}
+
+function snapIn(group){
+  let t=0;
+  function frame(){
+    t+=0.18;
+    group.scale.setScalar(t<1 ? 1+0.28*Math.sin(t*Math.PI) : 1);
+    if(t<1) requestAnimationFrame(frame);
+    else group.scale.setScalar(1);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PLACEMENT LOGIC
+// ═══════════════════════════════════════════════════════════
+function placeItem(item){
+  if(!item||stepCompleting) return;
+  scene.remove(item.group);
+  ghostItems = ghostItems.filter(i=>i!==item);
+  if(hoveredItem===item) hoveredItem=null;
+
+  // Add solid brick with pop animation
+  const m = makeBrick(item.brickData);
+  m.scale.setScalar(0.01);
+  scene.add(m); solidMeshes.push(m);
+  snapIn(m);
+
+  placedCount++;
+  updateCounter();
+  renderTray();
+  if(ghostItems.length===0) stepDone();
+}
+
+function updateCounter(){
+  const el=document.getElementById('place-counter');
+  if(!el) return;
+  const rem=totalInStep-placedCount;
+  if(totalInStep===0){ el.textContent=''; return; }
+  if(rem===0){
+    el.textContent='✅ All placed!'; el.className='place-counter done';
+  } else {
+    el.textContent=`🟡 ${placedCount} / ${totalInStep} bricks placed`;
+    el.className='place-counter';
+  }
+}
+
+function stepDone(){
+  stepCompleting=true;
+  const el=document.getElementById('place-counter');
+  if(el){ el.textContent='✅ Step complete!'; el.className='place-counter done'; }
+  setTimeout(()=>{
+    stepCompleting=false;
+    if(currentStep < currentSet.steps.length-1) renderStep(currentStep+1);
+  }, 750);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GAME LOGIC
+// ═══════════════════════════════════════════════════════════
+let currentSet=null, currentStep=0;
+
+function bounds(set){
+  const all=set.steps.flatMap(s=>s.b);
+  if(!all.length) return {cx:4,cy:4,cz:3,size:12};
+  let x0=Infinity,x1=-Infinity,y1=-Infinity,z0=Infinity,z1=-Infinity;
+  all.forEach(b=>{
+    x0=Math.min(x0,b.x); x1=Math.max(x1,b.x+b.w);
+    y1=Math.max(y1,(b.y+b.h)*PH);
+    z0=Math.min(z0,b.z); z1=Math.max(z1,b.z+b.d);
+  });
+  return {cx:(x0+x1)/2, cy:y1/2, cz:(z0+z1)/2, size:Math.max(x1-x0,y1,z1-z0)};
+}
+
+function clearAll(){
+  solidMeshes.forEach(m=>scene.remove(m)); solidMeshes=[];
+  ghostItems.forEach(i=>scene.remove(i.group)); ghostItems=[];
+  hoveredItem=null; stepCompleting=false;
+  clearDragGhost(); selectedTrayItem=null;
+}
+
+function renderStep(idx){
+  currentStep=idx;
+  clearAll();
+
+  // All previous steps → solid
+  for(let i=0;i<idx;i++){
+    currentSet.steps[i].b.forEach(bk=>{
+      const m=makeBrick(bk); scene.add(m); solidMeshes.push(m);
+    });
+  }
+
+  const step=currentSet.steps[idx];
+  const isLast=idx===currentSet.steps.length-1;
+
+  if(isLast){
+    // Final: show everything solid
+    currentSet.steps.forEach((s,i)=>{
+      if(i===idx)return;
+      s.b.forEach(bk=>{ const m=makeBrick(bk);scene.add(m);solidMeshes.push(m); });
+    });
+    placedCount=0; totalInStep=0;
+  } else {
+    // Compute placement-plane Y for challenge mode
+    if(step.b.length>0){
+      stepMinY=Math.min(...step.b.map(bk=>bk.y));
+    } else { stepMinY=0; }
+    placePlane.constant=-(stepMinY*PH);
+
+    // Ghost bricks for this step
+    step.b.forEach(bk=>{
+      const g=makeGhostBrick(bk);
+      if(gameMode==='easy') scene.add(g);
+      // In challenge mode ghosts are invisible in scene — tracked only in ghostItems for position matching
+      ghostItems.push({brickData:bk, group:g});
+    });
+    placedCount=0; totalInStep=step.b.length;
+    // Empty step? auto-advance
+    if(totalInStep===0) setTimeout(()=>renderStep(idx+1), 400);
+  }
+
+  // ── UI ──
+  const total=currentSet.steps.length;
+  const pct=Math.round((idx/(total-1))*100);
+  document.getElementById('step-lbl').textContent=`STEP ${idx+1} OF ${total}`;
+  document.getElementById('step-desc').textContent=step.t;
+  document.getElementById('prog-fill').style.width=pct+'%';
+  document.getElementById('prog-pct').textContent=pct+'%';
+
+  const counts={};
+  step.b.forEach(bk=>{ counts[bk.color]=(counts[bk.color]||0)+1; });
+  document.getElementById('brick-chips').innerHTML=Object.entries(counts).map(([col,n])=>
+    `<div class="b-chip"><div class="b-dot" style="background:${col}"></div>${n} brick${n>1?'s':''}</div>`
+  ).join('');
+
+  updateCounter();
+  document.getElementById('btn-prev').disabled=idx===0;
+
+  const navRow=document.getElementById('nav-row');
+  const cbox=document.getElementById('complete-box');
+  if(isLast){
+    navRow.style.display='none'; cbox.style.display='block';
+    document.getElementById('complete-msg').textContent=`You built the ${currentSet.name}! 🎉`;
+    document.getElementById('prog-fill').style.width='100%';
+    document.getElementById('prog-pct').textContent='100%';
+  } else {
+    navRow.style.display='flex'; cbox.style.display='none';
+  }
+
+  drawInstructions();
+  renderTray();
+}
+
+// Skip: instantly place all remaining ghost bricks then advance
+function goNext(){
+  if(stepCompleting) return;
+  [...ghostItems].forEach(item=>{
+    scene.remove(item.group);
+    const m=makeBrick(item.brickData); scene.add(m); solidMeshes.push(m);
+  });
+  ghostItems=[]; hoveredItem=null;
+  if(currentStep<currentSet.steps.length-1) renderStep(currentStep+1);
+}
+
+function goPrev(){
+  if(stepCompleting) return;
+  if(currentStep>0) renderStep(currentStep-1);
+}
+
+function startBuild(id){
+  currentSet=SETS.find(s=>s.id===id);
+  if(!currentSet) return;
+  currentStep=0;
+  document.getElementById('screen-home').style.display='none';
+  document.getElementById('screen-build').style.display='flex';
+  document.getElementById('sb-title').textContent=`${currentSet.emoji} ${currentSet.name}`;
+  if(!renderer){ initThree(); } else { clearAll(); }
+  const b=bounds(currentSet);
+  camTarget.set(b.cx, b.cy*0.7, b.cz);
+  sph={theta:0.6, phi:0.75, r:Math.max(20,b.size*2.5+6)};
+  camSync();
+  renderStep(0);
+}
+
+function goHome(){
+  if(renderer) clearAll();
+  autoRot=false;
+  document.getElementById('rot-btn').textContent='▶ Rotate';
+  document.getElementById('rot-btn').classList.remove('on');
+  document.getElementById('screen-build').style.display='none';
+  document.getElementById('screen-home').style.display='flex';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════
+buildHome();
+</script>
+</body>
+</html>
